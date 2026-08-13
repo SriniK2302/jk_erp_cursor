@@ -1623,3 +1623,6 @@ def _engagement_work_area_status_on_period_change(sender, instance, **kwargs):
 @receiver(post_delete, sender=DivisionWorkAreaPeriod)
 def _division_work_area_status_on_period_change(sender, instance, **kwargs):
     _set_division_work_area_status(instance.work_area_id)
+
+# Unified work-document model (see engagements/work_documents/models.py)
+from engagements.work_documents.models import WorkDocument  # noqa: E402,F401
