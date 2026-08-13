@@ -23,7 +23,7 @@ from psycopg import Error as PsycopgError
 from django.conf import settings
 from openpyxl import load_workbook
 from psycopg import sql
-from tkinter import Tk, TclError, filedialog
+#from tkinter import Tk, TclError, filedialog
 
 from utilities.pg_row_delete import connect_with_params
 
@@ -37,6 +37,14 @@ MIN_VARCHAR_LEN = 255
 
 
 def choose_excel_file() -> Path | None:
+    try:
+        from tkinter import Tk, TclError, filedialog
+    except ImportError as exc:
+        raise RuntimeError(
+            "File picker requires a desktop environment with tkinter; "
+            "not available on this server."
+        ) from exc
+
     try:
         root = Tk()
         root.withdraw()

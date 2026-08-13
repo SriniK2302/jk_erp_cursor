@@ -9,3 +9,5 @@ pypdf==6.10.2
 python-dotenv==1.2.2
 sqlparse==0.5.5
 tzdata==2026.1
+gunicorn==23.0.0
+whitenoise==6.9.0

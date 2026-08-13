@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from tkinter import Tk, TclError, filedialog
+#from tkinter import Tk, TclError, filedialog
 
 
 ProgressCallback = Callable[[str, int, int | None, str], None]
@@ -66,6 +66,14 @@ def _sha256_hex(path: Path) -> str:
 
 def choose_spreadsheet_file() -> Path | None:
     """Open native file picker for spreadsheet files."""
+    try:
+        from tkinter import Tk, TclError, filedialog
+    except ImportError as exc:
+        raise RuntimeError(
+            "File picker requires a desktop environment with tkinter; "
+            "not available on this server."
+        ) from exc
+
     try:
         picker_root = Tk()
         picker_root.withdraw()

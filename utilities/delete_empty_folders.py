@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from tkinter import Tk, TclError, filedialog
+#from tkinter import Tk, TclError, filedialog
 
 
 @dataclass
@@ -30,6 +30,14 @@ def choose_root_folder() -> Path | None:
     Returns None when selection is cancelled.
     Raises RuntimeError if the GUI cannot be launched.
     """
+    try:
+        from tkinter import Tk, TclError, filedialog
+    except ImportError as exc:
+        raise RuntimeError(
+            "Folder picker requires a desktop environment with tkinter; "
+            "not available on this server."
+        ) from exc
+
     try:
         picker_root = Tk()
         picker_root.withdraw()
