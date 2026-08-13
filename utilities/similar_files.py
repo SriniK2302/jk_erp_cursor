@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+
+from utilities.common import file_sha256
 
 #from tkinter import Tk, TclError, filedialog
 
@@ -52,16 +53,6 @@ class SimilarToReferenceReport:
     def skipped_count(self) -> int:
         return len(self.skipped_paths)
 
-
-def _sha256_hex(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        while True:
-            block = f.read(_READ_CHUNK)
-            if not block:
-                break
-            h.update(block)
-    return h.hexdigest()
 
 
 def choose_spreadsheet_file() -> Path | None:
@@ -129,7 +120,7 @@ def find_similar_to_reference_file(
 
     notify("profiling", 0, 1, "Hashing reference file...")
     try:
-        reference_digest = _sha256_hex(reference_file)
+        reference_digest = file_sha256(reference_file)
     except OSError as exc:
         raise ValueError(f"Cannot read reference file: {reference_file}") from exc
     notify("profiling", 1, 1, "Reference hashed.")
@@ -168,7 +159,7 @@ def find_similar_to_reference_file(
     for index, path in enumerate(candidates, start=1):
         report.spreadsheet_files += 1
         try:
-            digest = _sha256_hex(path)
+            digest = file_sha256(path)
         except OSError as exc:
             report.skipped_paths.append(f"{path}: {exc}")
         else:
@@ -234,7 +225,7 @@ def find_similar_spreadsheet_files(
     for index, path in enumerate(spreadsheet_paths, start=1):
         report.spreadsheet_files += 1
         try:
-            digest = _sha256_hex(path)
+            digest = file_sha256(path)
         except OSError as exc:
             report.skipped_paths.append(f"{path}: {exc}")
         else:

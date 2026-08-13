@@ -1,16 +1,11 @@
 """Detect duplicate files by signature and move extras to a target folder."""
 
 from __future__ import annotations
-
 from dataclasses import dataclass, field
-from hashlib import sha256
 from pathlib import Path
 from typing import Callable
 import shutil
-
-
-CHUNK_SIZE = 1024 * 1024
-
+from utilities.common import file_sha256
 
 @dataclass
 class DeleteDuplicateFilesReport:
@@ -28,19 +23,6 @@ class DeleteDuplicateFilesReport:
 
 
 ProgressCallback = Callable[[str, int, int | None, str], None]
-
-
-def file_signature(path: Path) -> str:
-    """Return SHA-256 signature for a file path."""
-    hasher = sha256()
-    with path.open("rb") as stream:
-        while True:
-            chunk = stream.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
 
 def _is_relative_to(path: Path, maybe_parent: Path) -> bool:
     try:
@@ -121,7 +103,7 @@ def move_duplicate_files_by_signature(
             continue
         for file_path in same_size_paths:
             try:
-                signature = file_signature(file_path)
+                signature = file_sha256(file_path)
             except OSError as exc:
                 report.skipped_paths.append(f"{file_path}: {exc}")
                 continue
