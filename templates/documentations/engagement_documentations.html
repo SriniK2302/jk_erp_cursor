@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Documentation</h1>
+      <p class="muted">Maintain setup-level standard documents by stage. You can attach an optional Word (.doc / .docx) template per item.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search documentation..."
+          aria-label="Search documentation"
+          data-grid-search
+        >
+        <div class="grid-toolbar-actions">
+          <span class="muted grid-count" data-grid-count></span>
+          <a href="{% url 'engagement_documentation_create' %}" class="button button-compact">Add Documentation</a>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Standard Document</th>
+              <th>Stage</th>
+              <th>Applicable To</th>
+              <th>Word template</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in documentations %}
+              <tr data-grid-row>
+                <td>{{ item.standard_document }}</td>
+                <td>{{ item.get_document_stage_display }}</td>
+                <td>
+                  {% for c in item.applicable_classifications.all %}
+                    {{ c.classification_name }}{% if not forloop.last %}, {% endif %}
+                  {% empty %}
+                    —
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if item.word_template %}
+                    <span class="doc-word-template-filename">{{ item.word_template_display_name }}</span>
+                    <span class="muted"> · </span>
+                    <a href="{% url 'engagement_documentation_word_template_download' item.pk %}">Download</a>
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="col-actions">
+                  {% if item.mapped_to_engagement or item.mapped_to_division %}
+                    {% include "includes/grid_row_actions.html" with list_url_name="engagement_documentations" edit_url_name="engagement_documentation_edit" edit_pk=item.id pk=item.id delete_action="delete" confirm_message="Delete this documentation item?" delete_disabled="1" delete_disabled_title="Mapped to an engagement or division — cannot delete." %}
+                  {% else %}
+                    {% include "includes/grid_row_actions.html" with list_url_name="engagement_documentations" edit_url_name="engagement_documentation_edit" edit_pk=item.id pk=item.id delete_action="delete" confirm_message="Delete this documentation item?" %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">No documentation items added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching documentation found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

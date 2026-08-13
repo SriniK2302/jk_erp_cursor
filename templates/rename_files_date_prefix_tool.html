@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Rename Date Prefix Tool · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Rename Date Prefix Tool</h1>
+      <p class="muted">Direct files only (no subfolders).</p>
+    </header>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Rename Date Prefix (YYMMDD → YYYY MM DD)</span>
+      <span class="tile-subtitle">Optionally cut all chars on the left of a marker first</span>
+
+      <form id="select-rename-date-prefix-folder-form" method="post" action="{% url 'select_rename_date_prefix_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_date_prefix_files' %}"
+        id="rename-date-prefix-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-date-prefix-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-date-prefix-folder"
+              name="rename_date_prefix_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_date_prefix_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-date-prefix-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <label for="rename-date-prefix-marker" class="muted utility-label">Optional marker to cut left side</label>
+        <input
+          id="rename-date-prefix-marker"
+          name="rename_date_prefix_marker"
+          type="text"
+          class="utility-input"
+          value="{{ rename_date_prefix_marker }}"
+          placeholder="e.g. 260427 or INV-260427"
+        >
+        <label for="existing-text-pattern" class="muted utility-label">Existing text pattern</label>
+        <input
+          id="existing-text-pattern"
+          name="existing_text_pattern"
+          type="text"
+          class="utility-input"
+          value="{{ existing_text_pattern|default:'YYDDMM' }}"
+          placeholder="YYDDMM"
+          autocomplete="off"
+        >
+        <label for="replacement-pattern" class="muted utility-label">Replacement pattern</label>
+        <input
+          id="replacement-pattern"
+          name="replacement_pattern"
+          type="text"
+          class="utility-input"
+          value="{{ replacement_pattern|default:'YYYY DD MM' }}"
+          placeholder="YYYY DD MM"
+          autocomplete="off"
+        >
+        <fieldset class="utility-fieldset-compact">
+          <legend class="muted">Pattern match position</legend>
+          <div class="utility-radio-stack">
+            <label>
+              <input
+                type="radio"
+                name="rename_date_pattern_position"
+                value="leading"
+                {% if rename_date_pattern_position != 'anywhere' %}checked{% endif %}
+              >
+              At start — replace matched text
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="rename_date_pattern_position"
+                value="anywhere"
+                {% if rename_date_pattern_position == 'anywhere' %}checked{% endif %}
+              >
+              Anywhere — prepend replacement at left; full name unchanged after it
+            </label>
+          </div>
+        </fieldset>
+        <button type="submit" id="execute-rename-date-prefix-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-date-prefix-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-date-prefix-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-date-prefix-progress-text">Renaming files...</p>
+      </div>
+
+      <p id="rename-date-prefix-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <p class="muted"><a href="{% url 'rename_files_utilities' %}">← Back to Rename Files</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("rename-date-prefix-form");
+    const progressWrap = document.getElementById("rename-date-prefix-progress-wrap");
+    const progressBar = document.getElementById("rename-date-prefix-progress-bar");
+    const progressText = document.getElementById("rename-date-prefix-progress-text");
+    const resultBox = document.getElementById("rename-date-prefix-result");
+    const executeBtn = document.getElementById("execute-rename-date-prefix-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-date-prefix-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Renaming direct files only...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to rename files.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while renaming files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

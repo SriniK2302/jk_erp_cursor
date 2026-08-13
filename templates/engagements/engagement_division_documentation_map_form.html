@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{% if documentation_map %}Edit Division Documentation Mapping{% else %}Add Division Documentation Mapping{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+{{ form.media }}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if documentation_map %}Edit Division Documentation Mapping{% else %}Add Division Documentation Mapping{% endif %}</h1>
+      <p class="muted">
+        {{ division.engagement.client.display_name }} · {{ division.engagement.fiscal_year.fy_no }} · {{ division.engagement.service.service_desc }} · {{ division.division_name }}
+      </p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.documentation.id_for_label }}">Documentation</label>
+        <div class="sap-control">
+          {{ form.documentation }}
+          <p class="muted" style="margin-top: 0.35rem;">
+            <a href="{{ add_documentation_url }}">+ Add Documentation</a>
+          </p>
+          {% if form.documentation.errors %}
+            <span class="field-error">{{ form.documentation.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_division_documentation_maps' division.id %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if documentation_map %}Update Mapping{% else %}Save Mapping{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'engagement_division_documentation_maps' division.id %}">← Back to Division Documentation</a></p>
+  </section>
+</div>
+{% endblock %}

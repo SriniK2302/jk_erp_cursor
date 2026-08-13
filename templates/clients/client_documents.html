@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Client documents · {{ client.client_name }} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Client documents</h1>
+      <p class="muted">
+        {{ client.client_name }}
+        <span class="muted">({{ client.client_code }})</span>
+        · {{ client.classification.classification_name }}
+      </p>
+      <p class="muted">Upload MOA, AOA, and other client-level files (any file type).</p>
+    </header>
+
+    {% include "clients/includes/client_nav_toolbar.html" %}
+
+    <div class="grid-panel doc-files-panel">
+      <h2 class="doc-files-subheading">Uploaded documents</h2>
+      <p class="muted doc-files-hint">Use <strong>Open</strong> (browser tab) or <strong>Download</strong> on each file.</p>
+      {% if documents %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for doc in documents %}
+            <li class="doc-attachment-line doc-attachment-line-page doc-attachment-line--client">
+              <div class="doc-attachment-line-main doc-attachment-line-main--stacked">
+                <div class="doc-attachment-head">
+                  {% if doc.document_label %}
+                    <strong class="doc-attachment-label">{{ doc.document_label }}</strong>
+                  {% endif %}
+                  <span class="doc-attachment-filename doc-attachment-filename--block">{{ doc.original_filename }}</span>
+                </div>
+                {% if doc.notes %}
+                  <div class="muted doc-attachment-notes">{{ doc.notes }}</div>
+                {% endif %}
+                <div class="muted doc-attachment-meta">
+                  Added {{ doc.created_on|date:"Y-m-d" }}
+                  {% if doc.created_by %} · {{ doc.created_by }}{% endif %}
+                </div>
+                <div class="doc-attachment-file-actions">
+                  {% if doc.can_open_inline %}
+                    <a
+                      href="{% url 'client_document_download' client.id doc.id %}?disposition=inline"
+                      class="button button-secondary button-compact"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >Open</a>
+                  {% endif %}
+                  <a
+                    href="{% url 'client_document_download' client.id doc.id %}"
+                    class="button button-secondary button-compact"
+                  >Download</a>
+                </div>
+              </div>
+              <form
+                method="post"
+                class="inline-form doc-attachment-delete"
+                onsubmit="return confirm('Remove this document?');"
+              >
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_document">
+                <input type="hidden" name="pk" value="{{ doc.id }}">
+                <button
+                  type="submit"
+                  class="icon-btn icon-btn-muted doc-attachment-remove"
+                  title="Remove this document"
+                  aria-label="Remove {{ doc.original_filename }}"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No documents uploaded yet.</p>
+      {% endif %}
+
+      <h2 class="doc-files-subheading">Add documents</h2>
+      <form method="post" enctype="multipart/form-data" class="doc-attach-form doc-attach-form-page sap-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload_document">
+        <div class="sap-row">
+          <label for="client-doc-label">Document type / label</label>
+          <div class="sap-control">
+            <input
+              type="text"
+              class="input-medium"
+              id="client-doc-label"
+              name="document_label"
+              maxlength="120"
+              placeholder="e.g. MOA, AOA, Board resolution"
+            >
+            <span class="muted">Optional. Applied to all files in this upload.</span>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="client-doc-files">Files</label>
+          <div class="sap-control">
+            <input
+              type="file"
+              name="files"
+              multiple
+              id="client-doc-files"
+              class="visually-hidden"
+              data-doc-file-input
+              aria-describedby="client-doc-files-hint"
+            >
+            <div class="doc-attach-file-row">
+              <button type="button" class="button button-secondary" data-doc-file-trigger="client-doc-files">Choose files…</button>
+              <span class="muted doc-attach-file-hint" id="client-doc-files-hint">None selected</span>
+            </div>
+            <span class="muted">Any file type. Up to 30 files per upload.</span>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="client-doc-notes">Notes</label>
+          <div class="sap-control">
+            <textarea
+              id="client-doc-notes"
+              name="notes"
+              class="input-long"
+              rows="3"
+              placeholder="Optional notes for these files"
+            ></textarea>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Upload</button>
+        </div>
+      </form>
+    </div>
+
+    <p class="muted page-actions">
+      <a href="{% url 'client_edit' client.id %}">← Back to Edit Client</a>
+      ·
+      <a href="{% url 'clients' %}">Clients list</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("[data-doc-file-trigger]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-doc-file-trigger");
+      var input = document.getElementById(id);
+      if (input) input.click();
+    });
+  });
+  document.querySelectorAll("[data-doc-file-input]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      var form = input.closest("form");
+      var hint = form && form.querySelector(".doc-attach-file-hint");
+      if (!hint) return;
+      if (!input.files || !input.files.length) {
+        hint.textContent = "None selected";
+        return;
+      }
+      hint.textContent = Array.from(input.files)
+        .map(function (f) {
+          return f.name;
+        })
+        .join(", ");
+    });
+  });
+});
+</script>
+{% endblock %}

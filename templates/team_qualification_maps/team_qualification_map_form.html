@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{% if qualification_map %}Edit Team Qualification Map{% else %}Add Team Qualification Map{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if qualification_map %}Edit Team Qualification Map{% else %}Add Team Qualification Map{% endif %}</h1>
+      <p class="muted">Capture qualification mapping periods for team members.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.team_member.id_for_label }}">Team Member</label>
+        <div class="sap-control">
+          {{ form.team_member }}
+          {% if form.team_member.errors %}
+            <span class="field-error">{{ form.team_member.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.qualification.id_for_label }}">Qualification</label>
+        <div class="sap-control">
+          {{ form.qualification }}
+          {% if form.qualification.errors %}
+            <span class="field-error">{{ form.qualification.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.from_date.id_for_label }}">From Date</label>
+        <div class="sap-control">
+          {{ form.from_date }}
+          {% if form.from_date.errors %}
+            <span class="field-error">{{ form.from_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.to_date.id_for_label }}">To Date</label>
+        <div class="sap-control">
+          {{ form.to_date }}
+          {% if form.to_date.errors %}
+            <span class="field-error">{{ form.to_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'team_qualification_maps' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if qualification_map %}Update Mapping{% else %}Save Mapping{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'team_qualification_maps' %}">← Back to Team Qualification Map</a></p>
+  </section>
+</div>
+{% endblock %}

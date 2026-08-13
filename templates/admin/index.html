@@ -1,0 +1,12 @@
+{% extends "admin/index.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="module" style="margin-bottom: 1rem;">
+  <h2>{% translate "Technical references" %}</h2>
+  <ul class="object-tools">
+    <li><a href="{% url 'admin_technical_data_flow' %}">Data flow document</a></li>
+  </ul>
+</div>
+{{ block.super }}
+{% endblock %}

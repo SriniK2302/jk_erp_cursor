@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly summary · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame gstr1-report-page">
+    <header class="page-header">
+      <h1>Monthly summary</h1>
+      <p class="muted gstr1-report-page__lede">
+        One row per calendar month in the selected fiscal year. Totals from <strong>invoice date</strong>
+        and invoice lines (same basis as GSTR1 list).
+      </p>
+    </header>
+
+    {% if fiscal_years %}
+      <form method="get" class="sap-form gstr1-report-filters" action="{% url 'invoice_reports_monthly_summary' %}">
+        <div class="gstr1-report-filters__grid">
+          <div class="gstr1-report-filters__field gstr1-report-filters__field--fy">
+            <label for="id_fy">Fiscal year</label>
+            <select name="fy" id="id_fy" class="input-medium" required>
+              {% for fy in fiscal_years %}
+                <option value="{{ fy.pk }}"{% if selected_fy and fy.pk == selected_fy.pk %} selected{% endif %}>
+                  {{ fy.fy_no }} — {{ fy.start_date|date:"Y-m-d" }} to {{ fy.end_date|date:"Y-m-d" }}
+                  {% if current_fy and fy.pk == current_fy.pk %} (current){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="gstr1-report-filters__field">
+            <label for="id_status_ms">Invoice status</label>
+            <select name="status" id="id_status_ms" class="input-medium">
+              <option value="all"{% if status_filter == "all" %} selected{% endif %}>All</option>
+              <option value="authorised"{% if status_filter == "authorised" %} selected{% endif %}>Authorised</option>
+              <option value="fresh"{% if status_filter == "fresh" %} selected{% endif %}>Fresh</option>
+            </select>
+          </div>
+          <div class="gstr1-report-filters__field gstr1-report-filters__field--btn">
+            <span class="visually-hidden">Run report</span>
+            <button type="submit" class="button">Show report</button>
+          </div>
+        </div>
+      </form>
+
+      {% if report_submitted and selected_fy and month_rows is not None and total_row %}
+        <div class="gstr1-report-toolbar">
+          <h2 class="gstr1-report-toolbar__title">
+            {{ selected_fy.fy_no }} · {% if status_filter == "authorised" %}Authorised{% elif status_filter == "fresh" %}Fresh{% else %}All{% endif %}
+          </h2>
+          <span class="gstr1-report-toolbar__dates">{{ selected_fy.start_date|date:"Y-m-d" }} → {{ selected_fy.end_date|date:"Y-m-d" }}</span>
+        </div>
+
+        <div class="grid-panel gstr1-report-grid" data-grid-root data-grid-no-resize="1" data-grid-id="reports-monthly-summary" data-default-sort-col="0" data-default-sort-dir="asc">
+          <div class="grid-toolbar">
+            <span class="muted grid-count" data-grid-count></span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-grid data-grid-wrap gstr1-invoices-grid" aria-label="Monthly invoice summary">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th class="num">Invoices</th>
+                  <th class="num col-gstr1-amt col-gstr1-amt-tv">Taxable value</th>
+                  <th class="num col-gstr1-amt">CGST</th>
+                  <th class="num col-gstr1-amt">SGST</th>
+                  <th class="num col-gstr1-amt">IGST</th>
+                  <th class="num col-gstr1-amt col-gstr1-amt-gross">Inv gross</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in month_rows %}
+                  <tr data-grid-row>
+                    <td data-sort-value="{{ row.month_first|date:'Y-m-d' }}">{{ row.month_label }}</td>
+                    <td class="num">{{ row.invoice_count }}</td>
+                    <td class="num col-gstr1-amt">{{ row.taxable_value|floatformat:"0g" }}</td>
+                    <td class="num col-gstr1-amt">{{ row.cgst|floatformat:"0g" }}</td>
+                    <td class="num col-gstr1-amt">{{ row.sgst|floatformat:"0g" }}</td>
+                    <td class="num col-gstr1-amt">{{ row.igst|floatformat:"0g" }}</td>
+                    <td class="num col-gstr1-amt">{{ row.inv_gross|floatformat:"0g" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr style="font-weight:600;">
+                  <td>{{ total_row.month_label }}</td>
+                  <td class="num">{{ total_row.invoice_count }}</td>
+                  <td class="num col-gstr1-amt">{{ total_row.taxable_value|floatformat:"0g" }}</td>
+                  <td class="num col-gstr1-amt">{{ total_row.cgst|floatformat:"0g" }}</td>
+                  <td class="num col-gstr1-amt">{{ total_row.sgst|floatformat:"0g" }}</td>
+                  <td class="num col-gstr1-amt">{{ total_row.igst|floatformat:"0g" }}</td>
+                  <td class="num col-gstr1-amt">{{ total_row.inv_gross|floatformat:"0g" }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      {% elif report_submitted %}
+        <p class="muted">No data for the selected fiscal year.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">Add fiscal years in Setup before running this report.</p>
+    {% endif %}
+
+    <p class="muted" style="margin-top:1rem;">
+      <a href="{% url 'invoice_reports' %}">← Reports</a>
+      ·
+      <a href="{% url 'sales_hub' %}">Manage Invoices hub</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

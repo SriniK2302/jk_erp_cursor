@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Qualifications · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Qualifications</h1>
+      <p class="muted">Review qualification list and add new qualifications.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search qualifications..."
+          aria-label="Search qualifications"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Qualification Description</th>
+              <th>Qualification Code</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for qualification in qualifications %}
+              <tr data-grid-row>
+                <td>{{ qualification.qualification_desc }}</td>
+                <td>{{ qualification.qualification_code }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="qualifications" edit_url_name="qualification_edit" edit_pk=qualification.id pk=qualification.id delete_action="delete" confirm_message="Delete this qualification?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="3" class="muted">No qualifications added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching qualifications found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'qualification_create' %}" class="button">Add Qualification</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

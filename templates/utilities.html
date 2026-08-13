@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block title %}File and Folder Utilities · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>File and Folder Utilities</h1>
+      <p class="muted">Rename, search, move, and clean up files on disk.</p>
+    </header>
+
+    <nav class="tile-grid utilities-file-grid" aria-label="Utility tools">
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Del. Empty Folders</span>
+        <span class="tile-subtitle">Pick a root folder and remove all empty subfolders</span>
+
+        <form method="post" action="{% url 'select_folder_for_delete_empty' %}" class="utility-form-inline">
+          {% csrf_token %}
+          <button type="submit" class="button button-compact button-secondary">Select Folder</button>
+        </form>
+
+        <form
+          method="post"
+          action="{% url 'delete_empty_folders' %}"
+          id="delete-empty-form"
+          class="utility-form-stack"
+        >
+          {% csrf_token %}
+          <label for="selected-folder" class="muted utility-label">Selected Folder</label>
+          <input
+            id="selected-folder"
+            name="selected_folder"
+            type="text"
+            class="utility-input"
+            value="{{ selected_empty_folder }}"
+            placeholder="No folder selected yet"
+          >
+
+          <button type="submit" id="execute-delete-btn" class="button button-compact">Execute</button>
+        </form>
+
+        <div id="delete-progress-wrap" class="utility-progress-wrap" hidden>
+          <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="delete-progress-bar" class="utility-progress-bar"></div>
+          </div>
+          <p class="muted utility-progress-text" id="delete-progress-text">Running cleanup...</p>
+        </div>
+
+        <p id="delete-result" class="muted utility-result" aria-live="polite"></p>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Del. Duplicate Files</span>
+        <span class="tile-subtitle">Select source and duplicate-hold folders</span>
+
+        <div class="utility-button-row">
+          <form method="post" action="{% url 'select_duplicate_source_folder' %}" class="utility-form-inline">
+            {% csrf_token %}
+            <button type="submit" class="button button-compact button-secondary">Select Source Folder</button>
+          </form>
+          <form method="post" action="{% url 'select_duplicate_target_folder' %}" class="utility-form-inline">
+            {% csrf_token %}
+            <button type="submit" class="button button-compact button-secondary">Select Target Folder</button>
+          </form>
+        </div>
+
+        <label for="duplicate-source-folder" class="muted utility-label">Source Folder</label>
+        <form
+          method="post"
+          action="{% url 'delete_duplicate_files' %}"
+          id="delete-duplicate-form"
+          class="utility-form-stack"
+        >
+          {% csrf_token %}
+          <input
+            id="duplicate-source-folder"
+            name="duplicate_source_folder"
+            type="text"
+            class="utility-input"
+            value="{{ duplicate_source_folder }}"
+            placeholder="No source folder selected yet"
+          >
+
+          <label for="duplicate-target-folder" class="muted utility-label">Target Folder</label>
+          <input
+            id="duplicate-target-folder"
+            name="duplicate_target_folder"
+            type="text"
+            class="utility-input"
+            value="{{ duplicate_target_folder }}"
+            placeholder="No target folder selected yet"
+          >
+        </form>
+        <div class="utility-button-row">
+          <button
+            type="submit"
+            id="execute-duplicate-btn"
+            class="button button-compact"
+            form="delete-duplicate-form"
+          >
+            Execute
+          </button>
+        </div>
+
+        <div id="duplicate-progress-wrap" class="utility-progress-wrap" hidden>
+          <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="duplicate-progress-bar" class="utility-progress-bar"></div>
+          </div>
+          <p class="muted utility-progress-text" id="duplicate-progress-text">Running duplicate cleanup...</p>
+        </div>
+
+        <p id="duplicate-result" class="muted utility-result" aria-live="polite"></p>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Similar Files</span>
+        <span class="tile-subtitle">One reference file → similar spreadsheets</span>
+        <p class="muted">
+          <a href="{% url 'similar_files_page' %}">Open report</a>
+        </p>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">File Content Search</span>
+        <span class="tile-subtitle">Phrase in order (first 500 words), case-neutral; text and Excel</span>
+
+        <form method="post" action="{% url 'select_content_search_folder' %}" class="utility-form-inline">
+          {% csrf_token %}
+          <button type="submit" class="button button-compact button-secondary">Select Folder</button>
+        </form>
+
+        <form
+          method="post"
+          action="{% url 'file_content_search' %}"
+          id="file-content-search-form"
+          class="utility-form-stack"
+        >
+          {% csrf_token %}
+          <label for="content-search-folder" class="muted utility-label">Search folder</label>
+          <input
+            id="content-search-folder"
+            name="content_search_folder"
+            type="text"
+            class="utility-input"
+            value="{{ content_search_folder }}"
+            placeholder="No folder selected yet"
+          >
+
+          <label for="search-phrase" class="muted utility-label">Phrase</label>
+          <input
+            id="search-phrase"
+            name="search_phrase"
+            type="text"
+            class="utility-input"
+            placeholder="e.g. City Union Bank"
+            autocomplete="off"
+          >
+
+          <button type="submit" id="execute-content-search-btn" class="button button-compact">Search</button>
+        </form>
+
+        <div id="content-search-progress-wrap" class="utility-progress-wrap" hidden>
+          <div
+            class="utility-progress-track"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <div id="content-search-progress-bar" class="utility-progress-bar"></div>
+          </div>
+          <p class="muted utility-progress-text" id="content-search-progress-text">Searching files...</p>
+        </div>
+
+        <p id="content-search-result" class="muted utility-result" aria-live="polite"></p>
+        <ul id="content-search-matches" class="utility-match-list muted" aria-label="Matching files"></ul>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Rename Files</span>
+        <span class="tile-subtitle">Date prefix, text replace, content date</span>
+        <p class="muted">
+          <a href="{% url 'rename_files_utilities' %}">Open Rename Files</a>
+        </p>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Organize Files</span>
+        <span class="tile-subtitle">FY folders, move by name match</span>
+        <p class="muted">
+          <a href="{% url 'organize_files_utilities' %}">Open Organize Files</a>
+        </p>
+      </article>
+
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Audit Document Renaming and Filing</span>
+        <span class="tile-subtitle">Rules plus phrase triage into category folders</span>
+        <p class="muted">
+          <a href="{% url 'audit_document_renaming_filing' %}">Rules</a>
+          ·
+          <a href="{% url 'audit_document_triage' %}">Triage</a>
+        </p>
+      </article>
+    </nav>
+
+    <p class="muted"><a href="{% url 'tools_utilities' %}">← Tools & utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("delete-empty-form");
+    const progressWrap = document.getElementById("delete-progress-wrap");
+    const progressBar = document.getElementById("delete-progress-bar");
+    const progressText = document.getElementById("delete-progress-text");
+    const resultBox = document.getElementById("delete-result");
+    const executeBtn = document.getElementById("execute-delete-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("selected-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Scanning and deleting empty folders...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 8, 90);
+        progressBar.style.width = current + "%";
+      }, 250);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to delete empty folders.");
+        }
+
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while deleting folders.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("delete-duplicate-form");
+    const progressWrap = document.getElementById("duplicate-progress-wrap");
+    const progressBar = document.getElementById("duplicate-progress-bar");
+    const progressText = document.getElementById("duplicate-progress-text");
+    const resultBox = document.getElementById("duplicate-result");
+    const executeBtn = document.getElementById("execute-duplicate-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const sourceFolder = document.getElementById("duplicate-source-folder");
+      const targetFolder = document.getElementById("duplicate-target-folder");
+      const sourceValue = sourceFolder ? sourceFolder.value.trim() : "";
+      const targetValue = targetFolder ? targetFolder.value.trim() : "";
+
+      if (!sourceValue) {
+        resultBox.textContent = "Select a source folder first.";
+        return;
+      }
+      if (!targetValue) {
+        resultBox.textContent = "Select a target folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Starting duplicate cleanup...";
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to process duplicate files.");
+        }
+
+        const jobId = payload.job_id;
+        if (!jobId) {
+          throw new Error("Duplicate cleanup job id missing.");
+        }
+
+        const statusUrl = "{% url 'duplicate_delete_status' 'JOB_ID_PLACEHOLDER' %}".replace("JOB_ID_PLACEHOLDER", jobId);
+        let attempts = 0;
+        const maxAttempts = 3600; // 1 hour at 1s polling
+
+        while (attempts < maxAttempts) {
+          attempts += 1;
+          const statusResponse = await fetch(statusUrl, {
+            headers: {
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok || !statusPayload.ok) {
+            throw new Error(statusPayload.message || "Failed to read job status.");
+          }
+
+          const percent = Number(statusPayload.progress_percent || 5);
+          progressBar.style.width = Math.min(Math.max(percent, 5), 100) + "%";
+          progressText.textContent = statusPayload.message || "Processing...";
+
+          if (statusPayload.done) {
+            if (statusPayload.error) {
+              throw new Error(statusPayload.error);
+            }
+            const result = statusPayload.result || {};
+            progressBar.style.width = "100%";
+            progressText.textContent = "Completed.";
+            resultBox.textContent = result.message
+              ? result.message + (result.warning ? " " + result.warning : "")
+              : "Duplicate cleanup completed.";
+            return;
+          }
+
+          await new Promise(function (resolve) { window.setTimeout(resolve, 1000); });
+        }
+
+        throw new Error("Operation is still running. Please wait and retry status refresh.");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while processing duplicates.";
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("file-content-search-form");
+    const progressWrap = document.getElementById("content-search-progress-wrap");
+    const progressBar = document.getElementById("content-search-progress-bar");
+    const progressText = document.getElementById("content-search-progress-text");
+    const resultBox = document.getElementById("content-search-result");
+    const matchesList = document.getElementById("content-search-matches");
+    const executeBtn = document.getElementById("execute-content-search-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !matchesList || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("content-search-folder");
+      const phraseInput = document.getElementById("search-phrase");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      const phraseValue = phraseInput ? phraseInput.value.trim() : "";
+
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        matchesList.innerHTML = "";
+        return;
+      }
+      if (!phraseValue) {
+        resultBox.textContent = "Enter a search phrase.";
+        matchesList.innerHTML = "";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      matchesList.innerHTML = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Searching...";
+      progressText.textContent = "Searching files...";
+
+      let current = 8;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 6, 92);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const raw = await response.text();
+        let payload;
+        try {
+          payload = raw ? JSON.parse(raw) : {};
+        } catch (parseErr) {
+          throw new Error(
+            raw.slice(0, 240) || ("Server returned non-JSON (HTTP " + response.status + ").")
+          );
+        }
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Search failed.");
+        }
+
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+
+        const paths = payload.matches || [];
+        for (let i = 0; i < paths.length; i += 1) {
+          const li = document.createElement("li");
+          li.textContent = paths[i];
+          matchesList.appendChild(li);
+        }
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        const msg =
+          error && error.message === "Failed to fetch"
+            ? "Network error or the request was cut off (timeout). Try a smaller subfolder, or run the dev server with a higher timeout."
+            : error.message || "Unexpected error while searching.";
+        resultBox.textContent = msg;
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Search";
+      }
+    });
+  })();
+
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% comment %}Requires client_nav: mode, search_mode, first_href, prev_href, next_href, last_href, prev_pk, next_pk, index, count{% endcomment %}
+<nav
+  class="client-nav-toolbar"
+  aria-label="Client navigation"
+  data-client-nav
+  data-search-url="{% url 'client_nav_search' %}"
+  data-search-mode="{{ client_nav.search_mode }}"
+>
+  <div class="client-nav-toolbar__inner">
+    <div class="client-nav-search">
+      <label for="client_nav_search_input" class="visually-hidden">Search clients to open</label>
+      <input
+        type="search"
+        id="client_nav_search_input"
+        class="input-medium client-nav-search__input"
+        placeholder="Search client…"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="client_nav_results"
+        aria-expanded="false"
+      >
+      <ul id="client_nav_results" class="client-nav-results" role="listbox" hidden></ul>
+    </div>
+    <div class="client-nav-buttons-wrap">
+      <div class="client-nav-buttons" role="toolbar" aria-label="Browse clients">
+        {% if client_nav.mode == "browse" %}
+          {% if client_nav.prev_pk %}
+            <a href="{{ client_nav.first_href }}" class="icon-btn client-nav-icon" title="First client" aria-label="First client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+            </a>
+          {% else %}
+            <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="First client" aria-disabled="true" aria-label="First client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+            </span>
+          {% endif %}
+          {% if client_nav.prev_pk %}
+            <a href="{{ client_nav.prev_href }}" class="icon-btn client-nav-icon" title="Previous client" aria-label="Previous client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            </a>
+          {% else %}
+            <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Previous client" aria-disabled="true" aria-label="Previous client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            </span>
+          {% endif %}
+          {% if client_nav.next_pk %}
+            <a href="{{ client_nav.next_href }}" class="icon-btn client-nav-icon" title="Next client" aria-label="Next client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </a>
+          {% else %}
+            <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Next client" aria-disabled="true" aria-label="Next client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </span>
+          {% endif %}
+          {% if client_nav.next_pk %}
+            <a href="{{ client_nav.last_href }}" class="icon-btn client-nav-icon" title="Last client" aria-label="Last client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 6l6 6-6 6"/><path d="M13 6l6 6-6 6"/></svg>
+            </a>
+          {% else %}
+            <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Last client" aria-disabled="true" aria-label="Last client">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 6l6 6-6 6"/><path d="M13 6l6 6-6 6"/></svg>
+            </span>
+          {% endif %}
+        {% else %}
+          <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="First client (save this client first)" aria-disabled="true" aria-label="First client">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+          </span>
+          <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Previous client" aria-disabled="true" aria-label="Previous client">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </span>
+          <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Next client" aria-disabled="true" aria-label="Next client">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+          </span>
+          <span class="icon-btn icon-btn-muted is-disabled client-nav-icon" title="Last client" aria-disabled="true" aria-label="Last client">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 6l6 6-6 6"/><path d="M13 6l6 6-6 6"/></svg>
+          </span>
+        {% endif %}
+      </div>
+      {% if client_nav.mode == "browse" and client_nav.count %}
+        <span class="muted client-nav-pos">{{ client_nav.index }} / {{ client_nav.count }}</span>
+      {% endif %}
+    </div>
+  </div>
+</nav>

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}{% if row %}Edit UDIN{% else %}Add UDIN{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if row %}Edit UDIN{% else %}Add UDIN{% endif %}</h1>
+      <p class="muted">Create or update UDIN entries for sales workflows.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.udin.id_for_label }}">UDIN No</label>
+        <div class="sap-control">
+          {{ form.udin }}
+          {% if form.udin.errors %}
+            <span class="field-error">{{ form.udin.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.remarks.id_for_label }}">Remarks</label>
+        <div class="sap-control">
+          {{ form.remarks }}
+          {% if form.remarks.errors %}
+            <span class="field-error">{{ form.remarks.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.date_of_signing_of_document.id_for_label }}">Date of signing of document</label>
+        <div class="sap-control">
+          {{ form.date_of_signing_of_document }}
+          {% if form.date_of_signing_of_document.errors %}
+            <span class="field-error">{{ form.date_of_signing_of_document.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">
+            For Certification, this date decides Service FY (e.g. 02-05-2026 → FY27).
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.create_date.id_for_label }}">Create Date</label>
+        <div class="sap-control">
+          {{ form.create_date }}
+          {% if form.create_date.errors %}
+            <span class="field-error">{{ form.create_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.client.id_for_label }}">Client</label>
+        <div class="sap-control">
+          <input
+            type="search"
+            id="client_search"
+            class="input-medium"
+            placeholder="Search client..."
+            aria-label="Search client"
+            style="margin-bottom:0.35rem;"
+          >
+          {{ form.client }}
+          {% if form.client.errors %}
+            <span class="field-error">{{ form.client.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.service.id_for_label }}">Service</label>
+        <div class="sap-control">
+          {{ form.service }}
+          {% if form.service.errors %}
+            <span class="field-error">{{ form.service.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.ay_fy.id_for_label }}">Service FY</label>
+        <div class="sap-control">
+          {{ form.ay_fy }}
+          {% if form.ay_fy.errors %}
+            <span class="field-error">{{ form.ay_fy.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">
+            Format: FY26, FY27, etc. Certification: from document date. Audit: year audited (YE 31.3.2026 → FY26).
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.service_remarks.id_for_label }}">Service remarks</label>
+        <div class="sap-control">
+          {{ form.service_remarks }}
+          {% if form.service_remarks.errors %}
+            <span class="field-error">{{ form.service_remarks.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin:0.35rem 0 0;font-size:0.82rem;">
+            <strong>Remarks</strong> above is from ICAI (read-only source for billing prep).
+            <strong>Service remarks</strong> is filled from Remarks (Certification only) when blank.
+            Existing service remarks are never cleared or overwritten by other buttons.
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.status.id_for_label }}">Status</label>
+        <div class="sap-control">
+          {{ form.status }}
+          {% if form.status.errors %}
+            <span class="field-error">{{ form.status.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.inv_no.id_for_label }}">Inv No</label>
+        <div class="sap-control">
+          {{ form.inv_no }}
+          {% if form.inv_no.errors %}
+            <span class="field-error">{{ form.inv_no.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.inv_date.id_for_label }}">Inv Date</label>
+        <div class="sap-control">
+          {{ form.inv_date }}
+          {% if form.inv_date.errors %}
+            <span class="field-error">{{ form.inv_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.inv_tv_amount.id_for_label }}">Inv TV amt</label>
+        <div class="sap-control">
+          {{ form.inv_tv_amount }}
+          {% if form.inv_tv_amount.errors %}
+            <span class="field-error">{{ form.inv_tv_amount.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row udin-billing-prep">
+        <label>Billing prep</label>
+        <div class="sap-control">
+          <div class="udin-billing-prep__actions">
+            <button type="submit" name="derive_service_fy" value="1" class="button button-secondary">
+              Update Service FY
+            </button>
+            <button type="submit" name="derive_service_remarks" value="1" class="button button-secondary">
+              Update service remarks
+            </button>
+            <button type="submit" name="check_invoice_ready" value="1" class="button button-secondary">
+              Check if UDIN inv ready
+            </button>
+          </div>
+          <p class="muted" style="margin:0.5rem 0 0;font-size:0.82rem;">
+            Update buttons change Service FY or service remarks only; other fields on this form are kept.
+          </p>
+          {% if billing_prep_feedback %}
+            <div class="udin-invoice-ready udin-invoice-ready--{{ billing_prep_feedback.level }}">
+              {{ billing_prep_feedback.text }}
+            </div>
+          {% endif %}
+          {% if invoice_ready_result %}
+            <div class="udin-invoice-ready{% if invoice_ready_result.ready %} udin-invoice-ready--ok{% else %} udin-invoice-ready--warn{% endif %}">
+              {% if invoice_ready_result.ready %}
+                <strong>Ready for invoice.</strong>
+                <span class="muted">Client, Service, Service FY, and Inv TV amt are set.</span>
+              {% else %}
+                <strong>Not ready for invoice.</strong>
+                <ul class="udin-invoice-ready__list">
+                  {% for issue in invoice_ready_result.issues %}
+                    <li>{{ issue }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'udins' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if row %}Update UDIN{% else %}Save UDIN{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'udins' %}">← Back to UDINs</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const searchInput = document.getElementById("client_search");
+    const clientSelect = document.getElementById("id_client");
+    if (!searchInput || !clientSelect) {
+      return;
+    }
+
+    const originalOptions = Array.from(clientSelect.options).map((opt) => ({
+      value: opt.value,
+      label: opt.textContent || "",
+      selected: opt.selected,
+    }));
+
+    function renderFilteredOptions(query) {
+      const q = (query || "").trim().toLowerCase();
+      const selectedValue = clientSelect.value;
+      clientSelect.innerHTML = "";
+
+      originalOptions.forEach((opt) => {
+        if (!q || opt.label.toLowerCase().includes(q) || String(opt.value) === String(selectedValue)) {
+          const node = document.createElement("option");
+          node.value = opt.value;
+          node.textContent = opt.label;
+          if (String(opt.value) === String(selectedValue)) {
+            node.selected = true;
+          }
+          clientSelect.appendChild(node);
+        }
+      });
+    }
+
+    searchInput.addEventListener("input", function () {
+      renderFilteredOptions(searchInput.value);
+    });
+  })();
+</script>
+{% endblock %}

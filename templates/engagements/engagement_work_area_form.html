@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{% if work_area %}Edit Work Area{% else %}Add Work Area{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if work_area %}Edit Work Area{% else %}Add Work Area{% endif %}</h1>
+      <p class="muted">
+        {{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}
+      </p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.work_area_name.id_for_label }}">Work Area Name</label>
+        <div class="sap-control">
+          {{ form.work_area_name }}
+          {% if form.work_area_name.errors %}
+            <span class="field-error">{{ form.work_area_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.documentation.id_for_label }}">Documentation</label>
+        <div class="sap-control">
+          {{ form.documentation }}
+          {% if form.documentation.errors %}
+            <span class="field-error">{{ form.documentation.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.sort_order.id_for_label }}">Sort Order</label>
+        <div class="sap-control">
+          {{ form.sort_order }}
+          {% if form.sort_order.errors %}
+            <span class="field-error">{{ form.sort_order.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_work_areas' engagement.id %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if work_area %}Update Work Area{% else %}Save Work Area{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'engagement_work_areas' engagement.id %}">← Back to Engagement Work Areas</a></p>
+  </section>
+</div>
+{% endblock %}

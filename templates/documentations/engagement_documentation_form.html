@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}{% if documentation %}Edit Documentation{% else %}Add Documentation{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if documentation %}Edit Documentation{% else %}Add Documentation{% endif %}</h1>
+      <p class="muted">Maintain standard documents by stage for setup.</p>
+    </header>
+
+    {% if documentation and documentation.word_template %}
+    <div class="grid-panel doc-word-template-current">
+      <h2 class="doc-files-subheading" style="margin-top:0;">Current Word template</h2>
+      <p class="doc-word-template-filename">{{ documentation.word_template_display_name }}</p>
+      <div class="doc-word-template-actions">
+        <a class="button button-secondary button-compact" href="{% url 'engagement_documentation_word_template_download' documentation.pk %}">Download</a>
+        <form method="post" class="inline-form" action="{% url 'engagement_documentation_edit' documentation.pk %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" onsubmit="return confirm('Remove this Word template?');">
+          {% csrf_token %}
+          <input type="hidden" name="form_action" value="delete_word_template">
+          <button type="submit" class="button button-secondary button-compact">Del</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <form method="post" class="sap-form" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+      {% endif %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.standard_document.id_for_label }}">Standard Document</label>
+        <div class="sap-control">
+          {{ form.standard_document }}
+          {% if form.standard_document.errors %}
+            <span class="field-error">{{ form.standard_document.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.filled_download_label.id_for_label }}">Fill Word file name suffix</label>
+        <div class="sap-control">
+          {{ form.filled_download_label }}
+          {% if form.filled_download_label.errors %}
+            <span class="field-error">{{ form.filled_download_label.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin-top: 0.35rem; margin-bottom: 0;">
+            Optional short code after date, FY, client code, and service code (e.g. <kbd>MR 01</kbd>).
+            Leave blank to shorten the standard document title automatically.
+            Use <kbd>MR 02</kbd> for the second management-representation pack: on each engagement, open <strong>Edit mapping</strong> to record status per MR 02 topic (Applicable, Not applicable, Complied, …).
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.word_template.id_for_label }}">{% if documentation and documentation.word_template %}Replace Word template{% else %}Word template{% endif %}</label>
+        <div class="sap-control">
+          {{ form.word_template }}
+          {% if form.word_template.errors %}
+            <span class="field-error">{{ form.word_template.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin-top: 0.35rem; margin-bottom: 0;">Optional .doc or .docx. Leave empty to keep the current file{% if documentation and documentation.word_template %} (shown above){% endif %}.</p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.document_stage.id_for_label }}">Stage</label>
+        <div class="sap-control">
+          {{ form.document_stage }}
+          {% if form.document_stage.errors %}
+            <span class="field-error">{{ form.document_stage.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.applicable_classifications.id_for_label }}">Applicable To</label>
+        <div class="sap-control">
+          <div class="applicable-classifications-field">
+            <div class="classification-checkbox-toolbar">
+              <button type="button" class="button button-secondary button-compact" data-action="select-all">
+                Select All
+              </button>
+              <button type="button" class="button button-secondary button-compact" data-action="unselect-all">
+                Unselect All
+              </button>
+            </div>
+            <div class="classification-checkbox-list">
+              {{ form.applicable_classifications }}
+            </div>
+          </div>
+          {% if form.applicable_classifications.errors %}
+            <span class="field-error">{{ form.applicable_classifications.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{{ cancel_url }}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if documentation %}Update Documentation{% else %}Save Documentation{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted">
+      <a href="{{ cancel_url }}">← Back</a>
+      ·
+      <a href="{% url 'setup' %}">Back to Setup</a>
+    </p>
+  </section>
+</div>
+<script>
+(function () {
+  var field = document.querySelector(".applicable-classifications-field");
+  if (!field) return;
+  var list = field.querySelector(".classification-checkbox-list");
+  if (!list) return;
+  function setAll(checked) {
+    list.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      cb.checked = checked;
+    });
+  }
+  field.querySelector('[data-action="select-all"]').addEventListener("click", function () {
+    setAll(true);
+  });
+  field.querySelector('[data-action="unselect-all"]').addEventListener("click", function () {
+    setAll(false);
+  });
+})();
+</script>
+{% endblock %}

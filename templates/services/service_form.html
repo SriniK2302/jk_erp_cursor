@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{% if service %}Edit Service{% else %}Add Service{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if service %}Edit Service{% else %}Add Service{% endif %}</h1>
+      <p class="muted">Maintain service master details in a focused form.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.service_desc.id_for_label }}">Service Description</label>
+        <div class="sap-control">
+          {{ form.service_desc }}
+          {% if form.service_desc.errors %}
+            <span class="field-error">{{ form.service_desc.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.service_code.id_for_label }}">Service Code</label>
+        <div class="sap-control">
+          {{ form.service_code }}
+          {% if form.service_code.errors %}
+            <span class="field-error">{{ form.service_code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'services' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if service %}Update Service{% else %}Save Service{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'services' %}">← Back to Services</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'services/js/service-form.js' %}"></script>
+{% endblock %}

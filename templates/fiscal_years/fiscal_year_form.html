@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{% if fiscal_year %}Edit Fiscal Year{% else %}Add Fiscal Year{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if fiscal_year %}Edit Fiscal Year{% else %}Add Fiscal Year{% endif %}</h1>
+      <p class="muted">Enter FY No in format FY25, FY26 etc. Start and end dates are auto-populated.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.fy_no.id_for_label }}">FY No</label>
+        <div class="sap-control">
+          {{ form.fy_no }}
+          {% if form.fy_no.errors %}
+            <span class="field-error">{{ form.fy_no.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.start_date.id_for_label }}">Start Date</label>
+        <div class="sap-control">
+          {{ form.start_date }}
+          {% if form.start_date.errors %}
+            <span class="field-error">{{ form.start_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.end_date.id_for_label }}">End Date</label>
+        <div class="sap-control">
+          {{ form.end_date }}
+          {% if form.end_date.errors %}
+            <span class="field-error">{{ form.end_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'fiscal_years' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if fiscal_year %}Update Fiscal Year{% else %}Save Fiscal Year{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'fiscal_years' %}">← Back to Fiscal Years</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'fiscal_years/js/fiscal-year-form.js' %}"></script>
+{% endblock %}

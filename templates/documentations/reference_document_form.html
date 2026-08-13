@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}{{ heading }} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{{ heading }}</h1>
+      <p class="muted">Upload a file and give it a clear title so others can find it in Setup.</p>
+    </header>
+
+    <form method="post" class="sap-form" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.category.id_for_label }}">Category</label>
+        <div class="sap-control">
+          {{ form.category }}
+          {% if form.category.errors %}
+            <span class="field-error">{{ form.category.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin-top:0.35rem;">Type a new name, or click an existing category below.</p>
+          <p class="muted ref-doc-cat-list-caption" style="margin-top:0.5rem;">All existing categories</p>
+          <div class="ref-doc-category-list" role="group" aria-label="Existing categories">
+            {% for opt in form.category_suggestions %}
+              <button type="button" class="ref-doc-category-chip" data-ref-cat="{{ opt|escape }}">{{ opt }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.tags.id_for_label }}">Tags</label>
+        <div class="sap-control">
+          {{ form.tags }}
+          {% if form.tags.errors %}
+            <span class="field-error">{{ form.tags.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin-top:0.35rem;">Comma-separated keywords for your own grouping.</p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.is_active.id_for_label }}">Active</label>
+        <div class="sap-control">
+          <label style="font-weight:normal; display:inline-flex; align-items:center; gap:0.4rem;">
+            {{ form.is_active }}
+            <span>Show in the default list (uncheck to retire without deleting).</span>
+          </label>
+          {% if form.is_active.errors %}
+            <span class="field-error">{{ form.is_active.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.title.id_for_label }}">Title</label>
+        <div class="sap-control">
+          {{ form.title }}
+          {% if form.title.errors %}
+            <span class="field-error">{{ form.title.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.description.id_for_label }}">Description</label>
+        <div class="sap-control">
+          {{ form.description }}
+          {% if form.description.errors %}
+            <span class="field-error">{{ form.description.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.file.id_for_label }}">File</label>
+        <div class="sap-control">
+          {{ form.file }}
+          {% if document and document.file %}
+            <p class="muted" style="margin-top: 0.35rem;">
+              Current: <a href="{% url 'reference_document_download' document.pk %}">{{ document.original_filename }}</a>
+            </p>
+          {% endif %}
+          {% if form.file.help_text %}
+            <p class="muted" style="margin-top: 0.35rem;">{{ form.file.help_text }}</p>
+          {% endif %}
+          {% if form.file.errors %}
+            <span class="field-error">{{ form.file.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{{ cancel_url }}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if document %}Update{% else %}Save{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted">
+      <a href="{{ cancel_url }}">← Back to list</a>
+      ·
+      <a href="{% url 'setup' %}">Setup</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var input = document.getElementById("{{ form.category.id_for_label }}");
+  var root = document.querySelector(".ref-doc-category-list");
+  if (!input || !root) return;
+  root.addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".ref-doc-category-chip");
+    if (!btn || !root.contains(btn)) return;
+    var v = btn.getAttribute("data-ref-cat");
+    if (v != null) input.value = v;
+    input.focus();
+  });
+})();
+</script>
+{% endblock %}

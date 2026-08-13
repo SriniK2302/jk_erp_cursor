@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Organize Files · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Organize Files</h1>
+      <p class="muted">Choose an organize flavour.</p>
+    </header>
+
+    <style>
+      .organize-files-two-col {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+      }
+      @media (max-width: 980px) {
+        .organize-files-two-col {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+
+    <div class="organize-files-two-col" aria-label="Organize files tools">
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Move to FY Folder (from date prefix)</span>
+      <span class="tile-subtitle">Prefix <code>YYYY MM DD</code> or <code>YYYY MM</code>; folder <code>FYxx</code> (April–March FY)</span>
+
+      <form id="select-move-to-fy-folder-form" method="post" action="{% url 'select_move_to_fy_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'move_files_to_fy_folder' %}"
+        id="move-to-fy-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="move-to-fy-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="move-to-fy-folder"
+              name="move_to_fy_folder"
+              type="text"
+              class="utility-input"
+              value="{{ move_to_fy_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-move-to-fy-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" id="execute-move-to-fy-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="move-to-fy-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="move-to-fy-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="move-to-fy-progress-text">Moving files into FY folders...</p>
+      </div>
+
+      <p id="move-to-fy-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Move files based on name contains</span>
+
+      <form id="select-move-name-search-folder-form" method="post" action="{% url 'select_move_name_search_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+      <form id="select-move-name-target-folder-form" method="post" action="{% url 'select_move_name_target_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'move_files_name_contains' %}"
+        id="move-name-contains-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="move-name-search-folder" class="muted utility-label">Search folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="move-name-search-folder"
+              name="move_name_search_folder"
+              type="text"
+              class="utility-input"
+              value="{{ move_name_search_folder }}"
+              placeholder="No search folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-move-name-search-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select search folder"
+              aria-label="Select search folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label for="move-name-contains-text" class="muted utility-label">File name contains</label>
+        <input
+          id="move-name-contains-text"
+          name="move_name_contains_text"
+          type="text"
+          class="utility-input"
+          autocomplete="off"
+        >
+
+        <div class="utility-folder-path-row">
+          <label for="move-name-target-folder" class="muted utility-label">Target folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="move-name-target-folder"
+              name="move_name_target_folder"
+              type="text"
+              class="utility-input"
+              value="{{ move_name_target_folder }}"
+              placeholder="e.g. FY25 (created under Search folder if missing)"
+            >
+            <button
+              type="submit"
+              form="select-move-name-target-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select target folder"
+              aria-label="Select target folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="execute-move-name-contains-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="move-name-contains-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="move-name-contains-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="move-name-contains-progress-text">Moving files...</p>
+      </div>
+
+      <p id="move-name-contains-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+    </div>
+
+    <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("move-to-fy-form");
+    const progressWrap = document.getElementById("move-to-fy-progress-wrap");
+    const progressBar = document.getElementById("move-to-fy-progress-bar");
+    const progressText = document.getElementById("move-to-fy-progress-text");
+    const resultBox = document.getElementById("move-to-fy-result");
+    const executeBtn = document.getElementById("execute-move-to-fy-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("move-to-fy-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Moving direct files into FY folders...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to move files into FY folders.");
+        }
+
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while moving files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("move-name-contains-form");
+    const progressWrap = document.getElementById("move-name-contains-progress-wrap");
+    const progressBar = document.getElementById("move-name-contains-progress-bar");
+    const progressText = document.getElementById("move-name-contains-progress-text");
+    const resultBox = document.getElementById("move-name-contains-result");
+    const executeBtn = document.getElementById("execute-move-name-contains-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    function phraseCompactDateMonthError(s) {
+      const t = (s || "").trim();
+      if (/^\d{4}$/.test(t)) {
+        const mm = parseInt(t.slice(2, 4), 10);
+        if (mm < 1 || mm > 12) {
+          return "For YYMM, month (last two digits) must be between 01 and 12.";
+        }
+      } else if (/^\d{6}$/.test(t)) {
+        const yyyy = parseInt(t.slice(0, 4), 10);
+        const mm = parseInt(t.slice(4, 6), 10);
+        if (yyyy >= 1800 && yyyy <= 2199 && (mm < 1 || mm > 12)) {
+          return "For YYYYMM, month (last two digits) must be between 01 and 12.";
+        }
+      }
+      return null;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const sourceInput = document.getElementById("move-name-search-folder");
+      const targetInput = document.getElementById("move-name-target-folder");
+      const containsInput = document.getElementById("move-name-contains-text");
+      const sourceValue = sourceInput ? sourceInput.value.trim() : "";
+      const targetValue = targetInput ? targetInput.value.trim() : "";
+      const containsValue = containsInput ? containsInput.value.trim() : "";
+      if (!sourceValue) {
+        resultBox.textContent = "Search folder is required.";
+        return;
+      }
+      if (!containsValue) {
+        resultBox.textContent = "File name contains is required.";
+        return;
+      }
+      const phraseErr = phraseCompactDateMonthError(containsValue);
+      if (phraseErr) {
+        resultBox.textContent = phraseErr;
+        return;
+      }
+      if (!targetValue) {
+        resultBox.textContent = "Target folder is required.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Moving direct files...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to move files.");
+        }
+
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while moving files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

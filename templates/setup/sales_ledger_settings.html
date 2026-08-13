@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Ledger Settings · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Sales Ledger Settings</h1>
+      <p class="muted">Map invoice components to COA and select receivables control account.</p>
+    </header>
+
+    <div class="page-actions">
+      <a href="{% url 'chart_of_accounts' %}" class="button button-secondary">COA</a>
+    </div>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+      <div class="sap-row">
+        <label for="{{ form.service_income_account.id_for_label }}">{{ form.service_income_account.label }}</label>
+        <div class="sap-control">
+          {{ form.service_income_account }}
+          {% if form.service_income_account.errors %}
+            <span class="field-error">{{ form.service_income_account.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="sap-row">
+        <label for="{{ form.cgst_output_account.id_for_label }}">{{ form.cgst_output_account.label }}</label>
+        <div class="sap-control">
+          {{ form.cgst_output_account }}
+          {% if form.cgst_output_account.errors %}
+            <span class="field-error">{{ form.cgst_output_account.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="sap-row">
+        <label for="{{ form.sgst_output_account.id_for_label }}">{{ form.sgst_output_account.label }}</label>
+        <div class="sap-control">
+          {{ form.sgst_output_account }}
+          {% if form.sgst_output_account.errors %}
+            <span class="field-error">{{ form.sgst_output_account.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="sap-row">
+        <label for="{{ form.igst_output_account.id_for_label }}">{{ form.igst_output_account.label }}</label>
+        <div class="sap-control">
+          {{ form.igst_output_account }}
+          {% if form.igst_output_account.errors %}
+            <span class="field-error">{{ form.igst_output_account.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="sap-row">
+        <label for="{{ form.sales_ledger_control_account.id_for_label }}">{{ form.sales_ledger_control_account.label }}</label>
+        <div class="sap-control">
+          {{ form.sales_ledger_control_account }}
+          {% if form.sales_ledger_control_account.errors %}
+            <span class="field-error">{{ form.sales_ledger_control_account.errors.0 }}</span>
+          {% endif %}
+          <p class="muted" style="margin:0.35rem 0 0;">
+            Use this as the receivables control account when capturing invoice balances.
+          </p>
+        </div>
+      </div>
+      <div class="sap-actions">
+        <button type="submit" class="button">Save Sales Ledger Settings</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

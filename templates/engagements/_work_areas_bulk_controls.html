@@ -1,0 +1,29 @@
+{% if user.is_superuser %}
+  <button
+    type="button"
+    class="button button-secondary"
+    data-wa-bulk-add-all
+    data-confirm="Add all standard work areas that have checklist lines, and add all checklist lines to each work area notes log?"
+  >Add all</button>
+  <button
+    type="button"
+    class="button button-secondary"
+    data-wa-bulk-delete-all
+    data-confirm="Delete all work areas that have no notes or queries? Work areas with saved notes will be kept."
+  >Delete all</button>
+  <form id="wa-bulk-csrf-form" class="visually-hidden" aria-hidden="true">
+    {% csrf_token %}
+  </form>
+  <div id="wa-bulk-progress-overlay" class="wa-bulk-progress-overlay" hidden>
+    <div class="wa-bulk-progress-panel" role="dialog" aria-modal="true" aria-labelledby="wa-bulk-progress-title">
+      <h3 id="wa-bulk-progress-title" class="doc-files-subheading" style="margin:0 0 0.75rem 0;">Please wait</h3>
+      <p id="wa-bulk-progress-label" class="muted" style="margin:0 0 0.5rem 0;">Working…</p>
+      <div class="utility-progress-wrap">
+        <div class="utility-progress-track" aria-hidden="true">
+          <div id="wa-bulk-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p id="wa-bulk-progress-status" class="utility-progress-text muted">Starting…</p>
+      </div>
+    </div>
+  </div>
+{% endif %}

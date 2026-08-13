@@ -1,0 +1,743 @@
+{% extends "base.html" %}
+
+{% block title %}Excel to PostgreSQL · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Upload data (Excel → PostgreSQL)</h1>
+      <p class="muted">
+        <strong>What this does:</strong> pick the database (<strong>Load DBs</strong>), choose the sheet — the <strong>table name</strong> is the sheet name (sanitized for PostgreSQL) and must already exist
+        (create it with <a href="{% url 'data_create_table' %}">Create PostgreSQL table</a> using the same sheet if needed). Load columns, select what to import; types come from PostgreSQL.
+        Values longer than a VARCHAR/CHAR limit are <strong>truncated</strong>.
+      </p>
+    </header>
+
+    <form method="post" action="{% url 'select_excel_import_file' %}" class="utility-form-inline" id="excel-select-file-form">
+      {% csrf_token %}
+      <input type="hidden" name="retain_postgres_db" id="retain-postgres-db" value="{{ initial_postgres_db|default:'' }}">
+      <input type="hidden" name="retain_sheet_name" id="retain-sheet-name" value="{{ initial_sheet_name|default:'' }}">
+      <input type="hidden" name="retain_table_name" id="retain-table-name" value="{{ initial_table_name|default:'' }}">
+      <div id="retain-selected-columns-wrap" hidden></div>
+    </form>
+
+    <div class="utility-form-stack excel-import-block">
+      <div class="utility-field-row">
+        <label for="excel-path" class="muted utility-label">Workbook path</label>
+        <div class="utility-field-row__grow">
+          <input id="excel-path" type="text" class="utility-input" value="{{ excel_path }}" readonly>
+          <button type="submit" class="button button-compact button-secondary" form="excel-select-file-form">Select Excel File</button>
+        </div>
+      </div>
+
+      <div class="utility-field-row">
+        <label for="sheet-select" class="muted utility-label">Sheet</label>
+        <div class="utility-field-row__grow">
+          <select id="sheet-select" class="utility-input">
+            <option value="">— Load sheets first —</option>
+          </select>
+          <button type="button" id="load-sheets-btn" class="button button-compact button-secondary">Load sheets</button>
+        </div>
+      </div>
+
+      <p class="muted utility-label excel-import-pg-intro">PostgreSQL database (same connection as the app — Django <code>DATABASES</code> default). Use <strong>Load DBs</strong> to refresh the list.</p>
+
+      <div class="utility-field-row">
+        <label for="postgres-db" class="muted utility-label">Database</label>
+        <div class="utility-field-col">
+          <div class="utility-button-row">
+            <select id="postgres-db" name="postgres_db" form="excel-import-run-form" class="utility-input">
+              <option value="">— Load DBs —</option>
+              {% if initial_postgres_db %}
+              <option value="{{ initial_postgres_db }}" selected>{{ initial_postgres_db }}</option>
+              {% elif default_db %}
+              <option value="{{ default_db }}" selected>{{ default_db }}</option>
+              {% endif %}
+            </select>
+            <button type="button" id="load-databases-btn" class="button button-compact button-secondary">Load DBs</button>
+          </div>
+          <p class="muted utility-footnote" id="pg-db-load-msg" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="utility-field-row">
+        <label for="table-name" class="muted utility-label">Table (from sheet name)</label>
+        <div class="utility-field-row__grow">
+          <input id="table-name" name="table_name" type="text" class="utility-input utility-input-readonly" value="{{ initial_table_name|default:'' }}" placeholder="Select a sheet first" form="excel-import-run-form" readonly autocomplete="off" title="Sanitized from the sheet name (letters, digits, underscore). Matches the sheet you select.">
+          <button type="button" id="load-headers-btn" class="button button-compact button-secondary">Load columns</button>
+          <button type="button" id="match-report-btn" class="button button-compact button-secondary" title="Compares checked columns to PostgreSQL (if none checked, uses every column from the sheet header row).">Column–field match report</button>
+        </div>
+      </div>
+
+      <p class="muted utility-label" id="import-columns-label">Columns to import (must match table column names)</p>
+      <div class="utility-button-row" id="import-column-toolbar" hidden>
+        <button type="button" id="import-col-select-all" class="button button-compact button-secondary">Select all</button>
+        <button type="button" id="import-col-unselect-all" class="button button-compact button-secondary">Unselect all</button>
+      </div>
+      <div id="import-column-list" class="excel-import-column-list" hidden aria-labelledby="import-columns-label"></div>
+
+      <div id="excel-import-match-report-wrap" class="excel-import-match-report-wrap" hidden></div>
+
+      <div id="excel-import-progress-wrap" class="utility-progress-wrap" hidden>
+        <div
+          class="utility-progress-track"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          id="excel-import-progress-track"
+        >
+          <div id="excel-import-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="excel-import-progress-text">Preparing import…</p>
+      </div>
+      <p class="muted" id="excel-import-result" aria-live="polite"></p>
+
+      <form id="excel-import-run-form" method="post" action="{% url 'excel_import_start' %}">
+        {% csrf_token %}
+        <input type="hidden" name="excel_path" id="excel-path-hidden" value="{{ excel_path }}">
+        <input type="hidden" name="sheet_name" id="sheet-name-hidden" value="">
+        <button type="submit" class="button button-compact" id="excel-import-submit-btn">Import to PostgreSQL</button>
+      </form>
+    </div>
+
+    <p class="muted"><a href="{% url 'data_utilities' %}">← Back to Data Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ initial_selected_headers|json_script:"excel-import-retained-columns" }}
+<script>
+  (function () {
+    const selectFileForm = document.getElementById("excel-select-file-form");
+    const retainPostgresDb = document.getElementById("retain-postgres-db");
+    const retainSheetName = document.getElementById("retain-sheet-name");
+    const retainTableName = document.getElementById("retain-table-name");
+    const retainSelectedColumnsWrap = document.getElementById("retain-selected-columns-wrap");
+    const excelPath = document.getElementById("excel-path");
+    const excelPathHidden = document.getElementById("excel-path-hidden");
+    const loadSheetsBtn = document.getElementById("load-sheets-btn");
+    const sheetSelect = document.getElementById("sheet-select");
+    const loadHeadersBtn = document.getElementById("load-headers-btn");
+    const sheetHidden = document.getElementById("sheet-name-hidden");
+    const runForm = document.getElementById("excel-import-run-form");
+    const progressWrap = document.getElementById("excel-import-progress-wrap");
+    const progressTrack = document.getElementById("excel-import-progress-track");
+    const progressBar = document.getElementById("excel-import-progress-bar");
+    const progressText = document.getElementById("excel-import-progress-text");
+    const resultBox = document.getElementById("excel-import-result");
+    const submitBtn = document.getElementById("excel-import-submit-btn");
+    const importColumnList = document.getElementById("import-column-list");
+    const importColumnToolbar = document.getElementById("import-column-toolbar");
+    const importColSelectAll = document.getElementById("import-col-select-all");
+    const importColUnselectAll = document.getElementById("import-col-unselect-all");
+    const postgresDbSelect = document.getElementById("postgres-db");
+    const loadDatabasesBtn = document.getElementById("load-databases-btn");
+    const pgDbLoadMsg = document.getElementById("pg-db-load-msg");
+    const tableName = document.getElementById("table-name");
+    const matchReportBtn = document.getElementById("match-report-btn");
+    const matchReportWrap = document.getElementById("excel-import-match-report-wrap");
+    const defaultDbFromServer = "{{ default_db|default:''|escapejs }}";
+    const retainedSheetFromServer = "{{ initial_sheet_name|default:''|escapejs }}";
+    var retainedColsFromServer = [];
+    try {
+      const retainedColsNode = document.getElementById("excel-import-retained-columns");
+      retainedColsFromServer = retainedColsNode ? JSON.parse(retainedColsNode.textContent || "[]") : [];
+    } catch (_err) {
+      retainedColsFromServer = [];
+    }
+
+    function sheetNameToTableName(sheetLabel) {
+      if (!sheetLabel) {
+        return "";
+      }
+      var safe = sheetLabel
+        .replace(/[^a-zA-Z0-9_]+/g, "_")
+        .replace(/^([0-9])/, "_$1")
+        .toLowerCase();
+      return safe ? safe.slice(0, 63) : "";
+    }
+
+    function syncTableFromSheet() {
+      if (!tableName || !sheetSelect) {
+        return;
+      }
+      if (!sheetSelect.value) {
+        tableName.value = "";
+        return;
+      }
+      var t = sheetNameToTableName(sheetSelect.value);
+      tableName.value = t || "";
+    }
+
+    function getCsrfToken() {
+      const input = runForm.querySelector("input[name=csrfmiddlewaretoken]");
+      return input ? input.value : "";
+    }
+
+    function syncHidden() {
+      if (excelPathHidden && excelPath) {
+        excelPathHidden.value = excelPath.value.trim();
+      }
+    }
+
+    function getSelectedImportColumns() {
+      if (!importColumnList) {
+        return [];
+      }
+      return Array.from(
+        importColumnList.querySelectorAll("input[type=checkbox][name=selected_column]:checked")
+      ).map(function (el) {
+        return el.value;
+      });
+    }
+
+    function syncRetainedState() {
+      if (retainPostgresDb && postgresDbSelect) {
+        retainPostgresDb.value = postgresDbSelect.value || "";
+      }
+      if (retainSheetName && sheetSelect) {
+        retainSheetName.value = sheetSelect.value || "";
+      }
+      if (retainTableName && tableName) {
+        retainTableName.value = tableName.value || "";
+      }
+      if (retainSelectedColumnsWrap) {
+        retainSelectedColumnsWrap.innerHTML = "";
+        getSelectedImportColumns().forEach(function (name) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "retain_selected_column";
+          input.value = name;
+          retainSelectedColumnsWrap.appendChild(input);
+        });
+      }
+    }
+
+    if (excelPath) {
+      excelPath.addEventListener("input", syncHidden);
+      syncHidden();
+    }
+
+    if (sheetSelect && sheetHidden) {
+      sheetSelect.addEventListener("change", function () {
+        sheetHidden.value = sheetSelect.value;
+        syncTableFromSheet();
+        syncRetainedState();
+        if (importColumnList) {
+          importColumnList.innerHTML = "";
+          importColumnList.hidden = true;
+        }
+        if (importColumnToolbar) {
+          importColumnToolbar.hidden = true;
+        }
+      });
+    }
+    if (selectFileForm) {
+      selectFileForm.addEventListener("submit", function () {
+        syncRetainedState();
+      });
+    }
+
+    async function loadPostgresDatabases() {
+      if (!postgresDbSelect) {
+        return;
+      }
+      if (pgDbLoadMsg) {
+        pgDbLoadMsg.textContent = "";
+      }
+      if (loadDatabasesBtn) {
+        loadDatabasesBtn.disabled = true;
+      }
+      try {
+        const res = await fetch("{% url 'pg_list_databases_settings_json' %}", {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list databases.");
+        }
+        const prev = postgresDbSelect.value || (retainPostgresDb && retainPostgresDb.value) || defaultDbFromServer;
+        const names = data.databases || [];
+        postgresDbSelect.innerHTML = "";
+        const o0 = document.createElement("option");
+        o0.value = "";
+        o0.textContent = "— Choose database —";
+        postgresDbSelect.appendChild(o0);
+        names.forEach(function (name) {
+          const o = document.createElement("option");
+          o.value = name;
+          o.textContent = name;
+          postgresDbSelect.appendChild(o);
+        });
+        if (prev && names.indexOf(prev) >= 0) {
+          postgresDbSelect.value = prev;
+        } else if (defaultDbFromServer && names.indexOf(defaultDbFromServer) >= 0) {
+          postgresDbSelect.value = defaultDbFromServer;
+        } else if (names.length === 1) {
+          postgresDbSelect.selectedIndex = 1;
+        }
+        if (pgDbLoadMsg) {
+          pgDbLoadMsg.textContent = "Loaded " + names.length + " database(s).";
+        }
+        syncRetainedState();
+      } catch (e) {
+        if (pgDbLoadMsg) {
+          pgDbLoadMsg.textContent = e.message || "Failed to list databases.";
+        }
+      } finally {
+        if (loadDatabasesBtn) {
+          loadDatabasesBtn.disabled = false;
+        }
+      }
+    }
+
+    if (loadDatabasesBtn) {
+      loadDatabasesBtn.addEventListener("click", function () {
+        loadPostgresDatabases();
+      });
+    }
+    loadPostgresDatabases();
+
+    loadSheetsBtn.addEventListener("click", async function () {
+      loadSheetsBtn.disabled = true;
+      try {
+        const res = await fetch("{% url 'excel_import_sheets_json' %}", {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not load sheets.");
+        }
+        sheetSelect.innerHTML = "";
+        const opt0 = document.createElement("option");
+        opt0.value = "";
+        opt0.textContent = "— Choose a sheet —";
+        sheetSelect.appendChild(opt0);
+        const sheets = data.sheets || [];
+        sheets.forEach(function (name) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          sheetSelect.appendChild(opt);
+        });
+        if (retainedSheetFromServer && sheets.indexOf(retainedSheetFromServer) >= 0) {
+          sheetSelect.value = retainedSheetFromServer;
+          sheetHidden.value = retainedSheetFromServer;
+          syncTableFromSheet();
+        } else if (sheets.length === 1) {
+          sheetSelect.selectedIndex = 1;
+          sheetHidden.value = sheets[0];
+          syncTableFromSheet();
+        }
+        syncRetainedState();
+      } catch (e) {
+        alert(e.message || "Failed to load sheets.");
+      } finally {
+        loadSheetsBtn.disabled = false;
+      }
+    });
+
+    function fillImportColumns(headers) {
+      if (!importColumnList || !importColumnToolbar) {
+        return;
+      }
+      importColumnList.innerHTML = "";
+      const retainedSet = new Set((retainedColsFromServer || []).map(function (x) {
+        return String(x);
+      }));
+      const useRetained = retainedSet.size > 0;
+      (headers || []).forEach(function (h, idx) {
+        const row = document.createElement("label");
+        row.className = "excel-import-column-row";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.name = "selected_column";
+        cb.value = h;
+        cb.checked = useRetained ? retainedSet.has(h) : true;
+        cb.setAttribute("form", "excel-import-run-form");
+        cb.addEventListener("change", function () {
+          syncRetainedState();
+        });
+        const span = document.createElement("span");
+        span.textContent = h || "(column " + (idx + 1) + ")";
+        row.appendChild(cb);
+        row.appendChild(span);
+        importColumnList.appendChild(row);
+      });
+      const hasCols = (headers || []).length > 0;
+      importColumnList.hidden = !hasCols;
+      importColumnToolbar.hidden = !hasCols;
+      retainedColsFromServer = [];
+      syncRetainedState();
+    }
+
+    function formatMismatchWarning(payload) {
+      var check = (payload && payload.mapping_check) || {};
+      var lines = [];
+      if (payload && payload.message) {
+        lines.push(payload.message);
+      } else {
+        lines.push("Column mismatch detected between Excel and destination table.");
+      }
+      var missing = check.missing_in_table || [];
+      var tableOnly = check.table_only_columns || [];
+      if (missing.length) {
+        lines.push("");
+        lines.push("Selected Excel columns missing in table:");
+        lines.push(missing.join(", "));
+      }
+      if (tableOnly.length) {
+        lines.push("");
+        lines.push("Table columns not in selected Excel columns:");
+        lines.push(tableOnly.join(", "));
+      }
+      lines.push("");
+      lines.push("Proceed with import anyway?");
+      return lines.join("\n");
+    }
+
+    if (importColSelectAll && importColumnList) {
+      importColSelectAll.addEventListener("click", function () {
+        importColumnList.querySelectorAll("input[type=checkbox][name=selected_column]").forEach(function (el) {
+          el.checked = true;
+        });
+        syncRetainedState();
+      });
+    }
+    if (importColUnselectAll && importColumnList) {
+      importColUnselectAll.addEventListener("click", function () {
+        importColumnList.querySelectorAll("input[type=checkbox][name=selected_column]").forEach(function (el) {
+          el.checked = false;
+        });
+        syncRetainedState();
+      });
+    }
+
+    loadHeadersBtn.addEventListener("click", async function () {
+      const sheet = sheetSelect.value;
+      if (!sheet) {
+        alert("Select a sheet first.");
+        return;
+      }
+      sheetHidden.value = sheet;
+      loadHeadersBtn.disabled = true;
+      try {
+        const url = "{% url 'excel_import_headers_json' %}?sheet=" + encodeURIComponent(sheet);
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not load columns.");
+        }
+        fillImportColumns(data.headers);
+        syncRetainedState();
+      } catch (e) {
+        alert(e.message || "Failed to load columns.");
+      } finally {
+        loadHeadersBtn.disabled = false;
+      }
+    });
+    if (postgresDbSelect) {
+      postgresDbSelect.addEventListener("change", syncRetainedState);
+    }
+    syncRetainedState();
+
+    function escapeHtmlCell(text) {
+      if (text === null || text === undefined) {
+        return "";
+      }
+      const div = document.createElement("div");
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
+    function renderMatchReportHtml(report) {
+      const db =
+        postgresDbSelect && postgresDbSelect.value ? postgresDbSelect.value : "";
+      const tbl =
+        tableName && tableName.value ? tableName.value : report.table_name || "";
+      const exact = !!report.exact_match;
+      const summary =
+        '<p class="excel-import-report-summary">' +
+        "<strong>" +
+        (exact
+          ? "Selected columns match the destination table exactly (names and coverage)."
+          : "There are differences between the sheet selection and the table — see the tables below.") +
+        "</strong> " +
+        "Database <code>" +
+        escapeHtmlCell(db) +
+        "</code>, table <code>public." +
+        escapeHtmlCell(tbl) +
+        "</code>. Columns in this report: " +
+        (report.selected_excel_count || 0) +
+        "; columns on the table: " +
+        (report.table_column_count || 0) +
+        ".</p>";
+
+      const head =
+        "<thead><tr><th>Excel header</th><th>Import name</th><th>PostgreSQL column</th><th>PostgreSQL type</th><th>Status</th></tr></thead>";
+      const bodyRows = (report.selected_columns || []).map(function (p) {
+        const status = p.matches_table ? "Matched" : "Not in table";
+        const statusClass = p.matches_table ? "excel-match-ok" : "excel-match-bad";
+        return (
+          "<tr><td>" +
+          escapeHtmlCell(p.excel_header) +
+          "</td><td><code>" +
+          escapeHtmlCell(p.sanitized_name) +
+          "</code></td><td>" +
+          escapeHtmlCell(p.postgres_column || "—") +
+          "</td><td>" +
+          escapeHtmlCell(p.postgres_type || "—") +
+          '</td><td class="' +
+          statusClass +
+          '">' +
+          escapeHtmlCell(status) +
+          "</td></tr>"
+        );
+      });
+      const t1 =
+        '<div class="table-wrap"><table class="data-grid excel-import-match-table">' +
+        head +
+        "<tbody>" +
+        bodyRows.join("") +
+        "</tbody></table></div>";
+
+      var extra = "";
+      const details = report.table_only_details || [];
+      if (details.length) {
+        const h =
+          "<h3 class=\"excel-import-report-subheading\">Table columns not in this import selection</h3>";
+        const th =
+          "<thead><tr><th>PostgreSQL column</th><th>PostgreSQL type</th></tr></thead>";
+        const rows = details.map(function (d) {
+          return (
+            "<tr><td>" +
+            escapeHtmlCell(d.postgres_column) +
+            "</td><td>" +
+            escapeHtmlCell(d.postgres_type || "—") +
+            "</td></tr>"
+          );
+        });
+        extra =
+          h +
+          '<div class="table-wrap"><table class="data-grid excel-import-match-table">' +
+          th +
+          "<tbody>" +
+          rows.join("") +
+          "</tbody></table></div>";
+      }
+
+      return (
+        '<h2 class="excel-import-report-heading">Column–field match report</h2>' +
+        summary +
+        t1 +
+        extra
+      );
+    }
+
+    if (matchReportBtn && matchReportWrap) {
+      matchReportBtn.addEventListener("click", async function () {
+        sheetHidden.value = sheetSelect.value;
+        syncHidden();
+        if (!sheetSelect.value) {
+          alert("Select a sheet first.");
+          return;
+        }
+        if (postgresDbSelect && !postgresDbSelect.value.trim()) {
+          alert("Select a PostgreSQL database (use Load DBs if the list is empty).");
+          return;
+        }
+        if (tableName && !tableName.value.trim()) {
+          alert("Enter the destination table name (select a sheet to fill it).");
+          return;
+        }
+        matchReportBtn.disabled = true;
+        matchReportWrap.hidden = false;
+        matchReportWrap.innerHTML =
+          '<p class="muted">Running match report…</p>';
+        const formData = new FormData(runForm);
+        try {
+          const res = await fetch("{% url 'excel_import_match_report' %}", {
+            method: "POST",
+            body: formData,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken(),
+            },
+          });
+          const payload = await res.json();
+          if (!res.ok || !payload.ok) {
+            throw new Error(payload.message || "Match report failed.");
+          }
+          matchReportWrap.innerHTML = renderMatchReportHtml(payload.report || {});
+        } catch (err) {
+          matchReportWrap.innerHTML =
+            '<p class="field-error">' +
+            escapeHtmlCell(err.message || "Match report failed.") +
+            "</p>";
+        } finally {
+          matchReportBtn.disabled = false;
+        }
+      });
+    }
+
+    runForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      sheetHidden.value = sheetSelect.value;
+      syncHidden();
+      if (!sheetSelect.value) {
+        alert("Select a sheet.");
+        return;
+      }
+      if (
+        !progressWrap ||
+        !progressBar ||
+        !progressText ||
+        !resultBox ||
+        !submitBtn ||
+        !runForm
+      ) {
+        return;
+      }
+
+      const postgresDb = document.getElementById("postgres-db");
+      const tableNameEl = document.getElementById("table-name");
+      if (postgresDb && !postgresDb.value.trim()) {
+        alert("Select a PostgreSQL database (use Load DBs if the list is empty).");
+        return;
+      }
+      if (tableNameEl && !tableNameEl.value.trim()) {
+        alert("Enter the destination table name.");
+        return;
+      }
+
+      if (importColumnList && !importColumnList.hidden) {
+        const checked = importColumnList.querySelectorAll(
+          "input[type=checkbox][name=selected_column]:checked"
+        );
+        if (checked.length === 0) {
+          alert("Select at least one column to import (use Select all if needed).");
+          return;
+        }
+      }
+
+      const formData = new FormData(runForm);
+
+      try {
+        let response = await fetch(runForm.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        let payload = await response.json();
+        if (response.status === 409 && payload && payload.needs_confirmation) {
+          const warningText = formatMismatchWarning(payload);
+          const proceed = window.confirm(warningText);
+          if (!proceed) {
+            return;
+          }
+          formData.append("confirm_mismatch", "1");
+          response = await fetch(runForm.action, {
+            method: "POST",
+            body: formData,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken()
+            }
+          });
+          payload = await response.json();
+        }
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Could not start import.");
+        }
+        const jobId = payload.job_id;
+        if (!jobId) {
+          throw new Error("Import job id missing.");
+        }
+
+        resultBox.textContent = "";
+        progressWrap.hidden = false;
+        submitBtn.disabled = true;
+        progressText.textContent = "Starting import…";
+        progressBar.style.width = "5%";
+        if (progressTrack) {
+          progressTrack.setAttribute("aria-valuenow", "5");
+        }
+
+        const statusUrl =
+          "{% url 'excel_import_status' 'JOB_ID_PLACEHOLDER' %}".replace(
+            "JOB_ID_PLACEHOLDER",
+            jobId
+          );
+        let attempts = 0;
+        const maxAttempts = 7200;
+
+        while (attempts < maxAttempts) {
+          attempts += 1;
+          const statusResponse = await fetch(statusUrl, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok || !statusPayload.ok) {
+            throw new Error(statusPayload.message || "Failed to read import status.");
+          }
+
+          const percent = Number(statusPayload.progress_percent || 5);
+          const clamped = Math.min(Math.max(percent, 5), 100);
+          progressBar.style.width = clamped + "%";
+          if (progressTrack) {
+            progressTrack.setAttribute("aria-valuenow", String(Math.round(clamped)));
+          }
+          progressText.textContent = statusPayload.message || "Processing…";
+
+          if (statusPayload.done) {
+            if (statusPayload.error) {
+              throw new Error(statusPayload.error);
+            }
+            const res = statusPayload.result || {};
+            const inserted = res.inserted != null ? res.inserted : 0;
+            const dbn = res.database || (postgresDb && postgresDb.value.trim()) || "";
+            const tbl = res.table_name || (tableNameEl && tableNameEl.value.trim()) || "";
+            progressBar.style.width = "100%";
+            if (progressTrack) {
+              progressTrack.setAttribute("aria-valuenow", "100");
+            }
+            progressText.textContent = "Completed.";
+            var msg =
+              "Imported " +
+              inserted.toLocaleString() +
+              " row(s) into " +
+              dbn +
+              ".public." +
+              tbl +
+              ".";
+            if (res.columns_not_in_table && res.columns_not_in_table.length) {
+              msg +=
+                " Sheet columns not in the table (skipped): " +
+                res.columns_not_in_table.join(", ") +
+                ".";
+            }
+            resultBox.textContent = msg;
+            return;
+          }
+
+          await new Promise(function (resolve) {
+            window.setTimeout(resolve, 500);
+          });
+        }
+        throw new Error("Import is still running. Refresh the page and try again later.");
+      } catch (err) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = err.message || "Import failed.";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>
+{% endblock %}

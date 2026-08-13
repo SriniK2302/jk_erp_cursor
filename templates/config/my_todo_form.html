@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{% if todo %}Edit task{% else %}New task{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if todo %}Edit task{% else %}New task{% endif %}</h1>
+      <p class="muted">Task name is required. Description and target date are optional.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.title.id_for_label }}">Task name</label>
+        <div class="sap-control">
+          {{ form.title }}
+          {% if form.title.errors %}<span class="field-error">{{ form.title.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.description.id_for_label }}">Description</label>
+        <div class="sap-control">
+          {{ form.description }}
+          {% if form.description.errors %}<span class="field-error">{{ form.description.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.target_date.id_for_label }}">Target date</label>
+        <div class="sap-control">
+          {{ form.target_date }}
+          {% if form.target_date.errors %}<span class="field-error">{{ form.target_date.errors.0 }}</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'my_todos' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if todo %}Save{% else %}Add task{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'my_todos' %}">← My to-do list</a></p>
+  </section>
+</div>
+{% endblock %}

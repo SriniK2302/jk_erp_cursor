@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}PostgreSQL delete rows · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>PostgreSQL delete rows</h1>
+      <p class="muted">
+        Enter host, port, username, and password (defaults match this app). Use <strong>Load DBs</strong> to fill the database list, then pick a database — tables in <strong>public</strong> load automatically.
+        <strong>Test connection</strong> is optional. Passwords are not stored. Delete with up to three filters (AND), or delete <strong>all</strong> rows after typing the exact table name to confirm.
+      </p>
+    </header>
+
+    <div class="utility-form-stack excel-import-block pg-delete-page">
+      <div class="utility-field-row">
+        <label for="pg-host" class="muted utility-label">Host</label>
+        <input id="pg-host" name="pg_host" type="text" class="utility-input" value="{{ default_host }}" form="pg-delete-form" autocomplete="off">
+      </div>
+      <div class="utility-field-row">
+        <label for="pg-port" class="muted utility-label">Port</label>
+        <input id="pg-port" name="pg_port" type="text" class="utility-input" value="{{ default_port }}" form="pg-delete-form" autocomplete="off">
+      </div>
+      <div class="utility-field-row">
+        <label for="pg-user" class="muted utility-label">Username</label>
+        <input id="pg-user" name="pg_user" type="text" class="utility-input" value="{{ default_user }}" form="pg-delete-form" autocomplete="username">
+      </div>
+      <div class="utility-field-row">
+        <label for="pg-password" class="muted utility-label">Password</label>
+        <input id="pg-password" name="pg_password" type="password" class="utility-input" value="" form="pg-delete-form" autocomplete="current-password">
+      </div>
+
+      <div class="utility-field-row">
+        <label for="pg-dbname" class="muted utility-label">Database</label>
+        <div class="utility-field-row__grow">
+          <select id="pg-dbname" name="pg_dbname" form="pg-delete-form" class="utility-input" autocomplete="off">
+            <option value="">— Load DBs —</option>
+            {% if default_db %}
+            <option value="{{ default_db }}" selected>{{ default_db }}</option>
+            {% endif %}
+          </select>
+          <button type="button" id="load-databases-btn" class="button button-compact button-secondary">Load DBs</button>
+        </div>
+      </div>
+
+      <div class="utility-field-row">
+        <span class="muted utility-label"></span>
+        <div class="pg-delete-test-wrap">
+          <div class="utility-button-row">
+            <button type="button" id="test-conn-btn" class="button button-compact">Test connection</button>
+          </div>
+          <p class="muted pg-delete-conn-msg" id="pg-conn-test-result" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="utility-field-row">
+        <label for="table-select" class="muted utility-label">Table (public)</label>
+        <select
+          id="table-select"
+          name="table_name"
+          class="utility-input"
+          form="pg-delete-form"
+          autocomplete="off"
+        >
+          <option value="">— Select a database first —</option>
+        </select>
+      </div>
+
+      <div class="utility-field-row">
+        <span class="muted utility-label" aria-hidden="true"></span>
+        <div class="utility-button-row">
+          <button type="button" id="load-columns-btn" class="button button-compact button-secondary">Load columns for filters</button>
+        </div>
+      </div>
+
+      <p class="muted utility-label">Row filters (optional unless not deleting all): column, operator, value. All set filters are combined with AND.</p>
+      {% for i in "123" %}
+      <div class="pg-delete-filter-row">
+        <label class="muted" for="filter{{ i }}_col">Filter {{ i }}</label>
+        <select id="filter{{ i }}_col" name="filter{{ i }}_col" class="utility-input filter-col" form="pg-delete-form">
+          <option value="">— Column —</option>
+        </select>
+        <select id="filter{{ i }}_op" name="filter{{ i }}_op" class="utility-input filter-op" form="pg-delete-form">
+          <option value="">— Op —</option>
+          <option value="=">=</option>
+          <option value="<>">&lt;&gt;</option>
+          <option value="!=">!=</option>
+          <option value="<">&lt;</option>
+          <option value=">">&gt;</option>
+          <option value="<=">&lt;=</option>
+          <option value=">=">&gt;=</option>
+          <option value="LIKE">LIKE</option>
+          <option value="ILIKE">ILIKE</option>
+        </select>
+        <input id="filter{{ i }}_val" name="filter{{ i }}_val" type="text" class="utility-input filter-val" placeholder="Value" form="pg-delete-form" autocomplete="off">
+      </div>
+      {% endfor %}
+
+      <div class="excel-import-column-row" style="margin-top: 0.5rem;">
+        <input type="checkbox" id="delete-all" name="delete_all" value="1" form="pg-delete-form">
+        <label for="delete-all">Delete <strong>all</strong> rows in this table (ignores filters). Requires confirmation below.</label>
+      </div>
+      <div class="utility-field-row">
+        <label for="delete-all-confirm" class="muted utility-label">Confirm delete-all</label>
+        <input id="delete-all-confirm" name="delete_all_confirm" type="text" class="utility-input" placeholder="Type exact table name" form="pg-delete-form" autocomplete="off">
+      </div>
+
+      <p class="muted" id="pg-delete-result" aria-live="polite"></p>
+
+      <form id="pg-delete-form" method="post" action="{% url 'pg_row_delete_execute' %}">
+        {% csrf_token %}
+        <button type="submit" class="button button-compact" id="pg-delete-submit">Execute delete</button>
+      </form>
+    </div>
+
+    <p class="muted"><a href="{% url 'data_utilities' %}">← Back to Data Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("pg-delete-form");
+    const testConnBtn = document.getElementById("test-conn-btn");
+    const connTestResult = document.getElementById("pg-conn-test-result");
+    const loadDatabasesBtn = document.getElementById("load-databases-btn");
+    const pgDbnameSelect = document.getElementById("pg-dbname");
+    const loadColsBtn = document.getElementById("load-columns-btn");
+    const tableSelect = document.getElementById("table-select");
+    const deleteAll = document.getElementById("delete-all");
+    const deleteAllConfirm = document.getElementById("delete-all-confirm");
+    const resultBox = document.getElementById("pg-delete-result");
+    const filterCols = document.querySelectorAll(".filter-col");
+
+    function getCsrfToken() {
+      const input = form.querySelector("input[name=csrfmiddlewaretoken]");
+      return input ? input.value : "";
+    }
+
+    function connFormData() {
+      const fd = new FormData();
+      fd.append("pg_host", document.getElementById("pg-host").value.trim());
+      fd.append("pg_port", document.getElementById("pg-port").value.trim());
+      fd.append("pg_user", document.getElementById("pg-user").value.trim());
+      fd.append("pg_password", document.getElementById("pg-password").value);
+      fd.append("pg_dbname", pgDbnameSelect.value.trim());
+      return fd;
+    }
+
+    async function refreshTablesList() {
+      const db = pgDbnameSelect.value.trim();
+      tableSelect.innerHTML = "";
+      const o0 = document.createElement("option");
+      o0.value = "";
+      o0.textContent = db ? "— Choose a table —" : "— Select a database first —";
+      tableSelect.appendChild(o0);
+      if (!db) {
+        return;
+      }
+      resultBox.textContent = "";
+      try {
+        const fd = connFormData();
+        const res = await fetch("{% url 'pg_row_delete_tables_json' %}", {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list tables.");
+        }
+        tableSelect.innerHTML = "";
+        const o1 = document.createElement("option");
+        o1.value = "";
+        o1.textContent = "— Choose a table —";
+        tableSelect.appendChild(o1);
+        (data.tables || []).forEach(function (name) {
+          const o = document.createElement("option");
+          o.value = name;
+          o.textContent = name;
+          tableSelect.appendChild(o);
+        });
+      } catch (e) {
+        resultBox.textContent = e.message || "Failed to list tables.";
+      }
+    }
+
+    async function loadPostgresDatabases() {
+      if (!loadDatabasesBtn || !pgDbnameSelect) {
+        return;
+      }
+      loadDatabasesBtn.disabled = true;
+      connTestResult.textContent = "";
+      resultBox.textContent = "";
+      try {
+        const fd = new FormData();
+        fd.append("pg_host", document.getElementById("pg-host").value.trim());
+        fd.append("pg_port", document.getElementById("pg-port").value.trim());
+        fd.append("pg_user", document.getElementById("pg-user").value.trim());
+        fd.append("pg_password", document.getElementById("pg-password").value);
+        fd.append("pg_dbname", pgDbnameSelect.value.trim());
+        fd.append("csrfmiddlewaretoken", getCsrfToken());
+        const res = await fetch("{% url 'pg_list_databases_json' %}", {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list databases.");
+        }
+        const prev = pgDbnameSelect.value;
+        const names = data.databases || [];
+        pgDbnameSelect.innerHTML = "";
+        const o0 = document.createElement("option");
+        o0.value = "";
+        o0.textContent = "— Choose database —";
+        pgDbnameSelect.appendChild(o0);
+        names.forEach(function (name) {
+          const o = document.createElement("option");
+          o.value = name;
+          o.textContent = name;
+          pgDbnameSelect.appendChild(o);
+        });
+        if (prev && names.indexOf(prev) >= 0) {
+          pgDbnameSelect.value = prev;
+        } else if (names.length === 1) {
+          pgDbnameSelect.selectedIndex = 1;
+        }
+        connTestResult.textContent = "Loaded " + names.length + " database(s). Pick one; tables refresh automatically.";
+        await refreshTablesList();
+      } catch (e) {
+        connTestResult.textContent = e.message || "Failed to list databases.";
+      } finally {
+        loadDatabasesBtn.disabled = false;
+      }
+    }
+
+    if (loadDatabasesBtn) {
+      loadDatabasesBtn.addEventListener("click", function () {
+        loadPostgresDatabases();
+      });
+    }
+
+    if (pgDbnameSelect) {
+      pgDbnameSelect.addEventListener("change", function () {
+        deleteAllConfirm.value = "";
+        refreshTablesList();
+      });
+    }
+
+    if (testConnBtn && connTestResult) {
+      testConnBtn.addEventListener("click", async function () {
+        testConnBtn.disabled = true;
+        connTestResult.textContent = "";
+        resultBox.textContent = "";
+        try {
+          const fd = connFormData();
+          const res = await fetch("{% url 'pg_row_delete_test_json' %}", {
+            method: "POST",
+            body: fd,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken()
+            }
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message || "Connection failed.");
+          }
+          connTestResult.textContent = data.message || "Connected.";
+        } catch (e) {
+          connTestResult.textContent = e.message || "Connection failed.";
+        } finally {
+          testConnBtn.disabled = false;
+        }
+      });
+    }
+
+    if (pgDbnameSelect && pgDbnameSelect.value) {
+      refreshTablesList();
+    }
+
+    function fillFilterColumns(cols) {
+      filterCols.forEach(function (sel) {
+        const cur = sel.value;
+        sel.innerHTML = "";
+        const o0 = document.createElement("option");
+        o0.value = "";
+        o0.textContent = "— Column —";
+        sel.appendChild(o0);
+        (cols || []).forEach(function (c) {
+          const o = document.createElement("option");
+          o.value = c;
+          o.textContent = c;
+          sel.appendChild(o);
+        });
+        if (cur && Array.from(sel.options).some(function (o) { return o.value === cur; })) {
+          sel.value = cur;
+        }
+      });
+    }
+
+    loadColsBtn.addEventListener("click", async function () {
+      const t = tableSelect.value;
+      if (!t) {
+        alert("Select a table first.");
+        return;
+      }
+      loadColsBtn.disabled = true;
+      resultBox.textContent = "";
+      try {
+        const fd = connFormData();
+        fd.append("table_name", t);
+        const res = await fetch("{% url 'pg_row_delete_columns_json' %}", {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not load columns.");
+        }
+        if (data.table_name) {
+          tableSelect.value = data.table_name;
+        }
+        fillFilterColumns(data.columns);
+      } catch (e) {
+        alert(e.message || "Failed to load columns.");
+      } finally {
+        loadColsBtn.disabled = false;
+      }
+    });
+
+    tableSelect.addEventListener("change", function () {
+      deleteAllConfirm.value = "";
+    });
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if (!tableSelect.value) {
+        alert("Select a table.");
+        return;
+      }
+      if (deleteAll.checked) {
+        if (deleteAllConfirm.value.trim() !== tableSelect.value) {
+          alert("To delete all rows, type the exact table name in the confirmation field.");
+          return;
+        }
+      } else {
+        let any = false;
+        for (let i = 1; i <= 3; i++) {
+          const c = document.getElementById("filter" + i + "_col");
+          const o = document.getElementById("filter" + i + "_op");
+          const v = document.getElementById("filter" + i + "_val");
+          if (c && o && c.value && o.value) {
+            any = true;
+            break;
+          }
+        }
+        if (!any) {
+          alert("Add at least one complete filter (column + operator + value), or check delete-all and confirm the table name.");
+          return;
+        }
+      }
+
+      resultBox.textContent = "";
+      const submitBtn = document.getElementById("pg-delete-submit");
+      submitBtn.disabled = true;
+      try {
+        const fd = new FormData(form);
+        const res = await fetch(form.action, {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Delete failed.");
+        }
+        resultBox.textContent = data.message || ("Deleted " + data.deleted + " row(s).");
+      } catch (e) {
+        resultBox.textContent = e.message || "Delete failed.";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  })();
+</script>
+{% endblock %}

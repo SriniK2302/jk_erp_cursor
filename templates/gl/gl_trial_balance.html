@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}GL Trial Balance · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>GL Trial Balance</h1>
+      <p class="muted">Choose a <strong>fiscal year</strong> and <strong>Show report</strong>. Leave <strong>Period</strong> as <em>Full year</em> to use GL posting rules (in-period activity, or brought-forward BS + Retained Earnings when the FY has no postings). Choose a <strong>calendar month</strong> within the FY to load balances from <code>tb_table_month</code> (posting-month buckets). With <strong>YTD</strong> checked (default), amounts are <strong>cumulative</strong> from the first month of the FY through the selected month; uncheck for that month only. Positive net → Debit; negative → Credit.</p>
+    </header>
+
+    {% if fiscal_years %}
+      <form method="get" class="sap-form" action="{% url 'gl_trial_balance' %}">
+        <div class="sap-row">
+          <label for="id_gl_tb_fy">Fiscal year</label>
+          <div class="sap-control">
+            <select name="fy" id="id_gl_tb_fy" class="input-medium" required>
+              {% for fy in fiscal_years %}
+                <option value="{{ fy.pk }}"{% if selected_fy and fy.pk == selected_fy.pk %} selected{% endif %}>
+                  {{ fy.fy_no }} — {{ fy.start_date|date:"Y-m-d" }} to {{ fy.end_date|date:"Y-m-d" }}
+                  {% if current_fy and fy.pk == current_fy.pk %} (current){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            {% if current_fy %}
+              <p class="muted invoice-udin-hint">Current FY by calendar: <strong>{{ current_fy.fy_no }}</strong> (pre-selected when you open this page).</p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="id_gl_tb_month">Period</label>
+          <div class="sap-control">
+            <select name="month" id="id_gl_tb_month" class="input-medium">
+              <option value=""{% if not selected_month_param %} selected{% endif %}>Full year (GL rules)</option>
+              {% for m in month_options %}
+                <option value="{{ m.period_from|date:"Y-m-d" }}"{% if selected_month_param == m.period_from|date:"Y-m-d" %} selected{% endif %}>
+                  {{ m.label }} ({{ m.period_from|date:"Y-m-d" }} to {{ m.period_to|date:"Y-m-d" }})
+                </option>
+              {% endfor %}
+            </select>
+            <p class="muted invoice-udin-hint">Monthly view reads <strong>tb_table_month</strong>. The period list updates when you change fiscal year.</p>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="gl-tb-ytd-on">YTD</label>
+          <div class="sap-control" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <input type="hidden" name="ytd" value="0">
+            <input type="checkbox" name="ytd" value="1" id="gl-tb-ytd-on" {% if tb_month_ytd %}checked{% endif %}>
+            <span class="muted">Cumulative from FY start through selected period (default on)</span>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Show report</button>
+        </div>
+      </form>
+      {{ fy_months_json|json_script:"gl-tb-fy-months-data" }}
+      <script>
+      (function () {
+        var fySel = document.getElementById("id_gl_tb_fy");
+        var moSel = document.getElementById("id_gl_tb_month");
+        var dataEl = document.getElementById("gl-tb-fy-months-data");
+        if (!fySel || !moSel || !dataEl) return;
+        var byFy;
+        try {
+          byFy = JSON.parse(dataEl.textContent);
+        } catch (e) {
+          return;
+        }
+        function syncPeriodOptions() {
+          var pk = fySel.value;
+          var months = byFy[pk] || [];
+          var prev = moSel.value;
+          moSel.innerHTML = "";
+          var o0 = document.createElement("option");
+          o0.value = "";
+          o0.textContent = "Full year (GL rules)";
+          moSel.appendChild(o0);
+          months.forEach(function (entry) {
+            var o = document.createElement("option");
+            o.value = entry.value;
+            o.textContent = entry.label;
+            moSel.appendChild(o);
+          });
+          var valid = months.some(function (entry) { return entry.value === prev; });
+          moSel.value = valid ? prev : "";
+        }
+        fySel.addEventListener("change", syncPeriodOptions);
+        syncPeriodOptions();
+      })();
+      </script>
+
+      {% if report_submitted and selected_fy %}
+        <h2 style="margin-top: 1.25rem; font-size: 1.1rem; font-weight: 600;">
+          {{ selected_fy.fy_no }}
+          {% if use_tb_table_month %}
+            {% if tb_month_ytd %}
+              · YTD through {{ month_label }} <span class="muted">(tb_table_month)</span>
+            {% else %}
+              · {{ month_label }} <span class="muted">(tb_table_month, month only)</span>
+            {% endif %}
+          {% endif %}
+          · {{ tb_rows|length }} row{{ tb_rows|length|pluralize }}
+        </h2>
+        {% if tb_rows %}
+          {% if tb_balanced %}
+            <p class="muted">Debit and credit column totals match (within 0.01).</p>
+          {% else %}
+            <p class="field-error">Debit total {{ total_dr|floatformat:"2g" }} vs credit total {{ total_cr|floatformat:"2g" }}.</p>
+          {% endif %}
+          <div class="table-wrap" style="margin-top: 0.75rem;">
+            <table class="data-grid data-grid-wrap" aria-label="GL trial balance">
+              <thead>
+                <tr>
+                  <th>Account name</th>
+                  <th>Code</th>
+                  <th class="num">Debit</th>
+                  <th class="num">Credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in tb_rows %}
+                  <tr>
+                    <td>{{ row.account_name }}</td>
+                    <td>{% if row.account_code %}{{ row.account_code }}{% else %}—{% endif %}</td>
+                    <td class="num">{% if row.debit is not None %}{{ row.debit|floatformat:"2g" }}{% endif %}</td>
+                    <td class="num">{% if row.credit is not None %}{{ row.credit|floatformat:"2g" }}{% endif %}</td>
+                  </tr>
+                {% endfor %}
+                <tr>
+                  <td colspan="2"><strong>Total</strong></td>
+                  <td class="num"><strong>{{ total_dr|floatformat:"2g" }}</strong></td>
+                  <td class="num"><strong>{{ total_cr|floatformat:"2g" }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted" style="margin-top: 1rem;">
+            {% if use_tb_table_month %}
+              {% if tb_month_ytd %}
+                No <strong>tb_table_month</strong> data for {{ selected_fy.fy_no }} from FY start through {{ month_label }}. Post journals in that range or run <code>python manage.py sync_gl_tb</code>.
+              {% else %}
+                No <strong>tb_table_month</strong> rows for {{ selected_fy.fy_no }} and {{ month_label }}. Post journals for that month or run <code>python manage.py sync_gl_tb</code>.
+              {% endif %}
+            {% else %}
+              Nothing to report for this fiscal year under the current rules (no Authorised GL lines in-period, and no brought-forward balances).
+            {% endif %}
+          </p>
+        {% endif %}
+      {% endif %}
+    {% else %}
+      <p class="muted">No fiscal years are defined. Add them under <a href="{% url 'fiscal_years' %}">Setup → GL → Fiscal years</a>.</p>
+    {% endif %}
+
+    <p class="muted" style="margin-top: 1.25rem;">
+      <a href="{% url 'gl_hub' %}">← GL hub</a>
+      ·
+      <a href="{% url 'setup' %}">Setup</a>
+      ·
+      <a href="{% url 'home' %}">Home</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

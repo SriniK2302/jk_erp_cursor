@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Work Areas — By Engagement · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work Areas — By engagement</h1>
+      <p class="muted">Select an engagement to open its engagement-level work areas.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search engagements..."
+          aria-label="Search engagements"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter engagements">
+        <span class="grid-filter-bar__label muted">View:</span>
+        <a href="{% url 'work_area_pick_engagement' %}?status=active" class="filter-chip{% if work_area_status_filter == 'active' %} filter-chip--active{% endif %}">Active</a>
+        <a href="{% url 'work_area_pick_engagement' %}?status=all" class="filter-chip{% if work_area_status_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>FY</th>
+              <th>Service</th>
+              <th>Work areas</th>
+              <th class="col-actions">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in engagements %}
+              <tr data-grid-row>
+                <td>{{ item.client.display_name }}</td>
+                <td>{{ item.fiscal_year.fy_no }}</td>
+                <td>{{ item.service.service_desc }}</td>
+                <td>{{ item.work_area_count }}</td>
+                <td class="col-actions">
+                  <a href="{% url 'engagement_work_areas' item.id %}" class="button button-compact">Open</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">
+                  {% if work_area_status_filter == 'active' %}
+                    No active engagements found.
+                  {% else %}
+                    No engagements found.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching engagements found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'work_area_hub' %}">← Back to Work Areas</a></p>
+  </section>
+</div>
+{% endblock %}

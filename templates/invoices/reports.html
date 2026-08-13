@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Reports · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Reports</h1>
+      <p class="muted">Choose a report below. More tiles can be added as you define them.</p>
+    </header>
+
+    <nav class="tile-grid" aria-label="Invoice and sales reports">
+      <a class="tile-link" href="{% url 'invoice_reports_sales_ledger_tb' %}">
+        <span class="tile-title">Sales Ledger TB</span>
+        <span class="tile-subtitle">Trial balance style view for the sales ledger (content to be wired)</span>
+      </a>
+      <a class="tile-link" href="{% url 'invoice_reports_monthly_summary' %}">
+        <span class="tile-title">Monthly summary</span>
+        <span class="tile-subtitle">Invoice totals by month: count, taxable, CGST/SGST/IGST, gross — full FY at a glance</span>
+      </a>
+      <a class="tile-link" href="{% url 'invoice_reports_gstr1_invoices' %}">
+        <span class="tile-title">Inv List for GSTR1</span>
+        <span class="tile-subtitle">One row per invoice: GSTN, taxable (service lines), CGST/SGST/IGST, gross — by month or YTD</span>
+      </a>
+    </nav>
+
+    <p class="muted">
+      <a href="{% url 'sales_hub' %}">← Manage Invoices hub</a>
+      ·
+      <a href="{% url 'invoices' %}">Invoices list</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

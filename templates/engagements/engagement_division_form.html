@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}{% if division %}Edit Engagement Division{% else %}Add Engagement Division{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if division %}Edit Engagement Division{% else %}Add Engagement Division{% endif %}</h1>
+      <p class="muted">Choose an engagement and type the engagement division. Planned start and finish are optional (both may be empty); catch gaps later in exception reporting.</p>
+      {% if not division %}
+      <p class="muted">Planned dates fill from the engagement schedule (earliest planned start through latest planned finish) when you choose an engagement; you can edit them before saving.</p>
+      {% endif %}
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.engagement.id_for_label }}">Engagement</label>
+        <div class="sap-control">
+          {{ form.engagement }}
+          {% if form.engagement.errors %}
+            <span class="field-error">{{ form.engagement.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.division_name.id_for_label }}">Engagement Division</label>
+        <div class="sap-control">
+          {{ form.division_name }}
+          {% if form.division_name.errors %}
+            <span class="field-error">{{ form.division_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.division_mail_ids.id_for_label }}">Division mail IDs</label>
+        <div class="sap-control">
+          {{ form.division_mail_ids }}
+          {% if form.division_mail_ids.errors %}
+            <span class="field-error">{{ form.division_mail_ids.errors.0 }}</span>
+          {% endif %}
+          <span class="muted">Defaults from engagement/client mail IDs if blank. Use comma, semicolon, or new line for multiple IDs.</span>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_start.id_for_label }}">Planned Start</label>
+        <div class="sap-control">
+          {{ form.planned_start }}
+          {% if form.planned_start.errors %}
+            <span class="field-error">{{ form.planned_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_finish.id_for_label }}">Planned Finish</label>
+        <div class="sap-control">
+          {{ form.planned_finish }}
+          {% if form.planned_finish.errors %}
+            <span class="field-error">{{ form.planned_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.actual_start.id_for_label }}">Actual Start</label>
+        <div class="sap-control">
+          {{ form.actual_start }}
+          {% if form.actual_start.errors %}
+            <span class="field-error">{{ form.actual_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.actual_finish.id_for_label }}">Actual Finish</label>
+        <div class="sap-control">
+          {{ form.actual_finish }}
+          {% if form.actual_finish.errors %}
+            <span class="field-error">{{ form.actual_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_divisions' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if division %}Update Division{% else %}Save Division{% endif %}</button>
+      </div>
+    </form>
+
+    {% if division %}
+      <div class="grid-panel">
+        <h2 class="doc-files-subheading">Team assigned to this division</h2>
+        {% if team_assignments %}
+          <div class="table-wrap">
+            <table class="data-grid">
+              <thead>
+                <tr>
+                  <th>Team member</th>
+                  <th>Planned start</th>
+                  <th>Planned finish</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in team_assignments %}
+                  <tr>
+                    <td>{{ row.team_member }}</td>
+                    <td>{% if row.planned_start %}{{ row.planned_start|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                    <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted">No team members assigned to this division yet.</p>
+        {% endif %}
+        <p class="muted">
+          <a href="{% url 'engagement_division_team_assignments' division.id %}">Open division team assignments</a>
+        </p>
+      </div>
+    {% endif %}
+
+    <p class="muted"><a href="{% url 'engagement_divisions' %}">← Back to Engagement Divisions</a></p>
+  </section>
+</div>
+{% if not division %}
+<script>
+(function () {
+  var engagementSelect = document.getElementById("id_engagement");
+  var plannedStart = document.getElementById("id_planned_start");
+  var plannedFinish = document.getElementById("id_planned_finish");
+  if (!engagementSelect || engagementSelect.disabled || !plannedStart || !plannedFinish) {
+    return;
+  }
+  var placeholder = "4242424242";
+  var boundsUrlTmpl = "{% url 'engagement_schedule_bounds' 4242424242 %}";
+
+  function applyBounds(data) {
+    if (data && data.planned_start && data.planned_finish) {
+      plannedStart.value = data.planned_start;
+      plannedFinish.value = data.planned_finish;
+    } else {
+      plannedStart.value = "";
+      plannedFinish.value = "";
+    }
+  }
+
+  function loadBounds() {
+    var pk = engagementSelect.value;
+    if (!pk) {
+      applyBounds(null);
+      return;
+    }
+    var url = boundsUrlTmpl.replace(placeholder, pk);
+    fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("bounds request failed");
+        }
+        return res.json();
+      })
+      .then(applyBounds)
+      .catch(function () {
+        applyBounds(null);
+      });
+  }
+
+  engagementSelect.addEventListener("change", loadBounds);
+  loadBounds();
+})();
+</script>
+{% endif %}
+{% endblock %}

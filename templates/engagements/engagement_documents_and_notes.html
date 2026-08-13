@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Documents & work notes · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Documents &amp; work notes</h1>
+      <p class="muted">{{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}</p>
+      <p class="muted">Work area notes (queries and remarks) together with every uploaded file for this engagement.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root data-grid-no-resize="1" data-grid-id="engagement-docs-notes-notes">
+      <h2 class="doc-files-subheading">Work area notes</h2>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search scope, work area, subject, details..."
+          aria-label="Search work area notes"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap work-area-notes-list-grid">
+          <thead>
+            <tr>
+              <th class="col-scope">Scope</th>
+              <th class="col-work-area">Work area</th>
+              <th class="col-date">Date</th>
+              <th class="col-type">Type</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-details">Details</th>
+              <th class="col-responses">Responses</th>
+              <th class="col-status">Status</th>
+              <th class="col-open">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in note_rows %}
+              <tr data-grid-row>
+                <td class="col-scope">
+                  {% if row.engagement_work_area_id %}
+                    Engagement (no division)
+                  {% else %}
+                    Division: {{ row.division_work_area.division.division_name }}
+                  {% endif %}
+                </td>
+                <td class="col-work-area">
+                  {% if row.engagement_work_area_id %}
+                    {{ row.engagement_work_area.work_area_name }}
+                  {% else %}
+                    {{ row.division_work_area.work_area_name }}
+                  {% endif %}
+                </td>
+                <td class="col-date">{{ row.query_date|date:"Y-m-d" }}</td>
+                <td class="col-type">{{ row.get_entry_type_display }}</td>
+                <td class="col-subject">{{ row.subject }}</td>
+                <td class="col-details">{{ row.query_text }}</td>
+                <td class="col-responses">{{ row.response_count }}</td>
+                <td class="col-status">{% if row.entry_type == "query" %}{{ row.get_status_display }}{% else %}—{% endif %}</td>
+                <td class="col-open">
+                  {% if row.engagement_work_area_id %}
+                    <a href="{% url 'engagement_work_area_queries' engagement.id row.engagement_work_area.id %}">Open</a>
+                  {% else %}
+                    <a href="{% url 'engagement_division_work_area_queries' row.division_work_area.division_id row.division_work_area.id %}">Open</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="9" class="muted">No notes across engagement and division work areas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching notes found.
+      </p>
+    </div>
+
+    <div class="grid-panel" data-grid-root data-grid-no-resize="1" data-grid-id="engagement-docs-notes-documents">
+      <h2 class="doc-files-subheading">Uploaded documents</h2>
+      <p class="muted">Files from engagement and division documentation, work-area uploads, and note attachments. Duplicates (same name uploaded twice in one scope) are flagged.</p>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search uploaded documents..."
+          aria-label="Search uploaded documents"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap data-grid-compact-actions">
+          <thead>
+            <tr>
+              <th>Document date</th>
+              <th>Level</th>
+              <th>Source</th>
+              <th>Document</th>
+              <th>Ref no</th>
+              <th>Remarks</th>
+              <th>File</th>
+              <th class="col-actions">Dup/Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in document_rows %}
+              <tr data-grid-row>
+                <td>{{ row.document_date|date:"Y-m-d" }}</td>
+                <td>{{ row.source_level }}</td>
+                <td>{{ row.source_name }}</td>
+                <td>{{ row.document_label }}</td>
+                <td>{% if row.reference_no %}{{ row.reference_no }}{% else %}—{% endif %}</td>
+                <td>{% if row.remarks %}{{ row.remarks }}{% else %}—{% endif %}</td>
+                <td>
+                  <a href="{{ row.download_url }}" title="{{ row.file_name }}">{{ row.file_name }}</a>
+                </td>
+                <td class="col-actions">
+                  {% if row.is_duplicate %}
+                    <div class="row-actions row-actions-compact">
+                      <span class="dup-badge" title="Duplicate copies">{{ row.duplicate_count }}x</span>
+                      <form method="post" class="inline-form" onsubmit="return confirm('Delete this duplicate file?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_duplicate">
+                        <input type="hidden" name="source_kind" value="{{ row.source_kind }}">
+                        <input type="hidden" name="pk" value="{{ row.pk }}">
+                        <button type="submit" class="icon-btn icon-btn-danger" title="Delete duplicate" aria-label="Delete duplicate">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                      </form>
+                    </div>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="8" class="muted">No uploaded documents found for this engagement.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching uploaded documents found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="#" onclick="history.back(); return false;">← Back</a>
+      ·
+      <a href="{% url 'engagements' %}">Engagements</a>
+      ·
+      <a href="{% url 'engagement_documentation_missing_uploads_report' engagement.id %}">Documentation — missing uploads</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

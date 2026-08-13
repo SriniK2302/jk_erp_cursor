@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{% if assignment %}Edit{% else %}Add{% endif %} Division Work Area Team Assignment · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if assignment %}Edit{% else %}Add{% endif %} Division Work Area Team Assignment</h1>
+      <p class="muted">
+        {{ division.engagement.client.display_name }} · {{ division.engagement.fiscal_year.fy_no }} · {{ division.engagement.service.service_desc }}
+      </p>
+      <p class="muted">Division: <strong>{{ division.division_name }}</strong> · Work area: <strong>{{ work_area.work_area_name }}</strong></p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.team_member.id_for_label }}">Team member</label>
+        <div class="sap-control">
+          {{ form.team_member }}
+          {% if form.team_member.errors %}
+            <span class="field-error">{{ form.team_member.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_start.id_for_label }}">Planned Start</label>
+        <div class="sap-control">
+          {{ form.planned_start }}
+          {% if form.planned_start.errors %}
+            <span class="field-error">{{ form.planned_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_finish.id_for_label }}">Planned Finish</label>
+        <div class="sap-control">
+          {{ form.planned_finish }}
+          {% if form.planned_finish.errors %}
+            <span class="field-error">{{ form.planned_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.assignment_notes.id_for_label }}">Assignment notes</label>
+        <div class="sap-control">
+          {{ form.assignment_notes }}
+          {% if form.assignment_notes.errors %}
+            <span class="field-error">{{ form.assignment_notes.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_division_work_area_assignments' division.id work_area.id %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if assignment %}Update Assignment{% else %}Save Assignment{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'engagement_division_work_area_assignments' division.id work_area.id %}">← Back to Division Work Area Team Assignments</a></p>
+  </section>
+</div>
+{% endblock %}

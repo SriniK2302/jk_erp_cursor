@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}My time log · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>My time log</h1>
+      <p class="muted">Timer sessions you started. Scope is engagement · division · work area; <strong>Task</strong> is optional free text (at start or when you stop).</p>
+    </header>
+
+    {% if active_time_session %}
+    <div class="active-timer-banner" role="status">
+      <span class="muted">Timer running{% if active_time_session.engagement %} — {{ active_time_session.engagement.client.display_name }} · {{ active_time_session.engagement.fiscal_year.fy_no }}{% endif %}</span>
+      <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="button button-secondary button-compact">Stop</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="grid-filter-bar" role="toolbar" aria-label="Date range">
+      <span class="grid-filter-bar__label muted">Range:</span>
+      <a href="{{ url_today }}" class="filter-chip{% if range_key == 'today' %} filter-chip--active{% endif %}">Today</a>
+      <a href="{{ url_week }}" class="filter-chip{% if range_key == 'week' %} filter-chip--active{% endif %}">This week</a>
+      <a href="{{ url_all }}" class="filter-chip{% if range_key == 'all' %} filter-chip--active{% endif %}">All</a>
+    </div>
+
+    <form method="get" class="grid-toolbar" style="margin-top:0.5rem;flex-wrap:wrap;gap:0.5rem;align-items:center">
+      <input type="hidden" name="range" value="{{ range_key }}">
+      <label class="muted" for="engagement-filter">Engagement</label>
+      <select id="engagement-filter" name="engagement" class="input-medium" aria-label="Filter by engagement">
+        <option value="">All visible engagements</option>
+        {% for e in engagement_choices %}
+          <option value="{{ e.pk }}"{% if engagement_filter_pk == e.pk %} selected{% endif %}>
+            {{ e.client.display_name }} · {{ e.fiscal_year.fy_no }} · {{ e.service.service_desc }}
+          </option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button button-secondary button-compact">Apply</button>
+    </form>
+
+    <p class="muted" style="margin:0.5rem 0">
+      <strong>Total:</strong> {{ total_minutes }} min
+      {% if total_minutes %}({{ total_hours|floatformat:2 }} h){% endif %}
+    </p>
+    {% if truncated %}
+      <p class="message-error" style="font-size:0.9rem">Showing the 500 most recent rows in this range. Narrow the filter if needed.</p>
+    {% endif %}
+
+    <div class="table-wrap">
+      <table class="data-grid">
+        <thead>
+          <tr>
+            <th>Started</th>
+            <th>Ended</th>
+            <th>Minutes</th>
+            <th>Status</th>
+            <th>Scope</th>
+            <th>Task</th>
+            <th>Close</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% with s=row.session %}
+            <tr>
+              <td>{{ s.started_at|date:"Y-m-d H:i" }}</td>
+              <td>{% if s.ended_at %}{{ s.ended_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td>{{ row.display_minutes }}</td>
+              <td>{{ row.row_status }}</td>
+              <td>{{ row.scope_label }}</td>
+              <td>{% if s.task_description %}{{ s.task_description }}{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td>{% if s.close_source %}{{ s.get_close_source_display }}{% else %}<span class="muted">—</span>{% endif %}</td>
+            </tr>
+            {% endwith %}
+          {% empty %}
+            <tr>
+              <td colspan="7" class="muted">No sessions in this range.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="muted">
+      <a href="{% url 'manage_engagements' %}">← Manage Engagements</a>
+      ·
+      <a href="{% url 'engagements' %}">Engagements list</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

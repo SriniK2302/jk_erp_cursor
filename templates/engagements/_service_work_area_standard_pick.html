@@ -1,0 +1,71 @@
+{% comment %}
+Shared preparatory standard work-area picker (engagement + division lists).
+Requires: pick_body_id, service_desc, service_id, service_standard_template_count,
+service_work_area_pick_rows, scope_phrase, add_selected_label
+{% endcomment %}
+{% if service_standard_template_count %}
+  {% if service_work_area_pick_rows %}
+  <p class="muted">
+    These names come from Setup → Service engagement checklists for
+    <strong>{{ service_desc }}</strong>. Only work areas not already on {{ scope_phrase }} are listed.
+    Work areas with at least one checklist line can be added (count shown); others are disabled.
+  </p>
+  <form method="post" class="service-wa-pick-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_from_service_templates">
+    <div data-service-wa-pick>
+      <input
+        type="search"
+        class="grid-search"
+        placeholder="Filter standard work areas…"
+        aria-label="Filter standard work areas"
+        data-service-wa-pick-search
+        autocomplete="off"
+      >
+      <div class="service-wa-pick-disclosure__buttons" style="margin: 0.5rem 0;">
+        <button type="button" class="button button-secondary button-compact" data-service-wa-pick-select-all>Select all</button>
+        <button type="button" class="button button-secondary button-compact" data-service-wa-pick-clear-all>Clear all</button>
+      </div>
+      <ul class="service-wa-pick-list" style="list-style: none; padding-left: 0; margin: 0.75rem 0 1rem;">
+        {% for row in service_work_area_pick_rows %}
+          <li
+            style="margin-bottom: 0.35rem;"
+            data-service-wa-pick-row
+            data-search-text="{{ row.template.name }}"
+          >
+            <label style="display: flex; gap: 0.5rem; align-items: baseline;{% if not row.can_map %} opacity: 0.65;{% endif %}">
+              <input
+                type="checkbox"
+                name="service_work_area_ids"
+                value="{{ row.template.pk }}"
+                {% if not row.can_map %}disabled{% endif %}
+              >
+              <span>
+                {{ row.template.name }}
+                <span class="muted">({{ row.checklist_line_count }} checklist line{{ row.checklist_line_count|pluralize }})</span>
+              </span>
+            </label>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="muted service-wa-pick-no-results" data-service-wa-pick-no-results hidden>
+        No work areas match this filter.
+      </p>
+    </div>
+    <button type="submit" class="button button-secondary">{{ add_selected_label }}</button>
+    <p class="muted" style="margin-top: 0.75rem; margin-bottom: 0;">
+      <a href="{% url 'engagement_checklist_templates' %}?service={{ service_id }}">Edit standard list in Setup</a>
+    </p>
+  </form>
+  {% else %}
+  <p class="muted" style="margin-bottom: 0;">
+    All standard work areas for this service are already on {{ scope_phrase }}.
+    <a href="{% url 'engagement_checklist_templates' %}?service={{ service_id }}">Edit standard list in Setup</a>.
+  </p>
+  {% endif %}
+{% else %}
+  <p class="muted" style="margin-bottom: 0;">
+    No standard work areas are defined for this service yet.
+    <a href="{% url 'engagement_checklist_templates' %}?service={{ service_id }}">Define them in Setup</a>.
+  </p>
+{% endif %}

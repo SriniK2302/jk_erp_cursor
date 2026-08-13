@@ -1,0 +1,34 @@
+{% if can_use_engagements_nav %}
+  <div class="session-engagement-bar" role="region" aria-label="Working engagement">
+    <form method="post" action="{% url 'session_engagement_set' %}" class="session-engagement-bar__form inline-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <label for="session-engagement-select" class="session-engagement-bar__label muted">Working engagement</label>
+      <select
+        id="session-engagement-select"
+        name="engagement_id"
+        class="input-medium session-engagement-bar__select"
+        aria-label="Select working engagement for this session"
+        onchange="this.form.submit()"
+      >
+        <option value="">All engagements</option>
+        {% for item in session_engagement_choices %}
+          <option value="{{ item.pk }}"{% if session_engagement and session_engagement.pk == item.pk %} selected{% endif %}>
+            {{ item.client.display_name }} · {{ item.fiscal_year.fy_no }} · {{ item.service.service_desc }}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if session_engagement %}
+      <span class="session-engagement-bar__active muted">
+        Filtering lists to:
+        <strong>{{ session_engagement.client.display_name }} · {{ session_engagement.fiscal_year.fy_no }} · {{ session_engagement.service.service_desc }}</strong>
+      </span>
+      <form method="post" action="{% url 'session_engagement_clear' %}" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="button button-secondary button-compact">Clear</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Uploaded Documents Report · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Uploaded documents report</h1>
+      <p class="muted">
+        {{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}
+      </p>
+      <p class="muted">Lists files from engagement documentation, division documentation, engagement and division work-area uploads, and work-area query (audit) attachments.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search uploaded documents..."
+          aria-label="Search uploaded documents"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+        <a href="{% url 'engagement_uploaded_documents_report' engagement.id %}" class="button button-secondary">Refresh</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap data-grid-compact-actions">
+          <thead>
+            <tr>
+              <th>Document date</th>
+              <th>Level</th>
+              <th>Source</th>
+              <th>Document</th>
+              <th>Ref no</th>
+              <th>Remarks</th>
+              <th>File</th>
+              <th class="col-actions">Dup/Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td>{{ row.document_date|date:"Y-m-d" }}</td>
+                <td>{{ row.source_level }}</td>
+                <td>{{ row.source_name }}</td>
+                <td>{{ row.document_label }}</td>
+                <td>{% if row.reference_no %}{{ row.reference_no }}{% else %}—{% endif %}</td>
+                <td>{% if row.remarks %}{{ row.remarks }}{% else %}—{% endif %}</td>
+                <td>
+                  <a href="{{ row.download_url }}" title="{{ row.file_name }}">{{ row.file_name }}</a>
+                </td>
+                <td class="col-actions">
+                  {% if row.is_duplicate %}
+                    <div class="row-actions row-actions-compact">
+                      <span class="dup-badge" title="Duplicate copies">{{ row.duplicate_count }}x</span>
+                      <form method="post" class="inline-form" onsubmit="return confirm('Delete this duplicate file?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_duplicate">
+                        <input type="hidden" name="source_kind" value="{{ row.source_kind }}">
+                        <input type="hidden" name="pk" value="{{ row.pk }}">
+                        <button type="submit" class="icon-btn icon-btn-danger" title="Delete duplicate" aria-label="Delete duplicate">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                      </form>
+                    </div>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="8" class="muted">No uploaded documents found for this engagement.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching uploaded documents found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="#" onclick="history.back(); return false;">← Back</a>
+      ·
+      <a href="{% url 'engagement_documentation_maps' engagement.id %}">Engagement Documentation</a>
+      ·
+      <a href="{% url 'engagement_documentation_missing_uploads_report' engagement.id %}">Documentation — missing uploads</a>
+      ·
+      <a href="{% url 'engagements' %}">Engagements</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

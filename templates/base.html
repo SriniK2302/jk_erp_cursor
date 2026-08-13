@@ -1,0 +1,86 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}JK ERP{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=23">
+</head>
+<body>
+  {% if user.is_authenticated %}
+    <nav class="global-mini-nav" aria-label="Quick navigation">
+      <a href="{% url 'home' %}" class="global-mini-nav__item" title="Home" aria-label="Home">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21h14V9.8"/></svg>
+      </a>
+      {% if can_use_engagements_nav %}
+      <a href="{% url 'my_time_log' %}" class="global-mini-nav__item" title="My time log" aria-label="My time log">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+      </a>
+      {% endif %}
+      {% if user.is_superuser %}
+      <a href="{% url 'admin:index' %}" class="global-mini-nav__item" title="Admin" aria-label="Admin">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M12 7v10"/></svg>
+      </a>
+      {% endif %}
+      <a href="{% url 'setup' %}" class="global-mini-nav__item" title="Setup" aria-label="Setup">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h0a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.5h0a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v0a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.5 1z"/></svg>
+      </a>
+      <a href="{% url 'manage_engagements' %}" class="global-mini-nav__item" title="Manage Engagements" aria-label="Manage Engagements">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
+      </a>
+      <a href="{% url 'tools_utilities' %}" class="global-mini-nav__item" title="Tools & utilities" aria-label="Tools and utilities">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 1 0 3 3l4 4-2 2-4-4a4 4 0 0 0-1-5z"/><path d="M2 20l6-6"/></svg>
+      </a>
+      <form method="post" action="{% url 'logout' %}" class="inline-form">
+        {% csrf_token %}
+        <button type="submit" class="global-mini-nav__item global-mini-nav__button" title="Log out" aria-label="Log out">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </form>
+    </nav>
+    <dialog id="timer-start-dialog" class="timer-start-dialog" aria-labelledby="timer-start-dialog-title">
+      <div class="timer-start-dialog__inner">
+        <h2 id="timer-start-dialog-title" class="timer-start-dialog__title">Start timer</h2>
+        <p class="timer-start-dialog__hint muted">Optional task description for this session.</p>
+        <form id="timer-start-dialog-form" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="timer-start-dialog-next" value="">
+          <label for="timer-start-dialog-recent" class="timer-start-dialog__label">Previous tasks for this item</label>
+          <select id="timer-start-dialog-recent" class="timer-start-dialog__select" aria-label="Insert a previous task for this scope"></select>
+          <label for="timer-start-dialog-task" class="timer-start-dialog__label">Task</label>
+          <textarea id="timer-start-dialog-task" name="task" rows="4" maxlength="500" class="timer-start-dialog__task" placeholder="What you are working on (optional)"></textarea>
+          <div class="timer-start-dialog__actions">
+            <button type="button" id="timer-start-dialog-cancel" class="button button-secondary">Cancel</button>
+            <button type="submit" class="button button-primary">Start</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  {% endif %}
+  {% if user.is_authenticated %}
+    {% include "engagements/_session_engagement_bar.html" %}
+  {% endif %}
+  {% block global_messages %}
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="message message-{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endblock %}
+  {% block content %}{% endblock %}
+  <script src="{% static 'js/common-grid.js' %}?v=10"></script>
+  <script src="{% static 'js/service-wa-pick-filter.js' %}?v=2"></script>
+  <script src="{% static 'js/service-wa-pick-disclosure.js' %}?v=1"></script>
+  <script src="{% static 'js/grid-column-resize.js' %}?v=2"></script>
+  {% if user.is_authenticated %}
+  <script>
+    window.TIMER_RECENT_TASKS_URL = {% if can_use_engagements_nav %}"{% url 'timer_recent_tasks' %}"{% else %}""{% endif %};
+  </script>
+  <script src="{% static 'js/timer-start-dialog.js' %}?v=7"></script>
+  {% endif %}
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

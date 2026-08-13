@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Engagement Status Remarks · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Engagement status remarks</h1>
+      <p class="muted">{{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}</p>
+    </header>
+
+    <p class="muted page-sticky-links">
+      <a href="{% url 'engagements' %}">← Back to Engagements</a>
+      ·
+      <a href="{% url 'engagement_schedules' engagement.id %}">Schedule</a>
+      ·
+      <a href="{% url 'engagement_work_areas' engagement.id %}">Work areas</a>
+    </p>
+
+    <div class="grid-panel">
+      <h2 class="doc-files-subheading">Add status remark</h2>
+      <form method="post" class="sap-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_remark">
+        <div class="sap-row">
+          <label for="status-remarks-date">Remark date</label>
+          <div class="sap-control">
+            <input id="status-remarks-date" name="remark_date" type="date" class="input-short" required value="{{ default_remark_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="status-remarks-text">Remarks</label>
+          <div class="sap-control">
+            <textarea id="status-remarks-text" name="remarks" class="input-long" rows="4" placeholder="Enter status remark..." required></textarea>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Save remark</button>
+        </div>
+      </form>
+
+      <h2 class="doc-files-subheading">Remark history</h2>
+      {% if remarks %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for item in remarks %}
+            <li class="doc-attachment-line doc-attachment-line-page">
+              <div class="doc-attachment-line-main">
+                <span class="doc-attachment-date-badge">{{ item.remark_date|date:"Y-m-d" }}</span>
+                <span class="muted">— {{ item.created_by }}</span>
+                <span class="muted"> · saved {{ item.created_on|date:"Y-m-d H:i" }}</span>
+                <span> · {{ item.remarks }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No status remarks added yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="grid-panel">
+      <h2 class="doc-files-subheading">Team list</h2>
+      {% if team_assignments %}
+        <div class="table-wrap">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Team member</th>
+                <th>Planned start</th>
+                <th>Planned finish</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in team_assignments %}
+                <tr>
+                  <td>{{ row.team_member }}</td>
+                  <td>{% if row.planned_start %}{{ row.planned_start|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                  <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">No team members assigned yet.</p>
+      {% endif %}
+      <p class="muted">
+        <a href="{% url 'engagement_team_assignments' engagement.id %}">Open engagement team assignments</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

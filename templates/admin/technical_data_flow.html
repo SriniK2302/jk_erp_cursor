@@ -1,0 +1,18 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{% translate "Technical Data Flow" %} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h1>{% translate "Technical Data Flow" %}</h1>
+    <p>
+      {% blocktranslate %}Source file: {{ doc_path }}{% endblocktranslate %}
+      ·
+      <a href="{% url 'admin:index' %}">{% translate "Back to admin" %}</a>
+    </p>
+    <pre style="white-space: pre-wrap; line-height: 1.35; margin: 0;">{{ doc_text }}</pre>
+  </div>
+</div>
+{% endblock %}

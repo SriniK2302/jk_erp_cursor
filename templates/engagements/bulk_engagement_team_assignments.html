@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Team across Engagements · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Assign Team across Engagements</h1>
+      <p class="muted">Choose one team member and assign across multiple engagements in one save.</p>
+      <p class="muted">Planned start/finish are auto-filled from each engagement schedule (earliest start and latest finish).</p>
+    </header>
+
+    <form method="post" class="sap-form" id="bulk-team-assignment-form">
+      {% csrf_token %}
+      <div class="sap-row">
+        <label for="team_member_id">Team member</label>
+        <div class="sap-control">
+          <select name="team_member_id" id="team_member_id" class="input-medium" required>
+            <option value="">Select team member...</option>
+            {% for tm in team_members %}
+              <option value="{{ tm.id }}"{% if selected_member_id == tm.id|stringformat:"s" %} selected{% endif %}>{{ tm }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid-panel" data-grid-root>
+        <div class="grid-toolbar">
+          <input
+            type="search"
+            class="grid-search"
+            placeholder="Search engagements..."
+            aria-label="Search engagements"
+            data-grid-search
+          >
+          <div class="grid-toolbar-actions">
+            <span class="muted grid-count" data-grid-count></span>
+            <button type="button" class="button button-secondary button-compact" id="bulk-select-all">Select all</button>
+            <button type="button" class="button button-secondary button-compact" id="bulk-clear-all">Clear all</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th class="col-select">Select</th>
+                <th>Client</th>
+                <th>FY</th>
+                <th>Service</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in engagements %}
+                <tr data-grid-row>
+                  <td class="col-select">
+                    <input
+                      type="checkbox"
+                      name="engagement_ids"
+                      value="{{ item.id }}"
+                      class="bulk-engagement-checkbox"
+                      {% if item.id|stringformat:"s" in selected_ids %}checked{% endif %}
+                    >
+                  </td>
+                  <td>{{ item.client.display_name }}</td>
+                  <td>{{ item.fiscal_year.fy_no }}</td>
+                  <td>{{ item.service.service_desc }}</td>
+                </tr>
+              {% empty %}
+                <tr data-grid-empty>
+                  <td colspan="4" class="muted">No active engagements available.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <button type="submit" class="button">Assign to Selected Engagements</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'manage_engagements' %}">← Back to Manage Engagements</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  "use strict";
+  const selectAllBtn = document.getElementById("bulk-select-all");
+  const clearAllBtn = document.getElementById("bulk-clear-all");
+
+  function visibleCheckboxes() {
+    return Array.from(document.querySelectorAll("tr[data-grid-row] input.bulk-engagement-checkbox"))
+      .filter((cb) => !cb.closest("tr").hidden);
+  }
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", function () {
+      visibleCheckboxes().forEach((cb) => { cb.checked = true; });
+    });
+  }
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener("click", function () {
+      visibleCheckboxes().forEach((cb) => { cb.checked = false; });
+    });
+  }
+})();
+</script>
+{% endblock %}

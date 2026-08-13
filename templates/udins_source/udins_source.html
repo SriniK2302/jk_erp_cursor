@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}UDIN Source · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>UDIN Source</h1>
+      <p class="muted">Import ICAI UDIN Excel into Source (permanent ICAI copy). Copy rows to UDINs when ready to work them.</p>
+      <p class="muted">
+        <strong>Workflow:</strong> Excel → <strong>UDIN Source</strong> (ICAI import, kept) →
+        <strong>UDINs → Copy from UDIN Source</strong> (working register) →
+        <strong>Invoices</strong> (billing copy). Each step keeps its own set of rows.
+      </p>
+    </header>
+
+    <div class="udin-source-toolbar">
+      <form method="post" enctype="multipart/form-data" class="sap-form udin-source-import-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="import_excel">
+        <div class="udin-source-import-bar">
+          <label for="{{ import_form.source_file.id_for_label }}" class="udin-source-import-bar__label">Source Excel File</label>
+          <div class="udin-source-import-bar__file sap-control">
+            {{ import_form.source_file }}
+            {% if import_form.source_file.errors %}
+              <span class="field-error">{{ import_form.source_file.errors.0 }}</span>
+            {% endif %}
+          </div>
+          <div class="udin-source-import-bar__actions">
+            <button type="submit" class="button">Import UDIN Source</button>
+          </div>
+        </div>
+      </form>
+      <form method="post" class="inline-form udin-source-import-bar__actions">
+        {% csrf_token %}
+        <a href="{% url 'udins' %}" class="button button-secondary">UDINs</a>
+        <a href="{% url 'invoices' %}" class="button button-secondary">Invoices</a>
+        <a href="{% url 'sales_hub' %}" class="button button-secondary">Manage Invoices</a>
+      </form>
+    </div>
+
+    <details class="home-frame">
+      <summary class="button button-secondary" style="display:inline-flex; cursor:pointer;">Open Header Mapping</summary>
+      <form method="post" class="sap-form" novalidate style="margin-top:0.6rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_mapping">
+        <div class="sap-row">
+          <label for="{{ map_form.mapping_json.id_for_label }}">Header Mapping (Editable JSON)</label>
+          <div class="sap-control">
+            {{ map_form.mapping_json }}
+            {% if map_form.mapping_json.errors %}
+              <span class="field-error">{{ map_form.mapping_json.errors.0 }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button button-secondary">Save Header Mapping</button>
+        </div>
+      </form>
+    </details>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-filter-bar">
+        <span class="grid-filter-bar__label muted">Staging:</span>
+        <a
+          href="?copy_status=all"
+          class="filter-chip {% if copy_filter == 'all' %}filter-chip--active{% endif %}"
+        >
+          All in source
+        </a>
+        <a
+          href="?copy_status=pending"
+          class="filter-chip {% if copy_filter == 'pending' %}filter-chip--active{% endif %}"
+        >
+          Not copied to UDINs
+        </a>
+        <a
+          href="?copy_status=copied"
+          class="filter-chip {% if copy_filter == 'copied' %}filter-chip--active{% endif %}"
+        >
+          Copied to UDINs
+        </a>
+      </div>
+      <div class="grid-toolbar">
+        <input type="search" class="grid-search" placeholder="Search UDIN source..." aria-label="Search UDIN source" data-grid-search>
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+      <div class="table-wrap udin-source-wrap udin-source-wrap-top" data-udin-source-scroll-top>
+        <div class="udin-source-scroll-inner" data-udin-source-scroll-inner></div>
+      </div>
+      <div class="table-wrap udin-source-wrap">
+        <table class="data-grid udin-source-grid">
+          <thead>
+            <tr>
+              <th>S.No.</th>
+              <th>UDIN</th>
+              <th>MRN</th>
+              <th>Firm</th>
+              <th>Document Type</th>
+              <th>Document Sub-Type</th>
+              <th>Other Doc</th>
+              <th>Document Description</th>
+              <th>Date of Signing of Document</th>
+              <th>AY/FY</th>
+              <th>Created Date/Time</th>
+              <th>Remarks</th>
+              <th>Status</th>
+              <th>Particulars 1</th>
+              <th>Figures/Values 1</th>
+              <th>Particulars 2</th>
+              <th>Figures/Values 2</th>
+              <th>Particulars 3</th>
+              <th>Figures/Values 3</th>
+              <th>Particulars 4</th>
+              <th>Figures/Values 4</th>
+              <th>Copied to UDINs</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td>{{ row.s_no|default:"" }}</td>
+                <td>{{ row.udin }}</td>
+                <td>{{ row.mrn }}</td>
+                <td>{{ row.firm }}</td>
+                <td>{{ row.document_type }}</td>
+                <td>{{ row.document_sub_type }}</td>
+                <td>{{ row.other_doc }}</td>
+                <td>{{ row.document_description }}</td>
+                <td>{{ row.date_of_signing_of_document }}</td>
+                <td>{{ row.ay_fy }}</td>
+                <td>{{ row.created_date_time }}</td>
+                <td>{{ row.remarks }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.particulars_1 }}</td>
+                <td>{{ row.figures_values_1 }}</td>
+                <td>{{ row.particulars_2 }}</td>
+                <td>{{ row.figures_values_2 }}</td>
+                <td>{{ row.particulars_3 }}</td>
+                <td>{{ row.figures_values_3 }}</td>
+                <td>{{ row.particulars_4 }}</td>
+                <td>{{ row.figures_values_4 }}</td>
+                <td>{% if row.copied_to_udins %}Yes{% else %}No{% endif %}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="udins_source" pk=row.id delete_action="delete" confirm_message="Delete this source row?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="23" class="muted">
+                  {% if copy_filter == 'all' %}
+                    No rows in source — import Excel to add rows.
+                  {% elif copy_filter == 'copied' %}
+                    No rows copied to UDINs yet — use Copy from UDIN Source on the UDINs page.
+                  {% else %}
+                    No rows waiting to copy — import Excel or copy from UDIN Source on the UDINs page.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted grid-no-results" data-grid-no-results hidden>No matching source rows found.</p>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const topWrap = document.querySelector("[data-udin-source-scroll-top]");
+    const topInner = document.querySelector("[data-udin-source-scroll-inner]");
+    const bottomWrap = document.querySelector(".table-wrap.udin-source-wrap:not(.udin-source-wrap-top)");
+    const table = document.querySelector(".data-grid.udin-source-grid");
+    if (!topWrap || !topInner || !bottomWrap || !table) {
+      return;
+    }
+
+    function syncWidth() {
+      topInner.style.width = table.scrollWidth + "px";
+    }
+
+    let syncing = false;
+    topWrap.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      bottomWrap.scrollLeft = topWrap.scrollLeft;
+      syncing = false;
+    });
+    bottomWrap.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      topWrap.scrollLeft = bottomWrap.scrollLeft;
+      syncing = false;
+    });
+
+    syncWidth();
+    window.addEventListener("resize", syncWidth);
+  })();
+</script>
+{% endblock %}

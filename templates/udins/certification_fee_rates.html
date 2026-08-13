@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}UDIN certification fees · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>UDIN certification fees</h1>
+      <p class="muted">
+        Define fee (Inv TV amt) per client and <strong>certification</strong> service, then apply in bulk to matching UDIN rows
+        that do not already have an Inv TV amt (existing amounts are never overwritten).
+      </p>
+    </header>
+
+    <form method="post" class="inline-form" style="margin-bottom: 0.75rem;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="apply_all_to_udins">
+      <button type="submit" class="button button-secondary" onclick="return confirm('Apply all rates to UDINs with the same client and service, only where Inv TV amt is currently blank? Existing amounts will not be changed.');">
+        Apply all rates to UDINs
+      </button>
+    </form>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input type="search" class="grid-search" placeholder="Search rates..." aria-label="Search rates" data-grid-search>
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Service</th>
+              <th>Fee (Inv TV)</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rates %}
+              <tr data-grid-row>
+                <td>{{ row.client.client_name }}</td>
+                <td>{{ row.service.service_desc }}</td>
+                <td>{{ row.fee_amount|floatformat:"2g" }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="certification_fee_rates" edit_url_name="certification_fee_rate_edit" edit_pk=row.id pk=row.id delete_action="delete" confirm_message="Delete this fee rate?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="4" class="muted">No certification fee rates yet. Add one to define client + certification service + fee.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted grid-no-results" data-grid-no-results hidden>No matching rates found.</p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'certification_fee_rate_create' %}" class="button">Add rate</a>
+    </div>
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a> · <a href="{% url 'udins' %}">UDINs</a></p>
+  </section>
+</div>
+{% endblock %}

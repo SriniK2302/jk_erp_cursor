@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Receipts · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Receipts</h1>
+      <p class="muted">Payment receipts and allocation will be added here in a later iteration.</p>
+    </header>
+
+    <p class="muted">
+      <a href="{% url 'sales_hub' %}">← Manage Invoices hub</a>
+      ·
+      <a href="{% url 'invoices' %}">Invoices list</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

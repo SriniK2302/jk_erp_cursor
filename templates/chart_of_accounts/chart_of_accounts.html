@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Chart of Accounts · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Chart of Accounts</h1>
+      <p class="muted">Maintain account master with PL/BS and account type mapping.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search chart of accounts..."
+          aria-label="Search chart of accounts"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Account Code</th>
+              <th>Account Name</th>
+              <th>PL/BS</th>
+              <th>Type</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td>{{ row.account_code }}</td>
+                <td>{{ row.account_name }}</td>
+                <td>{{ row.plbs }}</td>
+                <td>{{ row.get_plbs_type_display }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="chart_of_accounts" edit_url_name="chart_of_account_edit" edit_pk=row.id pk=row.id delete_action="delete" confirm_message="Delete this account?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5"><strong>No accounts added yet.</strong> Click <em>Add Account</em> to create the first row.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching accounts found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'chart_of_account_create' %}" class="button">Add Account</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

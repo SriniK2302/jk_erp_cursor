@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{% if row %}Edit Account{% else %}Add Account{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if row %}Edit Account{% else %}Add Account{% endif %}</h1>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.account_name.id_for_label }}">Account Name</label>
+        <div class="sap-control">
+          {{ form.account_name }}
+          {% if form.account_name.errors %}
+            <span class="field-error">{{ form.account_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.plbs_type.id_for_label }}">PL/BS Type</label>
+        <div class="sap-control">
+          {{ form.plbs_type }}
+          {% if form.plbs_type.errors %}
+            <span class="field-error">{{ form.plbs_type.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.plbs.id_for_label }}">PL/BS</label>
+        <div class="sap-control">
+          {{ form.plbs }}
+          {% if form.plbs.errors %}
+            <span class="field-error">{{ form.plbs.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.account_code.id_for_label }}">Account Code</label>
+        <div class="sap-control">
+          {{ form.account_code }}
+          {% if form.account_code.errors %}
+            <span class="field-error">{{ form.account_code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'chart_of_accounts' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if row %}Update Account{% else %}Save Account{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'chart_of_accounts' %}">← Back to Chart of Accounts</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const codeInput = document.getElementById("id_account_code");
+    const plbsInput = document.getElementById("id_plbs");
+    const typeInput = document.getElementById("id_plbs_type");
+    if (!codeInput || !plbsInput || !typeInput) {
+      return;
+    }
+
+    function plbsFromType(plbsType) {
+      if (plbsType === "LIABILITY" || plbsType === "ASSET") {
+        return "BS";
+      }
+      if (plbsType === "INCOME" || plbsType === "EXPENSES") {
+        return "PL";
+      }
+      return "";
+    }
+
+    function syncPlbsByType() {
+      plbsInput.value = plbsFromType(typeInput.value);
+    }
+
+    async function syncCodeByType() {
+      const plbsType = (typeInput.value || "").trim();
+      if (!plbsType) {
+        codeInput.value = "";
+        return;
+      }
+      try {
+        const url = "{% url 'chart_of_account_next_code' %}?plbs_type=" + encodeURIComponent(plbsType);
+        const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const payload = await res.json();
+        codeInput.value = payload.code || "";
+      } catch (_err) {
+        codeInput.value = "";
+      }
+    }
+
+    const form = typeInput.closest("form");
+    if (form) {
+      form.addEventListener("submit", function () {
+        syncPlbsByType();
+      });
+    }
+    typeInput.addEventListener("change", function () {
+      syncPlbsByType();
+      syncCodeByType();
+    });
+    syncPlbsByType();
+    syncCodeByType();
+  })();
+</script>
+{% endblock %}

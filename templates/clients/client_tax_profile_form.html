@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Client Tax Profile · {{ client.client_name }} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Client Tax Profile</h1>
+      <p class="muted">{{ client.client_name }} ({{ client.client_code }})</p>
+      <p class="muted">One-to-one tax details for this client.</p>
+    </header>
+
+    {% include "clients/includes/client_nav_toolbar.html" %}
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.pan.id_for_label }}">PAN</label>
+        <div class="sap-control">
+          {{ form.pan }}
+          {% if form.pan.errors %}
+            <span class="field-error">{{ form.pan.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.tax_password.id_for_label }}">Tax password</label>
+        <div class="sap-control">
+          {{ form.tax_password }}
+          {% if form.tax_password.errors %}
+            <span class="field-error">{{ form.tax_password.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.date_of_formation.id_for_label }}">Date of formation</label>
+        <div class="sap-control">
+          {{ form.date_of_formation }}
+          {% if form.date_of_formation.errors %}
+            <span class="field-error">{{ form.date_of_formation.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'clients' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if tax_profile %}Update Tax Profile{% else %}Save Tax Profile{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'clients' %}">← Back to Clients</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'clients/js/client-nav.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+
+
+{% block title %}{% if grade_map %}Edit Team Grade Map{% else %}Add Team Grade Map{% endif %} · JK ERP{% endblock %}
+
+
+
+{% block content %}
+
+<div class="page">
+
+  <section class="home-frame">
+
+    <header class="page-header">
+
+      <h1>{% if grade_map %}Edit Team Grade Map{% else %}Add Team Grade Map{% endif %}</h1>
+
+      <p class="muted">Capture grade mapping periods for team members.</p>
+
+      {% if not grade_map %}
+
+        <p class="muted">From Date is auto-derived from on-roll and grade history. To Date is suggested from the on-roll end date when present; you can change it.</p>
+
+      {% elif to_date_locked %}
+
+        <p class="muted">To Date is fixed because a later grade mapping exists (it must end the day before that mapping starts).</p>
+
+      {% else %}
+
+        <p class="muted">To Date can be changed because there is no later grade mapping for this member.</p>
+
+      {% endif %}
+
+    </header>
+
+
+
+    <form
+
+      method="post"
+
+      class="sap-form"
+
+      novalidate
+
+      data-grade-map-form
+
+      data-defaults-url="{% url 'team_grade_map_defaults' %}"
+
+      data-is-edit="{% if grade_map %}true{% else %}false{% endif %}"
+
+      {% if grade_map %}data-period-id="{{ grade_map.pk }}"{% endif %}
+
+    >
+
+      {% csrf_token %}
+
+
+
+      <div class="sap-row">
+
+        <label for="{{ form.team_member.id_for_label }}">Team Member</label>
+
+        <div class="sap-control">
+
+          {{ form.team_member }}
+
+          {% if form.team_member.errors %}
+
+            <span class="field-error">{{ form.team_member.errors.0 }}</span>
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+
+      <div class="sap-row">
+
+        <label for="{{ form.grade.id_for_label }}">Grade</label>
+
+        <div class="sap-control">
+
+          {{ form.grade }}
+
+          {% if form.grade.errors %}
+
+            <span class="field-error">{{ form.grade.errors.0 }}</span>
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+
+      <div class="sap-row">
+
+        <label for="{{ form.from_date.id_for_label }}">From Date</label>
+
+        <div class="sap-control">
+
+          {{ form.from_date }}
+
+          {% if form.from_date.errors %}
+
+            <span class="field-error">{{ form.from_date.errors.0 }}</span>
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+
+      <div class="sap-row">
+
+        <label for="{{ form.to_date.id_for_label }}">To Date</label>
+
+        <div class="sap-control">
+
+          {{ form.to_date }}
+
+          {% if form.to_date.errors %}
+
+            <span class="field-error">{{ form.to_date.errors.0 }}</span>
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+
+      <div class="sap-actions">
+
+        <a href="{% url 'team_grade_maps' %}" class="button button-secondary">Cancel</a>
+
+        <button type="submit" class="button">{% if grade_map %}Update Mapping{% else %}Save Mapping{% endif %}</button>
+
+      </div>
+
+    </form>
+
+
+
+    <p class="muted"><a href="{% url 'team_grade_maps' %}">← Back to Team Grade Map</a></p>
+
+  </section>
+
+</div>
+
+{% endblock %}
+
+
+
+{% block extra_scripts %}
+
+  {% load static %}
+
+  <script src="{% static 'teams/js/team-grade-map-form.js' %}?v=3"></script>
+
+{% endblock %}
+

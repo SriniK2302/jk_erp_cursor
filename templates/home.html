@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Home · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>JK ERP</h1>
+      {% if user.is_authenticated %}
+        <p class="muted">Signed in as <strong>{{ user.get_username }}</strong></p>
+      {% else %}
+        <p class="muted">Sign in to continue.</p>
+      {% endif %}
+    </header>
+
+    {% if user.is_authenticated %}
+      <nav class="tile-grid" aria-label="Main actions">
+        {% if can_use_engagements %}
+          <a class="tile-link" href="{% url 'manage_engagements' %}">
+            <span class="tile-title">Manage Engagements</span>
+            <span class="tile-subtitle">Engagements, time log, work areas, and schedules</span>
+          </a>
+        {% endif %}
+        {% if user.is_superuser %}
+          <a class="tile-link" href="{% url 'admin:index' %}">
+            <span class="tile-title">Admin</span>
+            <span class="tile-subtitle">Manage users and roles</span>
+          </a>
+        {% endif %}
+        {% if can_use_setup %}
+          <a class="tile-link" href="{% url 'setup' %}">
+            <span class="tile-title">Setup</span>
+            <span class="tile-subtitle">Configure your workspace</span>
+          </a>
+          <a class="tile-link" href="{% url 'gl_hub' %}">
+            <span class="tile-title">GL</span>
+            <span class="tile-subtitle">Chart of accounts, fiscal years, sales ledger, and TB</span>
+          </a>
+          <a class="tile-link" href="{% url 'sales_hub' %}">
+            <span class="tile-title">Manage Invoices</span>
+            <span class="tile-subtitle">Invoices, UDINs, UDIN Source, and receipts</span>
+          </a>
+        {% endif %}
+        {% if can_use_tools %}
+          <a class="tile-link" href="{% url 'tools_utilities' %}">
+            <span class="tile-title">Tools & utilities</span>
+            <span class="tile-subtitle">To-do list, file tools, and data utilities</span>
+          </a>
+        {% endif %}
+      </nav>
+
+      {% if can_use_engagements %}
+        <section class="home-work-list" aria-labelledby="home-work-list-heading">
+          <h2 id="home-work-list-heading" class="home-work-list__title">Work list</h2>
+          <p class="muted home-work-list__intro">
+            For engagements you can access: every <strong>open schedule line</strong> (no actual finish yet), every
+            <strong>work area</strong> on <strong>Scheduled</strong> or <strong>In progress</strong> engagements that
+            does not already have an open line (add dates on the work area schedule when ready), and—only if there are
+            no work areas at all—a single engagement row. Schedule lines drop off when closed (actual finish set).
+          </p>
+          {% if home_work_list_rows %}
+            <div class="table-wrap home-work-list__table">
+              <table class="data-grid">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>FY</th>
+                    <th>Service</th>
+                    <th>Work line</th>
+                    <th>Planned finish</th>
+                    <th class="col-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in home_work_list_rows %}
+                    {% with e=row.engagement %}
+                      <tr>
+                        <td>{{ e.client.display_name }}</td>
+                        <td>{{ e.fiscal_year.fy_no }}</td>
+                        <td>{{ e.service.service_desc }}</td>
+                        <td>{{ row.label }}</td>
+                        <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% endif %}</td>
+                        <td class="col-actions">
+                          <div class="row-actions">
+                            {% if row.kind == "ew_period" or row.kind == "ew_area" %}
+                              {% if active_timer_scope.engagement_work_area_id == row.work_area.id %}
+                                <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                  <button type="submit" class="button button-secondary button-compact" title="Stop timer for this work area">Stop</button>
+                                </form>
+                              {% else %}
+                                <button
+                                  type="button"
+                                  class="icon-btn icon-btn-muted timer-start-opener"
+                                  title="Start timer (this work area)"
+                                  aria-label="Start timer for this work area"
+                                  data-start-url="{% url 'timer_start_engagement_work_area' e.id row.work_area.id %}"
+                                  data-next="{{ request.get_full_path }}"
+                                  data-engagement="{{ e.id }}"
+                                  data-engagement-work-area="{{ row.work_area.id }}"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                                </button>
+                              {% endif %}
+                            {% elif row.kind == "dw_period" or row.kind == "dw_area" %}
+                              {% if active_timer_scope.division_work_area_id == row.work_area.id %}
+                                <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                  <button type="submit" class="button button-secondary button-compact" title="Stop timer for this work area">Stop</button>
+                                </form>
+                              {% else %}
+                                <button
+                                  type="button"
+                                  class="icon-btn icon-btn-muted timer-start-opener"
+                                  title="Start timer (this work area)"
+                                  aria-label="Start timer for this work area"
+                                  data-start-url="{% url 'timer_start_division_work_area' row.division.id row.work_area.id %}"
+                                  data-next="{{ request.get_full_path }}"
+                                  data-engagement="{{ e.id }}"
+                                  data-division="{{ row.division.id }}"
+                                  data-division-work-area="{{ row.work_area.id }}"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                                </button>
+                              {% endif %}
+                            {% elif row.kind == "engagement" %}
+                              {% if active_timer_scope.engagement_id == e.id and not active_timer_scope.engagement_work_area_id and not active_timer_scope.division_work_area_id and not active_timer_scope.division_id %}
+                                <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                  <button type="submit" class="button button-secondary button-compact" title="Stop timer for this engagement">Stop</button>
+                                </form>
+                              {% else %}
+                                <button
+                                  type="button"
+                                  class="icon-btn icon-btn-muted timer-start-opener"
+                                  title="Start timer (engagement)"
+                                  aria-label="Start timer for this engagement"
+                                  data-start-url="{% url 'timer_start_engagement' e.id %}"
+                                  data-next="{{ request.get_full_path }}"
+                                  data-engagement="{{ e.id }}"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                                </button>
+                              {% endif %}
+                            {% endif %}
+                            <a href="{% url 'engagement_work_areas' e.id %}" class="icon-btn icon-btn-muted" title="Engagement work areas" aria-label="Engagement work areas">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                            </a>
+                            {% if row.kind == "ew_period" or row.kind == "ew_area" %}
+                              <a href="{% url 'engagement_work_area_schedule' e.id row.work_area.id %}" class="icon-btn icon-btn-muted" title="Schedule for this work area" aria-label="Work area schedule">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                              </a>
+                            {% elif row.kind == "dw_period" or row.kind == "dw_area" %}
+                              <a href="{% url 'engagement_division_work_area_schedule' row.division.id row.work_area.id %}" class="icon-btn icon-btn-muted" title="Schedule for this work area" aria-label="Work area schedule">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                              </a>
+                            {% else %}
+                              <a href="{% url 'engagement_schedules' e.id %}" class="icon-btn icon-btn-muted" title="Engagement schedule" aria-label="Engagement schedule">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                              </a>
+                            {% endif %}
+                            <a href="{% url 'engagement_documentation_maps' e.id %}" class="icon-btn icon-btn-muted" title="Documentation" aria-label="Documentation">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endwith %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <p class="muted home-work-list__footer">
+              <a href="{% url 'engagements' %}">All engagements</a>
+            </p>
+          {% else %}
+            <p class="muted home-work-list__empty">No open work items right now.</p>
+            <p class="muted home-work-list__footer">
+              <a href="{% url 'engagements' %}">View engagements</a>
+            </p>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="link-button">Log out</button>
+      </form>
+    {% else %}
+      <p><a class="button" href="{% url 'login' %}">Log in</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

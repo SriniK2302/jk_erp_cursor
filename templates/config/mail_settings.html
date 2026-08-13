@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block global_messages %}{% endblock %}
+
+{% block title %}Mail settings (Zoho SMTP) · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Mail settings (Zoho SMTP)</h1>
+      <p class="muted">
+        Outbound email for team assignment notices. Zoho organisation mail typically uses
+        <strong>smtppro.zoho.com</strong> (port 587 + TLS, or 465 + SSL with TLS off). Use your Zoho mailbox and an
+        <a href="https://www.zoho.com/mail/help/zoho-mail-app-passwords.html" rel="noopener noreferrer">app-specific password</a>
+        if required.
+      </p>
+    </header>
+
+    {% if messages %}
+      {% for message in messages %}
+        {% if message.level_tag == "success" %}
+          <p class="form-banner form-banner-success" role="status">{{ message }}</p>
+        {% else %}
+          <p class="form-banner form-banner-error" role="alert">{{ message }}</p>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.enabled.id_for_label }}">Send mail</label>
+        <div class="sap-control">
+          {{ form.enabled }}
+          {% if form.enabled.errors %}
+            <span class="field-error">{{ form.enabled.errors.0 }}</span>
+          {% endif %}
+          <p class="muted small-help">Turn on only after host, credentials, and From address are correct.</p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.smtp_host.id_for_label }}">SMTP host</label>
+        <div class="sap-control">
+          {{ form.smtp_host }}
+          {% if form.smtp_host.errors %}
+            <span class="field-error">{{ form.smtp_host.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.smtp_port.id_for_label }}">SMTP port</label>
+        <div class="sap-control">
+          {{ form.smtp_port }}
+          {% if form.smtp_port.errors %}
+            <span class="field-error">{{ form.smtp_port.errors.0 }}</span>
+          {% endif %}
+          <p class="muted small-help">587 with TLS, or 465 with SSL (disable TLS when using SSL).</p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.use_tls.id_for_label }}">Use TLS</label>
+        <div class="sap-control">
+          {{ form.use_tls }}
+          {% if form.use_tls.errors %}
+            <span class="field-error">{{ form.use_tls.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.use_ssl.id_for_label }}">Use SSL</label>
+        <div class="sap-control">
+          {{ form.use_ssl }}
+          {% if form.use_ssl.errors %}
+            <span class="field-error">{{ form.use_ssl.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.username.id_for_label }}">SMTP username</label>
+        <div class="sap-control">
+          {{ form.username }}
+          {% if form.username.errors %}
+            <span class="field-error">{{ form.username.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.password.id_for_label }}">SMTP password</label>
+        <div class="sap-control">
+          {{ form.password }}
+          {% if form.password.errors %}
+            <span class="field-error">{{ form.password.errors.0 }}</span>
+          {% endif %}
+          {% if form.password.help_text %}
+            <p class="muted small-help">{{ form.password.help_text }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.default_from_email.id_for_label }}">From email</label>
+        <div class="sap-control">
+          {{ form.default_from_email }}
+          {% if form.default_from_email.errors %}
+            <span class="field-error">{{ form.default_from_email.errors.0 }}</span>
+          {% endif %}
+          {% if form.default_from_email.help_text %}
+            <p class="muted small-help">{{ form.default_from_email.help_text }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <button type="submit" class="button">Save</button>
+        <a href="{% url 'setup' %}" class="button button-secondary">Cancel</a>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

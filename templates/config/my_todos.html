@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}My to-do list · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>My to-do list</h1>
+      <p class="muted">Tasks are private to your login. Open items are listed before completed ones, then by target date.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search tasks…"
+          aria-label="Search tasks"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Target date</th>
+              <th>Status</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in todos %}
+              <tr
+                data-grid-row
+                class="{% if row.is_completed %}todo-row-done{% elif row.target_date and row.target_date < today %}todo-row-overdue{% endif %}"
+              >
+                <td>
+                  <strong>{{ row.title }}</strong>
+                  {% if row.description %}
+                    <p class="muted todo-desc-preview">{{ row.description|truncatewords:24 }}</p>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.target_date %}
+                    {{ row.target_date|date:"Y-m-d" }}
+                  {% else %}
+                    <span class="muted">—</span>
+                  {% endif %}
+                </td>
+                <td>{% if row.is_completed %}<span class="muted">Done</span>{% else %}Open{% endif %}</td>
+                <td class="col-actions">
+                  <div class="row-actions">
+                    <form method="post" action="{% url 'my_todo_toggle' row.pk %}" class="inline-form">
+                      {% csrf_token %}
+                      <button type="submit" class="button button-compact button-secondary">
+                        {% if row.is_completed %}Reopen{% else %}Complete{% endif %}
+                      </button>
+                    </form>
+                    <a href="{% url 'my_todo_edit' row.pk %}" class="button button-compact button-secondary">Edit</a>
+                    <form method="post" action="{% url 'my_todo_delete' row.pk %}" class="inline-form" onsubmit="return confirm('Delete this task?');">
+                      {% csrf_token %}
+                      <button type="submit" class="button button-compact button-secondary">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="4" class="muted">No tasks yet. Use <strong>Add task</strong> to create one.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching tasks found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'my_todo_create' %}" class="button">Add task</a>
+    </div>
+
+    <p class="muted">
+      <a href="{% url 'tools_utilities' %}">← Tools & utilities</a>
+      &nbsp;·&nbsp;
+      <a href="{% url 'home' %}">Home</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Engagements · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Manage Engagements</h1>
+      {% if can_manage_structure %}
+        <p class="muted">Configure engagement masters and schedules.</p>
+      {% else %}
+        <p class="muted">Work on your assigned engagements (documentation and actual progress updates).</p>
+      {% endif %}
+    </header>
+
+    <nav class="tile-grid engagement-manage-grid" aria-label="Engagement actions">
+      <a class="tile-link" href="{% url 'engagements' %}">
+        <span class="tile-title">{% if can_manage_structure %}Engagements{% else %}My Engagements{% endif %}</span>
+        <span class="tile-subtitle">
+          {% if can_manage_structure %}
+            Maintain engagement master and schedule sets
+          {% else %}
+            View assigned engagements and update operational progress
+          {% endif %}
+        </span>
+      </a>
+      <a class="tile-link" href="{% url 'certification_fees' %}">
+        <span class="tile-title">Certification fees</span>
+        <span class="tile-subtitle">From date, to date, and Inv TV amt for Certification UDINs</span>
+      </a>
+      {% if can_manage_structure %}
+        <a class="tile-link" href="{% url 'engagement_divisions' %}">
+          <span class="tile-title">Engagement Divisions</span>
+          <span class="tile-subtitle">Map engagement-level division names</span>
+        </a>
+        <a class="tile-link" href="{% url 'work_area_hub' %}">
+          <span class="tile-title">Work Areas</span>
+          <span class="tile-subtitle">Plan work areas by engagement or by division, with dated schedules per work area</span>
+        </a>
+      {% endif %}
+      {% if can_manage_structure %}
+        <a class="tile-link" href="{% url 'bulk_engagement_team_assignments' %}">
+          <span class="tile-title">Assign Team across Engagements</span>
+          <span class="tile-subtitle">Assign one team member to multiple engagements in one step</span>
+        </a>
+      {% endif %}
+      {% if can_use_engagements_nav %}
+      <a class="tile-link" href="{% url 'my_time_log' %}">
+        <span class="tile-title">My time log</span>
+        <span class="tile-subtitle">Review timer sessions and minutes</span>
+      </a>
+      {% endif %}
+
+      <span class="tile-grid-break" aria-hidden="true"></span>
+
+      {% if can_use_engagements_nav %}
+      <a class="tile-link" href="{% url 'team_assignments_report' %}">
+        <span class="tile-title">Team assignments report</span>
+        <span class="tile-subtitle">Roster by engagement, division, and work areas you can access</span>
+      </a>
+      {% endif %}
+      <a class="tile-link" href="{% url 'work_area_notes_report' %}">
+        <span class="tile-title">Work area notes report</span>
+        <span class="tile-subtitle">Query and remark notes report by work area with filters</span>
+      </a>
+    </nav>
+
+    <p class="muted"><a href="{% url 'home' %}">← Back to Home</a></p>
+  </section>
+</div>
+{% endblock %}

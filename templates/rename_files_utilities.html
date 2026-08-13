@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block title %}Rename Files · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Rename Files</h1>
+      <p class="muted">Choose a rename flavour.</p>
+      <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
+    </header>
+
+    <style>
+      .rename-files-two-col {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.8rem;
+      }
+      @media (max-width: 980px) {
+        .rename-files-two-col {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+
+    <div class="rename-files-two-col" aria-label="Rename files tools">
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Rename files based on Date Chars</span>
+
+      <form id="select-rename-date-prefix-folder-form" method="post" action="{% url 'select_rename_date_prefix_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_date_prefix_files' %}"
+        id="rename-date-prefix-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-date-prefix-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-date-prefix-folder"
+              name="rename_date_prefix_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_date_prefix_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-date-prefix-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <label for="existing-text-pattern" class="muted utility-label">Existing text pattern</label>
+        <input
+          id="existing-text-pattern"
+          name="existing_text_pattern"
+          type="text"
+          class="utility-input"
+          value="{{ existing_text_pattern }}"
+          placeholder="e.g. YYDDMM, YYMMDD, YYYY-MM-DD"
+          autocomplete="off"
+          required
+        >
+        <label for="replacement-pattern" class="muted utility-label">Replacement pattern</label>
+        <input
+          id="replacement-pattern"
+          name="replacement_pattern"
+          type="text"
+          class="utility-input"
+          value="{{ replacement_pattern }}"
+          placeholder="e.g. YYYY DD MM, DD-MM-YYYY, YYYY_MM_DD"
+          autocomplete="off"
+          required
+        >
+        <fieldset class="utility-fieldset-compact">
+          <legend class="muted">Pattern match position</legend>
+          <div class="utility-radio-stack">
+            <label>
+              <input
+                type="radio"
+                name="rename_date_pattern_position"
+                value="leading"
+                {% if rename_date_pattern_position != 'anywhere' %}checked{% endif %}
+              >
+              At start — replace matched text
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="rename_date_pattern_position"
+                value="anywhere"
+                {% if rename_date_pattern_position == 'anywhere' %}checked{% endif %}
+              >
+              Anywhere — prepend replacement at left; full name unchanged after it
+            </label>
+          </div>
+        </fieldset>
+        <button type="submit" id="execute-rename-date-prefix-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-date-prefix-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-date-prefix-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-date-prefix-progress-text">Renaming files...</p>
+      </div>
+
+      <p id="rename-date-prefix-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Rename file based on Text</span>
+
+      <form id="select-rename-text-folder-form" method="post" action="{% url 'select_rename_text_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_files_based_on_text' %}"
+        id="rename-by-text-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-text-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-text-folder"
+              name="rename_text_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_text_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-text-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label for="file-name-text-identifier" class="muted utility-label">File name text Identifier</label>
+        <input
+          id="file-name-text-identifier"
+          name="file_name_text_identifier"
+          type="text"
+          class="utility-input"
+          autocomplete="off"
+        >
+
+        <label for="rename-criteria" class="muted utility-label">Rename criteria</label>
+        <select id="rename-criteria" name="rename_criteria" class="utility-input">
+          <option value="remove_left">Remove text to Left</option>
+          <option value="remove_right">Remove text to Right</option>
+        </select>
+
+        <button type="submit" id="execute-rename-by-text-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-by-text-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-by-text-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-by-text-progress-text">Renaming files...</p>
+      </div>
+
+      <p id="rename-by-text-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Rename by Date in File Content</span>
+      <span class="tile-subtitle">Reads each file and prefixes name as <code>YYYY MM DD</code> from first date match</span>
+
+      <form id="select-rename-content-date-folder-form" method="post" action="{% url 'select_rename_content_date_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_files_by_content_date' %}"
+        id="rename-by-content-date-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-content-date-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-content-date-folder"
+              name="rename_content_date_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_content_date_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-content-date-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label for="date-search-pattern" class="muted utility-label">Date search pattern</label>
+        <input
+          id="date-search-pattern"
+          name="date_search_pattern"
+          type="text"
+          class="utility-input"
+          value="{{ rename_content_date_pattern|default:'dd-mm-yy' }}"
+          placeholder="e.g. dd-mm-yy, dd-mmm-yy, dd/mm/yyyy"
+          autocomplete="off"
+          required
+        >
+        <label for="date-search-file-type" class="muted utility-label">File type</label>
+        <select id="date-search-file-type" name="date_search_file_type" class="utility-input">
+          <option value="all" {% if rename_content_date_file_type == 'all' %}selected{% endif %}>All</option>
+          <option value="pdf" {% if rename_content_date_file_type == 'pdf' %}selected{% endif %}>PDF</option>
+          <option value="ppt" {% if rename_content_date_file_type == 'ppt' %}selected{% endif %}>PPT</option>
+          <option value="excel" {% if rename_content_date_file_type == 'excel' %}selected{% endif %}>Excel</option>
+          <option value="word" {% if rename_content_date_file_type == 'word' %}selected{% endif %}>Word</option>
+        </select>
+        <p class="muted">Prefix format is fixed: <code>YYYY MM DD</code>.</p>
+
+        <button type="submit" id="execute-rename-by-content-date-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-by-content-date-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-by-content-date-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-by-content-date-progress-text">Reading files and renaming...</p>
+      </div>
+
+      <p id="rename-by-content-date-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+    </div>
+
+    <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("rename-date-prefix-form");
+    const progressWrap = document.getElementById("rename-date-prefix-progress-wrap");
+    const progressBar = document.getElementById("rename-date-prefix-progress-bar");
+    const progressText = document.getElementById("rename-date-prefix-progress-text");
+    const resultBox = document.getElementById("rename-date-prefix-result");
+    const executeBtn = document.getElementById("execute-rename-date-prefix-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-date-prefix-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Renaming direct files only...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to rename files.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while renaming files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("rename-by-text-form");
+    const progressWrap = document.getElementById("rename-by-text-progress-wrap");
+    const progressBar = document.getElementById("rename-by-text-progress-bar");
+    const progressText = document.getElementById("rename-by-text-progress-text");
+    const resultBox = document.getElementById("rename-by-text-result");
+    const executeBtn = document.getElementById("execute-rename-by-text-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-text-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Renaming direct files only...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to rename files.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while renaming files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("rename-by-content-date-form");
+    const progressWrap = document.getElementById("rename-by-content-date-progress-wrap");
+    const progressBar = document.getElementById("rename-by-content-date-progress-bar");
+    const progressText = document.getElementById("rename-by-content-date-progress-text");
+    const resultBox = document.getElementById("rename-by-content-date-result");
+    const executeBtn = document.getElementById("execute-rename-by-content-date-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-content-date-folder");
+      const patternInput = document.getElementById("date-search-pattern");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      const patternValue = patternInput ? patternInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+      if (!patternValue) {
+        resultBox.textContent = "Date search pattern is required.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Reading files and renaming...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to rename files.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while renaming files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

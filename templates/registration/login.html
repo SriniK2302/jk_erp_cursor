@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Log in · JK ERP{% endblock %}
+
+{% block content %}
+<div class="auth-layout">
+  <div class="auth-card">
+    <h1>Log in</h1>
+    <p class="muted">Use your account credentials.</p>
+
+    {% if form.errors %}
+      <p class="form-error" role="alert">Please correct the errors below.</p>
+    {% endif %}
+
+    <form method="post" action="{% url 'login' %}" class="stack-form" novalidate>
+      {% csrf_token %}
+      {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+
+      <div class="field">
+        <label for="id_username">Username</label>
+        <input type="text" name="username" id="id_username" value="{{ form.username.value|default:'' }}" autofocus autocomplete="username" required>
+        {% if form.username.errors %}
+          <span class="field-error">{{ form.username.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="id_password">Password</label>
+        <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+        {% if form.password.errors %}
+          <span class="field-error">{{ form.password.errors.0 }}</span>
+        {% endif %}
+      </div>
+
+      {% if form.non_field_errors %}
+        <p class="form-error" role="alert">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <button type="submit" class="button button-block">Sign in</button>
+    </form>
+
+    <p class="muted footer-link"><a href="{% url 'home' %}">← Back to home</a></p>
+  </div>
+</div>
+{% endblock %}

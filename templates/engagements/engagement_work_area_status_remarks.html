@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Engagement Work Area Status Remarks · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Engagement work area status remarks</h1>
+      <p class="muted">{{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}</p>
+      <p class="muted">Work area: <strong>{{ work_area.work_area_name }}</strong></p>
+    </header>
+
+    <p class="muted page-sticky-links">
+      <a href="{% url 'engagement_work_areas' engagement.id %}">← Back to Engagement Work Areas</a>
+      ·
+      <a href="{% url 'engagement_work_area_schedule' engagement.id work_area.id %}">Work area schedule</a>
+      ·
+      <a href="{% url 'engagement_work_area_documents' engagement.id work_area.id %}">Work area documents</a>
+    </p>
+
+    <div class="grid-panel">
+      <h2 class="doc-files-subheading">Add status remark</h2>
+      <form method="post" class="sap-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_remark">
+        <div class="sap-row">
+          <label for="status-remarks-date">Remark date</label>
+          <div class="sap-control">
+            <input id="status-remarks-date" name="remark_date" type="date" class="input-short" required value="{{ default_remark_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="status-remarks-text">Remarks</label>
+          <div class="sap-control">
+            <textarea id="status-remarks-text" name="remarks" class="input-long" rows="4" placeholder="Enter status remark..." required></textarea>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Save remark</button>
+        </div>
+      </form>
+
+      <h2 class="doc-files-subheading">Remark history</h2>
+      {% if remarks %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for item in remarks %}
+            <li class="doc-attachment-line doc-attachment-line-page">
+              <div class="doc-attachment-line-main">
+                <span class="doc-attachment-date-badge">{{ item.remark_date|date:"Y-m-d" }}</span>
+                <span class="muted">— {{ item.created_by }}</span>
+                <span class="muted"> · saved {{ item.created_on|date:"Y-m-d H:i" }}</span>
+                <span> · {{ item.remarks }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No status remarks added yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

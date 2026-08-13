@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Data Utilities · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Data Utilities</h1>
+      <p class="muted">Data-focused tools for the team will be listed here.</p>
+    </header>
+
+    <nav class="tile-grid" aria-label="Data utilities">
+      <a class="tile-link" href="{% url 'data_create_table' %}">
+        <span class="tile-title">Create PostgreSQL table</span>
+        <span class="tile-subtitle">Excel schema sheet, host/port/DB credentials, CREATE TABLE in public</span>
+      </a>
+      <a class="tile-link" href="{% url 'data_excel_import' %}">
+        <span class="tile-title">Upload data (Excel → PostgreSQL)</span>
+        <span class="tile-subtitle">Match table and column names; import selected columns; long text truncated</span>
+      </a>
+      <a class="tile-link" href="{% url 'data_pg_row_delete' %}">
+        <span class="tile-title">PostgreSQL delete rows</span>
+        <span class="tile-subtitle">Host, port, database, user, password; test connection, then delete rows with filters or clear a table</span>
+      </a>
+      <a class="tile-link" href="{% url 'data_analysis' %}">
+        <span class="tile-title">Data Analysis</span>
+        <span class="tile-subtitle">PostgreSQL: pick database and table, label/value columns, grouped summaries</span>
+      </a>
+    </nav>
+
+    <p class="muted"><a href="{% url 'tools_utilities' %}">← Tools & utilities</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}{% if row %}Edit certification fee{% else %}Add certification fee{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if row %}Edit certification fee{% else %}Add certification fee{% endif %}</h1>
+      <p class="muted">Certification only — fee applies for the selected client when the UDIN signing date falls in this period.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <p class="field-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.client.id_for_label }}">Client</label>
+        <div class="sap-control">
+          {{ form.client }}
+          {% if form.client.errors %}
+            <span class="field-error">{{ form.client.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.from_date.id_for_label }}">From date</label>
+        <div class="sap-control">
+          {{ form.from_date }}
+          {% if form.from_date.errors %}
+            <span class="field-error">{{ form.from_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.to_date.id_for_label }}">To date</label>
+        <div class="sap-control">
+          {{ form.to_date }}
+          {% if form.to_date.errors %}
+            <span class="field-error">{{ form.to_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fee_amount.id_for_label }}">Fee (Inv TV amt)</label>
+        <div class="sap-control">
+          {{ form.fee_amount }}
+          {% if form.fee_amount.errors %}
+            <span class="field-error">{{ form.fee_amount.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'certification_fees' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if row %}Update{% else %}Save{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'certification_fees' %}">← Back to certification fees</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block title %}Data Analysis · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Data Analysis</h1>
+      <p class="muted">
+        Left: connection and <strong>public</strong> table. Right: <strong>Load columns</strong>, mark each column as <strong>Label</strong> (GROUP BY) or <strong>Value</strong> (SUM), then run a task. Passwords are not stored.
+      </p>
+    </header>
+
+    <div class="data-analysis-layout excel-import-block">
+      <div class="data-analysis-source">
+        <form id="data-analysis-form">
+          {% csrf_token %}
+        </form>
+
+        <div class="data-analysis-field-pair">
+          <div class="data-analysis-pair-cell">
+            <label for="da-pg-host" class="muted utility-label">Host</label>
+            <input id="da-pg-host" name="pg_host" type="text" class="utility-input" value="{{ default_host }}" form="data-analysis-form" autocomplete="off">
+          </div>
+          <div class="data-analysis-pair-cell">
+            <label for="da-pg-port" class="muted utility-label">Port</label>
+            <input id="da-pg-port" name="pg_port" type="text" class="utility-input" value="{{ default_port }}" form="data-analysis-form" autocomplete="off">
+          </div>
+        </div>
+        <div class="data-analysis-field-pair">
+          <div class="data-analysis-pair-cell">
+            <label for="da-pg-user" class="muted utility-label">Username</label>
+            <input id="da-pg-user" name="pg_user" type="text" class="utility-input" value="{{ default_user }}" form="data-analysis-form" autocomplete="username">
+          </div>
+          <div class="data-analysis-pair-cell">
+            <label for="da-pg-password" class="muted utility-label">Password</label>
+            <input id="da-pg-password" name="pg_password" type="password" class="utility-input" value="" form="data-analysis-form" autocomplete="current-password">
+          </div>
+        </div>
+
+        <div class="data-analysis-db-row">
+          <label for="da-pg-dbname" class="muted utility-label">Database</label>
+          <div class="utility-button-row">
+            <select id="da-pg-dbname" name="pg_dbname" form="data-analysis-form" class="utility-input" autocomplete="off">
+              <option value="">— Load DBs —</option>
+              {% if default_db %}
+              <option value="{{ default_db }}" selected>{{ default_db }}</option>
+              {% endif %}
+            </select>
+            <button type="button" id="da-load-databases-btn" class="button button-compact button-secondary">Load DBs</button>
+          </div>
+        </div>
+
+        <div class="data-analysis-inline-actions">
+          <button type="button" id="da-test-conn-btn" class="button button-compact">Test connection</button>
+          <p class="muted pg-delete-conn-msg" id="da-conn-test-result" aria-live="polite"></p>
+        </div>
+
+        <div class="data-analysis-table-row">
+          <label for="da-table-select" class="muted utility-label">Table</label>
+          <select id="da-table-select" class="utility-input" autocomplete="off" form="data-analysis-form">
+            <option value="">— Select DB —</option>
+          </select>
+        </div>
+
+        <p class="muted data-analysis-summary" id="da-selection-summary" aria-live="polite"></p>
+      </div>
+
+      <div class="data-analysis-panel" aria-labelledby="da-panel-heading">
+        <h2 id="da-panel-heading">Tasks &amp; columns</h2>
+
+        <div class="utility-button-row data-analysis-task-row">
+          <button type="button" id="da-load-columns-btn" class="button button-compact button-secondary">Load columns</button>
+          <button type="button" id="da-summary-btn" class="button button-compact">Summary</button>
+        </div>
+
+        <div class="data-analysis-role-panel">
+          <div class="data-analysis-role-filter">
+            <label for="da-column-filter" class="muted utility-label data-analysis-role-filter-label">Filter columns</label>
+            <input id="da-column-filter" type="search" class="utility-input data-analysis-role-filter-input" placeholder="Type to filter by name…" autocomplete="off" spellcheck="false" aria-controls="da-column-role-list">
+          </div>
+          <div class="data-analysis-role-head muted utility-footnote">
+            <span>Column</span>
+            <span>Label (GROUP BY)</span>
+            <span>Value (SUM)</span>
+          </div>
+          <div id="da-column-role-list" class="data-analysis-role-list" aria-label="Columns for summary"></div>
+          <p class="muted utility-footnote data-analysis-role-hint" id="da-role-hint">
+            Check Label or Value per column (not both). Value columns must be numeric in PostgreSQL.
+          </p>
+        </div>
+
+        <div class="table-wrap" id="da-summary-wrap" hidden>
+          <p class="muted utility-footnote" id="da-summary-note"></p>
+          <table class="data-grid" id="da-summary-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top: 0.75rem;"><a href="{% url 'data_utilities' %}">← Back to Data Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("data-analysis-form");
+    const testConnBtn = document.getElementById("da-test-conn-btn");
+    const connTestResult = document.getElementById("da-conn-test-result");
+    const loadDatabasesBtn = document.getElementById("da-load-databases-btn");
+    const pgDbnameSelect = document.getElementById("da-pg-dbname");
+    const tableSelect = document.getElementById("da-table-select");
+    const selectionSummary = document.getElementById("da-selection-summary");
+    const loadColsBtn = document.getElementById("da-load-columns-btn");
+    const summaryBtn = document.getElementById("da-summary-btn");
+    const columnRoleList = document.getElementById("da-column-role-list");
+    const columnFilterInput = document.getElementById("da-column-filter");
+    const summaryWrap = document.getElementById("da-summary-wrap");
+    const summaryNote = document.getElementById("da-summary-note");
+    const summaryTable = document.getElementById("da-summary-table");
+    const summaryThead = summaryTable ? summaryTable.querySelector("thead") : null;
+    const summaryTbody = summaryTable ? summaryTable.querySelector("tbody") : null;
+
+    function getCsrfToken() {
+      const input = form.querySelector("input[name=csrfmiddlewaretoken]");
+      return input ? input.value : "";
+    }
+
+    function connFormData() {
+      const fd = new FormData();
+      fd.append("pg_host", document.getElementById("da-pg-host").value.trim());
+      fd.append("pg_port", document.getElementById("da-pg-port").value.trim());
+      fd.append("pg_user", document.getElementById("da-pg-user").value.trim());
+      fd.append("pg_password", document.getElementById("da-pg-password").value);
+      fd.append("pg_dbname", pgDbnameSelect.value.trim());
+      return fd;
+    }
+
+    function clearSummary() {
+      if (summaryWrap) {
+        summaryWrap.hidden = true;
+      }
+      if (summaryNote) {
+        summaryNote.textContent = "";
+      }
+      if (summaryThead) {
+        summaryThead.innerHTML = "";
+      }
+      if (summaryTbody) {
+        summaryTbody.innerHTML = "";
+      }
+    }
+
+    function getCheckedColumns(role) {
+      if (!columnRoleList) {
+        return [];
+      }
+      const out = [];
+      columnRoleList.querySelectorAll('input[type="checkbox"][data-da-role="' + role + '"]:checked').forEach(function (el) {
+        out.push(el.getAttribute("data-da-col"));
+      });
+      return out;
+    }
+
+    function applyColumnFilter() {
+      if (!columnRoleList) {
+        return;
+      }
+      var raw = columnFilterInput ? columnFilterInput.value : "";
+      var q = raw.replace(/\s+/g, " ").trim().toLowerCase();
+      columnRoleList.querySelectorAll(".data-analysis-role-row").forEach(function (row) {
+        var name = (row.getAttribute("data-da-col") || "").toLowerCase();
+        var match = !q || name.indexOf(q) !== -1;
+        row.classList.toggle("is-da-filtered-out", !match);
+      });
+    }
+
+    function bindColumnFilterEvents() {
+      if (!columnFilterInput) {
+        return;
+      }
+      var run = function () {
+        applyColumnFilter();
+      };
+      columnFilterInput.addEventListener("input", run);
+      columnFilterInput.addEventListener("search", run);
+      columnFilterInput.addEventListener("keyup", run);
+      columnFilterInput.addEventListener("paste", function () {
+        requestAnimationFrame(run);
+      });
+      columnFilterInput.addEventListener("compositionend", run);
+    }
+
+    function fillColumnRoleCheckboxes(columns) {
+      if (!columnRoleList) {
+        return;
+      }
+      columnRoleList.innerHTML = "";
+      if (columnFilterInput) {
+        columnFilterInput.value = "";
+      }
+      (columns || []).forEach(function (name) {
+        const row = document.createElement("div");
+        row.className = "data-analysis-role-row";
+        row.setAttribute("data-da-col", name);
+
+        const nm = document.createElement("span");
+        nm.className = "data-analysis-role-name";
+        nm.textContent = name;
+
+        const lbLabel = document.createElement("label");
+        const cbL = document.createElement("input");
+        cbL.type = "checkbox";
+        cbL.setAttribute("data-da-role", "label");
+        cbL.setAttribute("data-da-col", name);
+        lbLabel.appendChild(cbL);
+        lbLabel.appendChild(document.createTextNode(" Label"));
+
+        const lbVal = document.createElement("label");
+        const cbV = document.createElement("input");
+        cbV.type = "checkbox";
+        cbV.setAttribute("data-da-role", "value");
+        cbV.setAttribute("data-da-col", name);
+        lbVal.appendChild(cbV);
+        lbVal.appendChild(document.createTextNode(" Value"));
+
+        cbL.addEventListener("change", function () {
+          if (cbL.checked) {
+            cbV.checked = false;
+          }
+        });
+        cbV.addEventListener("change", function () {
+          if (cbV.checked) {
+            cbL.checked = false;
+          }
+        });
+
+        row.appendChild(nm);
+        row.appendChild(lbLabel);
+        row.appendChild(lbVal);
+        columnRoleList.appendChild(row);
+      });
+      applyColumnFilter();
+      clearSummary();
+    }
+
+    function updateSelectionSummary() {
+      if (!selectionSummary) {
+        return;
+      }
+      const db = pgDbnameSelect.value.trim();
+      const tbl = tableSelect.value.trim();
+      if (db && tbl) {
+        selectionSummary.textContent = db + " · public." + tbl;
+      } else if (db) {
+        selectionSummary.textContent = db + " — pick a table";
+      } else {
+        selectionSummary.textContent = "";
+      }
+    }
+
+    async function refreshTablesList() {
+      const db = pgDbnameSelect.value.trim();
+      tableSelect.innerHTML = "";
+      const o0 = document.createElement("option");
+      o0.value = "";
+      o0.textContent = db ? "— Table —" : "— Select DB —";
+      tableSelect.appendChild(o0);
+      updateSelectionSummary();
+      fillColumnRoleCheckboxes([]);
+      if (!db) {
+        return;
+      }
+      try {
+        const fd = connFormData();
+        const res = await fetch("{% url 'pg_row_delete_tables_json' %}", {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list tables.");
+        }
+        tableSelect.innerHTML = "";
+        const o1 = document.createElement("option");
+        o1.value = "";
+        o1.textContent = "— Table —";
+        tableSelect.appendChild(o1);
+        (data.tables || []).forEach(function (name) {
+          const o = document.createElement("option");
+          o.value = name;
+          o.textContent = name;
+          tableSelect.appendChild(o);
+        });
+      } catch (e) {
+        if (connTestResult) {
+          connTestResult.textContent = e.message || "Failed to list tables.";
+        }
+      }
+      updateSelectionSummary();
+    }
+
+    async function loadPostgresDatabases() {
+      loadDatabasesBtn.disabled = true;
+      if (connTestResult) {
+        connTestResult.textContent = "";
+      }
+      try {
+        const fd = new FormData();
+        fd.append("pg_host", document.getElementById("da-pg-host").value.trim());
+        fd.append("pg_port", document.getElementById("da-pg-port").value.trim());
+        fd.append("pg_user", document.getElementById("da-pg-user").value.trim());
+        fd.append("pg_password", document.getElementById("da-pg-password").value);
+        fd.append("pg_dbname", pgDbnameSelect.value.trim());
+        fd.append("csrfmiddlewaretoken", getCsrfToken());
+        const res = await fetch("{% url 'pg_list_databases_json' %}", {
+          method: "POST",
+          body: fd,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list databases.");
+        }
+        const prev = pgDbnameSelect.value;
+        const names = data.databases || [];
+        pgDbnameSelect.innerHTML = "";
+        const o0 = document.createElement("option");
+        o0.value = "";
+        o0.textContent = "— Database —";
+        pgDbnameSelect.appendChild(o0);
+        names.forEach(function (name) {
+          const o = document.createElement("option");
+          o.value = name;
+          o.textContent = name;
+          pgDbnameSelect.appendChild(o);
+        });
+        if (prev && names.indexOf(prev) >= 0) {
+          pgDbnameSelect.value = prev;
+        } else if (names.length === 1) {
+          pgDbnameSelect.selectedIndex = 1;
+        }
+        if (connTestResult) {
+          connTestResult.textContent = names.length + " database(s). Tables refresh when you pick one.";
+        }
+        await refreshTablesList();
+      } catch (e) {
+        if (connTestResult) {
+          connTestResult.textContent = e.message || "Failed to list databases.";
+        }
+      } finally {
+        loadDatabasesBtn.disabled = false;
+      }
+    }
+
+    function renderSummaryTable(columns, rows) {
+      if (!summaryThead || !summaryTbody || !summaryWrap) {
+        return;
+      }
+      summaryThead.innerHTML = "";
+      summaryTbody.innerHTML = "";
+      const trh = document.createElement("tr");
+      (columns || []).forEach(function (c) {
+        const th = document.createElement("th");
+        th.textContent = c;
+        trh.appendChild(th);
+      });
+      summaryThead.appendChild(trh);
+      (rows || []).forEach(function (rowObj) {
+        const tr = document.createElement("tr");
+        (columns || []).forEach(function (c) {
+          const td = document.createElement("td");
+          var v = rowObj[c];
+          if (v === null || v === undefined) {
+            td.textContent = "";
+          } else if (typeof v === "number") {
+            td.textContent = Number.isFinite(v) ? v.toLocaleString() : String(v);
+          } else {
+            td.textContent = String(v);
+          }
+          tr.appendChild(td);
+        });
+        summaryTbody.appendChild(tr);
+      });
+      summaryWrap.hidden = false;
+    }
+
+    bindColumnFilterEvents();
+
+    if (loadDatabasesBtn) {
+      loadDatabasesBtn.addEventListener("click", function () {
+        loadPostgresDatabases();
+      });
+    }
+
+    if (pgDbnameSelect) {
+      pgDbnameSelect.addEventListener("change", function () {
+        refreshTablesList();
+      });
+    }
+
+    if (tableSelect) {
+      tableSelect.addEventListener("change", function () {
+        updateSelectionSummary();
+        fillColumnRoleCheckboxes([]);
+        clearSummary();
+      });
+    }
+
+    if (loadColsBtn) {
+      loadColsBtn.addEventListener("click", async function () {
+        const t = tableSelect.value;
+        if (!t) {
+          alert("Choose a table first (left column).");
+          return;
+        }
+        loadColsBtn.disabled = true;
+        try {
+          const fd = connFormData();
+          fd.append("table_name", t);
+          const res = await fetch("{% url 'pg_row_delete_columns_json' %}", {
+            method: "POST",
+            body: fd,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken()
+            }
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message || "Could not load columns.");
+          }
+          if (data.table_name) {
+            tableSelect.value = data.table_name;
+          }
+          fillColumnRoleCheckboxes(data.columns);
+          updateSelectionSummary();
+        } catch (e) {
+          alert(e.message || "Failed to load columns.");
+        } finally {
+          loadColsBtn.disabled = false;
+        }
+      });
+    }
+
+    if (summaryBtn) {
+      summaryBtn.addEventListener("click", async function () {
+        const t = tableSelect.value;
+        if (!t) {
+          alert("Choose a table first.");
+          return;
+        }
+        const labels = getCheckedColumns("label");
+        const values = getCheckedColumns("value");
+        if (labels.length === 0) {
+          alert("Check at least one Label column (GROUP BY).");
+          return;
+        }
+        if (values.length === 0) {
+          alert("Check at least one Value column to sum.");
+          return;
+        }
+        var labelSet = {};
+        labels.forEach(function (x) {
+          labelSet[x.toLowerCase()] = true;
+        });
+        for (var i = 0; i < values.length; i++) {
+          if (labelSet[values[i].toLowerCase()]) {
+            alert("Value column " + values[i] + " is also a label. Remove overlap.");
+            return;
+          }
+        }
+        summaryBtn.disabled = true;
+        clearSummary();
+        try {
+          const fd = connFormData();
+          fd.append("table_name", t);
+          labels.forEach(function (c) {
+            fd.append("label_column", c);
+          });
+          values.forEach(function (c) {
+            fd.append("value_column", c);
+          });
+          const res = await fetch("{% url 'data_analysis_summary_json' %}", {
+            method: "POST",
+            body: fd,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken()
+            }
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message || "Summary failed.");
+          }
+          renderSummaryTable(data.columns, data.rows);
+          var note = data.row_count + " group row(s) in summary.";
+          if (data.truncated) {
+            note += " Only the first " + data.row_count + " groups are shown (server limit).";
+          }
+          if (summaryNote) {
+            summaryNote.textContent = note;
+          }
+        } catch (e) {
+          alert(e.message || "Summary failed.");
+        } finally {
+          summaryBtn.disabled = false;
+        }
+      });
+    }
+
+    if (testConnBtn && connTestResult) {
+      testConnBtn.addEventListener("click", async function () {
+        testConnBtn.disabled = true;
+        connTestResult.textContent = "";
+        try {
+          const fd = connFormData();
+          const res = await fetch("{% url 'pg_row_delete_test_json' %}", {
+            method: "POST",
+            body: fd,
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+              "X-CSRFToken": getCsrfToken()
+            }
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) {
+            throw new Error(data.message || "Connection failed.");
+          }
+          connTestResult.textContent = data.message || "Connected.";
+        } catch (e) {
+          connTestResult.textContent = e.message || "Connection failed.";
+        } finally {
+          testConnBtn.disabled = false;
+        }
+      });
+    }
+
+    if (pgDbnameSelect && pgDbnameSelect.value) {
+      refreshTablesList();
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "matrix_key": "mr02",
+  "title": "MR 02 — acknowledgment points (this engagement)",
+  "points": [
+    { "id": "p01", "order": 1, "title": "Subsequent Events" },
+    { "id": "p02", "order": 2, "title": "Investor Education and Protection Fund (IEPF)" },
+    { "id": "p03", "order": 3, "title": "Dues to Micro, Small and Medium Enterprises (MSME)" },
+    { "id": "p04", "order": 4, "title": "Pending Litigations" },
+    { "id": "p05", "order": 5, "title": "Long-term and Derivative Contracts" },
+    { "id": "p06", "order": 6, "title": "Capital Commitments" },
+    { "id": "p07", "order": 7, "title": "Guarantees" },
+    { "id": "p08", "order": 8, "title": "Impairment of Investments" },
+    { "id": "p09", "order": 9, "title": "Inventory" },
+    { "id": "p10", "order": 10, "title": "Loan Renewals / Evergreening" },
+    { "id": "p11", "order": 11, "title": "Loans and Advances to Promoters, Directors and KMPs" },
+    { "id": "p12", "order": 12, "title": "Trade Receivables from Directors and Director-connected Entities" },
+    { "id": "p13", "order": 13, "title": "Subsidiary Obligations – Funds Taken" },
+    { "id": "p14", "order": 14, "title": "Subsidiary Securities – Loans Raised on Pledge" }
+  ]
+}

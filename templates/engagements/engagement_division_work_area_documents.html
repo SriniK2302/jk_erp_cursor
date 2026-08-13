@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Division work area documents · {{ work_area.work_area_name }} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Division work area documents</h1>
+      <p class="muted">
+        {{ division.engagement.client.display_name }} · {{ division.engagement.fiscal_year.fy_no }} · {{ division.engagement.service.service_desc }}
+      </p>
+      <p class="muted">
+        Division: <strong>{{ division.division_name }}</strong> · Work area: <strong>{{ work_area.work_area_name }}</strong>
+      </p>
+    </header>
+
+    <p class="muted page-sticky-links">
+      <a href="{% url 'engagement_division_work_areas' division.id %}">← Back to Division Work Areas</a>
+      ·
+      <a href="{% url 'engagement_division_work_area_schedule' division.id work_area.id %}">Work area schedule</a>
+    </p>
+
+    <div class="grid-panel doc-files-panel">
+      <p class="muted">
+        Files are now added through the
+        <a href="{% url 'engagement_division_work_area_queries' division.id work_area.id %}">notes log</a>
+        — add a note (with or without a file) and it appears here and in the reports.
+        This page lists everything already on record for this work area.
+      </p>
+
+      <h2 class="doc-files-subheading">Uploaded documents</h2>
+      {% if documents %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for doc in documents %}
+            <li class="doc-attachment-line doc-attachment-line-page">
+              <div class="doc-attachment-line-main">
+                <span class="doc-attachment-date-badge">{{ doc.document_date|date:"Y-m-d" }}</span>
+                <a
+                  class="doc-attachment-link"
+                  href="{% url 'engagement_division_work_area_document_download' division.id work_area.id doc.id %}"
+                  title="{{ doc.original_filename }}"
+                >
+                  <span class="doc-attachment-filename">{{ doc.original_filename }}</span>
+                </a>
+                <span class="muted">— {{ doc.description }}</span>
+                {% if doc.document_reference_no %}
+                  <span class="muted"> · Ref: {{ doc.document_reference_no }}</span>
+                {% endif %}
+                {% if doc.remarks %}
+                  <span class="muted"> · {{ doc.remarks }}</span>
+                {% endif %}
+              </div>
+              <div class="doc-attachment-line-actions">
+                <button type="button" class="icon-btn icon-btn-edit doc-attachment-edit-toggle" data-doc-edit-toggle="dwa-doc-edit-{{ doc.id }}" title="Edit document details" aria-label="Edit details of {{ doc.original_filename }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                </button>
+                <form method="post" class="inline-form doc-attachment-delete" onsubmit="return confirm('Remove only this file?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_document">
+                  <input type="hidden" name="pk" value="{{ doc.id }}">
+                  <button type="submit" class="icon-btn icon-btn-muted doc-attachment-remove" title="Remove this file" aria-label="Remove {{ doc.original_filename }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
+                </form>
+              </div>
+              <form method="post" id="dwa-doc-edit-{{ doc.id }}" class="sap-form doc-attachment-edit-form" hidden>
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_document">
+                <input type="hidden" name="pk" value="{{ doc.id }}">
+                <div class="sap-row">
+                  <label for="dwa-doc-edit-date-{{ doc.id }}">Document date</label>
+                  <div class="sap-control">
+                    <input type="date" class="input-compact" id="dwa-doc-edit-date-{{ doc.id }}" name="document_date" value="{{ doc.document_date|date:'Y-m-d' }}" required>
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="dwa-doc-edit-documentation-{{ doc.id }}">Documentation</label>
+                  <div class="sap-control">
+                    <select id="dwa-doc-edit-documentation-{{ doc.id }}" name="documentation_id" class="input-long">
+                      <option value="">— Keep current: {{ doc.description }} —</option>
+                      {% for opt in doc_options %}
+                        <option value="{{ opt.id }}">{{ opt.standard_document }} ({{ opt.get_document_stage_display }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="dwa-doc-edit-reference-{{ doc.id }}">Document reference no</label>
+                  <div class="sap-control">
+                    <input type="text" id="dwa-doc-edit-reference-{{ doc.id }}" name="document_reference_no" class="input-long" maxlength="100" value="{{ doc.document_reference_no }}" placeholder="Optional reference no">
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="dwa-doc-edit-remarks-{{ doc.id }}">Remarks</label>
+                  <div class="sap-control">
+                    <textarea id="dwa-doc-edit-remarks-{{ doc.id }}" name="remarks" class="input-long" rows="2" placeholder="Optional remarks">{{ doc.remarks }}</textarea>
+                  </div>
+                </div>
+                <div class="sap-actions">
+                  <button type="submit" class="button button-secondary button-compact">Update details</button>
+                </div>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No documents uploaded yet.</p>
+      {% endif %}
+
+      <h2 class="doc-files-subheading">Files attached via notes</h2>
+      {% if note_attachments %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for att in note_attachments %}
+            <li class="doc-attachment-line doc-attachment-line-page">
+              <div class="doc-attachment-line-main">
+                <span class="doc-attachment-date-badge">{{ att.created_on|date:"Y-m-d" }}</span>
+                <a
+                  class="doc-attachment-link"
+                  href="{% url 'engagement_division_query_attachment_download' division.id work_area.id att.query_id att.id %}"
+                  title="{{ att.original_filename }}"
+                >
+                  <span class="doc-attachment-filename">{{ att.original_filename }}</span>
+                </a>
+                <span class="muted">— Note: {{ att.query.subject }}{% if att.document_reference_no %} · Ref: {{ att.document_reference_no }}{% endif %} · added by {{ att.created_by }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="muted">These files were added on the <a href="{% url 'engagement_division_work_area_queries' division.id work_area.id %}">notes log</a>; manage them there.</p>
+      {% else %}
+        <p class="muted">No files attached via the <a href="{% url 'engagement_division_work_area_queries' division.id work_area.id %}">notes log</a> yet.</p>
+      {% endif %}
+    </div>
+
+    <p class="muted page-actions">
+      <a href="{% url 'engagement_division_work_areas' division.id %}">← Back to Division Work Areas</a>
+      ·
+      <a href="{% url 'engagement_division_work_area_schedule' division.id work_area.id %}">Work area schedule</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("[data-doc-edit-toggle]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var form = document.getElementById(btn.getAttribute("data-doc-edit-toggle"));
+      if (form) form.hidden = !form.hidden;
+    });
+  });
+});
+</script>
+{% endblock %}

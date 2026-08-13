@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Work Area Notes · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work area notes</h1>
+      <p class="muted">{{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}</p>
+      {% if is_division_scope %}
+        <p class="muted">Division: <strong>{{ division.division_name }}</strong> · Work area: <strong>{{ work_area.work_area_name }}</strong></p>
+      {% else %}
+        <p class="muted">Work area: <strong>{{ work_area.work_area_name }}</strong></p>
+      {% endif %}
+    </header>
+
+    <p class="muted page-sticky-links">
+      <a href="{{ notes_back_url }}">{{ notes_back_label }}</a>
+      ·
+      <a href="{{ notes_documents_url }}">Work area documents</a>
+      ·
+      <a href="{{ notes_all_documents_url }}">All engagement documents</a>
+    </p>
+
+    <div class="grid-panel">
+      <h2 class="doc-files-subheading">Add notes</h2>
+      <form method="post" action="{{ form_post_url }}" enctype="multipart/form-data" class="sap-form" novalidate id="wa-batch-form">
+        {% csrf_token %}
+        {{ checklist_items_payload|json_script:"wa-checklist-items-data" }}
+        {{ saved_checklist_item_ids|json_script:"wa-saved-checklist-ids-data" }}
+        <input type="hidden" name="action" value="add_query_batch" id="wa-batch-form-action-default">
+        <p id="wa-batch-inline-errors" class="form-banner-error" role="alert" hidden style="margin:0 0 0.5rem 0;"></p>
+        <div class="sap-row">
+          <label>Work area</label>
+          <div class="sap-control">
+            <input type="text" class="input-long" readonly value="{{ work_area.work_area_name }}">
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="batch-wa-amount">Work area amount (optional)</label>
+          <div class="sap-control" style="display:flex; gap:.5rem; align-items:center;" data-amount-calc>
+            <input id="batch-wa-amount" type="number" name="batch_wa_amount" class="input-short" step="0.01" data-amount-target
+              value="{% if work_area.monetary_amount is not None %}{{ work_area.monetary_amount }}{% endif %}">
+            <select id="batch-wa-amount-unit" name="batch_wa_amount_unit" aria-label="Amount unit">
+              {% for value, label in amount_unit_choices %}
+                <option value="{{ value }}"{% if value == work_area.monetary_amount_unit|default:'lakhs' %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <details style="position:relative;">
+              <summary class="button button-secondary button-compact" style="list-style:none; cursor:pointer;">Calculator</summary>
+              <div style="position:absolute; z-index:20; right:0; margin-top:.35rem; padding:.5rem; border:1px solid #445; background:#1b2533; border-radius:.35rem; min-width:16rem;">
+                <label for="batch-wa-amount-calc" class="muted" style="display:block; margin-bottom:.25rem;">Expression</label>
+                <input id="batch-wa-amount-calc" type="text" class="input-long" placeholder="(1250+350)*2" data-amount-calc-input>
+                <div style="display:flex; gap:.35rem; margin-top:.4rem;">
+                  <button type="button" class="button button-secondary button-compact" data-amount-calc-apply>Apply</button>
+                  <button type="button" class="button button-secondary button-compact" data-amount-calc-clear>Clear</button>
+                </div>
+                <p class="muted" data-amount-calc-message style="margin:.35rem 0 0 0;"></p>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label>Lines</label>
+          <div class="sap-control" style="overflow-x:auto;">
+            <table class="data-grid data-grid-wrap wa-notes-batch-grid" style="width:100%;">
+              <colgroup>
+                <col class="wa-batch-col-date">
+                <col class="wa-batch-col-type">
+                <col class="wa-batch-col-checklist">
+                <col class="wa-batch-col-expected">
+                <col class="wa-batch-col-text">
+                <col class="wa-batch-col-actions">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th scope="col">Checklist line<br><span class="muted" style="font-weight:400;font-size:0.82em;">{% if work_area_has_checklist_template %}Template line{% else %}Optional — type or pick{% endif %}</span></th>
+                  <th>Expected from</th>
+                  <th scope="col">Query / remarks<br><span class="muted" style="font-weight:400;font-size:0.82em;">Attachments</span></th>
+                  <th class="col-actions" scope="col"><span class="visually-hidden">Save line, remove line</span></th>
+                </tr>
+              </thead>
+              <tbody id="wa-batch-rows" data-default-date="{{ default_date|date:'Y-m-d' }}">
+                <tr class="wa-batch-row">
+                  <td>
+                    <input type="date" name="batch_row_date" class="input-short" required value="{{ default_date|date:'Y-m-d' }}">
+                  </td>
+                  <td>
+                    <select name="batch_row_type">
+                      {% for value, label in entry_type_choices %}
+                        <option value="{{ value }}"{% if value == "query" %} selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td class="wa-batch-cell-checklist">
+                    <input type="hidden" name="batch_row_checklist" value="" class="wa-batch-checklist-value" autocomplete="off">
+                    <textarea
+                      name="batch_row_checklist_label"
+                      class="input-long wa-batch-checklist-display"
+                      rows="2"
+                      placeholder="{% if work_area_has_checklist_template %}Use picker or Add all checklist lines below{% else %}Optional — type a reference line{% endif %}"
+                    ></textarea>
+                    <div class="wa-batch-checklist-actions-row">
+                      <button type="button" class="button button-secondary button-compact wa-batch-checklist-open"{% if not checklist_items %} disabled{% endif %}>Select checklist line…</button>
+                    </div>
+                  </td>
+                  <td class="wa-batch-cell-expected">
+                    <select name="batch_row_expected">
+                      {% for value, label in responder_type_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td class="wa-batch-cell-query">
+                    <textarea name="batch_row_text" class="input-long wa-batch-query-text" rows="3"></textarea>
+                    <div class="wa-batch-query-files">
+                      <input type="file" name="batch_row_files_0" multiple data-batch-row-file aria-label="Attachments for this line">
+                    </div>
+                    <ul class="wa-batch-file-list muted" data-batch-file-list></ul>
+                  </td>
+                  <td class="col-actions wa-batch-row-actions">
+                    <button type="button" class="icon-btn icon-btn-muted wa-batch-save-row" title="Save this line to the notes log" aria-label="Save this line">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    </button>
+                    <button type="button" class="icon-btn icon-btn-danger wa-batch-remove-row" title="Remove this line" aria-label="Remove this line">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <dialog id="wa-batch-checklist-dialog" class="wa-batch-checklist-dialog">
+              <div class="wa-batch-checklist-dialog-header">
+                <h3 class="doc-files-subheading" style="margin:0;">Choose checklist line</h3>
+                <button type="button" class="button button-secondary button-compact" data-wa-checklist-close>Close</button>
+              </div>
+              <label for="wa-batch-checklist-filter" class="muted" style="display:block; margin:.35rem 0 .2rem 0;">Search</label>
+              <input id="wa-batch-checklist-filter" type="search" class="input-long" placeholder="Filter lines…" autocomplete="off">
+              <div class="wa-batch-checklist-dialog-list" role="listbox" aria-label="Checklist lines"></div>
+            </dialog>
+            <p style="margin-top:.5rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+              <button type="button" class="button button-secondary" id="wa-batch-add-row">Add line</button>
+              {% if work_area_has_checklist_template and checklist_items %}
+                <button type="button" class="button button-secondary" id="wa-batch-add-all-checklist">
+                  Add all checklist lines to form
+                </button>
+                <button
+                  type="submit"
+                  class="button"
+                  formmethod="post"
+                  name="action"
+                  value="add_all_checklist_lines"
+                  onclick="return confirm('Add every checklist line from the template to the notes log? Lines already saved are skipped.');"
+                >
+                  Add all to notes log
+                </button>
+              {% endif %}
+            </p>
+            {% if work_area_has_checklist_template %}
+              <p class="muted" style="margin-top:.35rem;">
+                This work area is linked to a service checklist: treat it as <strong>applicable</strong> and cover each template line (use <strong>Add all</strong>, then save or send). Work areas without a checklist stay free-form.
+              </p>
+            {% endif %}
+            <p class="muted" style="margin-top:.35rem;">Use the <strong>save</strong> (disk) icon on a line to add that note to the log (work area amount, if filled, is saved at the same time). The page reloads after a successful save so the notes log updates—save or copy other draft lines first if you need them. Use the <strong>delete</strong> icon to drop an extra line; if only one line remains, it clears that row.</p>
+          </div>
+        </div>
+      </form>
+
+      <h2 class="doc-files-subheading">Notes log</h2>
+      {% if queries %}
+        <div class="notes-log-scroll">
+        {% for q in queries %}
+          <div class="grid-panel">
+            <p><strong>{{ q.subject }}</strong>{% if q.service_checklist_item %} <span class="muted">· {{ q.service_checklist_item.line_text }}</span>{% endif %} <span class="muted">· {{ q.query_date|date:"Y-m-d" }} · {{ q.get_entry_type_display }}{% if q.entry_type == "query" %} · {{ q.get_response_expected_from_display }} · {{ q.get_status_display }} · Responses: {{ q.responses.count }}{% endif %} · {% if q.amount %}Amount: {{ q.amount }} {{ q.get_amount_unit_display }} · {% endif %}{% if q.entry_type == "query" %}WP: {% if q.working_paper_no %}{{ q.working_paper_no }}{% else %}Not converted{% endif %}{% endif %}</span></p>
+            <div class="note-body-scroll">{{ q.query_text }}</div>
+            <p class="muted">Raised by {{ q.created_by }} on {{ q.created_on|date:"Y-m-d H:i" }}</p>
+            {% if q.attachments.all %}
+              <ul class="doc-attachment-list doc-attachment-list-page">
+                {% for att in q.attachments.all %}
+                  <li class="doc-attachment-line doc-attachment-line-page">
+                    <div class="doc-attachment-line-main doc-attachment-line-with-actions">
+                      <span class="doc-attachment-date-badge">{{ att.created_on|date:"Y-m-d" }}</span>
+                      {% if is_division_scope %}
+                        <a href="{% url 'engagement_division_query_attachment_download' division.id work_area.id q.id att.id %}">{{ att.original_filename }}</a>
+                      {% else %}
+                        <a href="{% url 'engagement_query_attachment_download' engagement.id work_area.id q.id att.id %}">{{ att.original_filename }}</a>
+                      {% endif %}
+                      {% if att.document_reference_no %}
+                        <span class="muted"> · Ref: {{ att.document_reference_no }}</span>
+                      {% endif %}
+                      <span class="muted"> · added by {{ att.created_by }}</span>
+                      <form method="post" class="inline-form doc-attachment-delete-form" onsubmit="return confirm('Delete this attachment?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_query_attachment">
+                        <input type="hidden" name="query_pk" value="{{ q.id }}">
+                        <input type="hidden" name="attachment_pk" value="{{ att.id }}">
+                        <button type="submit" class="icon-btn icon-btn-danger" title="Delete attachment" aria-label="Delete attachment">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                      </form>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="muted">No documents attached to this query yet.</p>
+            {% endif %}
+            <form method="post" enctype="multipart/form-data" class="inline-form" style="margin-bottom:.5rem;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add_query_attachment">
+              <input type="hidden" name="query_pk" value="{{ q.id }}">
+              <input type="file" name="attachment_file" required>
+              <input type="text" name="document_reference_no" class="input-medium" maxlength="100" placeholder="Document reference no (optional)" aria-label="Document reference no">
+              <button type="submit" class="button button-secondary button-compact">Add document</button>
+            </form>
+            <div class="wa-note-log-inline-actions">
+              <span class="wa-note-saved-indicator" role="img" aria-label="Saved in notes log" title="Saved in notes log">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              </span>
+              <form method="post" class="inline-form" onsubmit="return confirm('Delete this note?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_query">
+                <input type="hidden" name="query_pk" value="{{ q.id }}">
+                <button type="submit" class="button button-secondary button-compact">Del</button>
+              </form>
+            </div>
+            <details class="note-response-entry" style="margin-bottom:.5rem;">
+              <summary class="button button-secondary button-compact">Edit note</summary>
+              <form method="post" class="sap-form" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_query">
+                <input type="hidden" name="query_pk" value="{{ q.id }}">
+                <div class="sap-row">
+                  <label for="edit-date-{{ q.id }}">Note date</label>
+                  <div class="sap-control">
+                    <input id="edit-date-{{ q.id }}" type="date" name="query_date" class="input-short" value="{{ q.query_date|date:'Y-m-d' }}" required>
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="edit-entry-type-{{ q.id }}">Entry type</label>
+                  <div class="sap-control">
+                    <select id="edit-entry-type-{{ q.id }}" name="entry_type">
+                      {% for value, label in entry_type_choices %}
+                        <option value="{{ value }}"{% if value == q.entry_type %} selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                    {% if q.entry_type == "query" and q.converted_to_working_paper %}
+                      <span class="muted">Locked: converted to working paper.</span>
+                    {% elif q.entry_type == "query" and q.responses.count %}
+                      <span class="muted">Locked: responses recorded.</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="edit-subject-{{ q.id }}">Subject</label>
+                  <div class="sap-control">
+                    <input id="edit-subject-{{ q.id }}" type="text" name="subject" class="input-long" maxlength="255" value="{{ q.subject }}">
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="edit-amount-{{ q.id }}">Amount (optional)</label>
+                  <div class="sap-control" style="display:flex; gap:.5rem; align-items:center;">
+                    <input id="edit-amount-{{ q.id }}" type="number" name="amount" class="input-short" step="0.01" value="{{ q.amount|default:'' }}">
+                    <select name="amount_unit" aria-label="Amount unit">
+                      {% for value, label in amount_unit_choices %}
+                        <option value="{{ value }}"{% if value == q.amount_unit %} selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="edit-expected-{{ q.id }}">Expected from</label>
+                  <div class="sap-control">
+                    <select id="edit-expected-{{ q.id }}" name="response_expected_from">
+                      {% for value, label in responder_type_choices %}
+                        <option value="{{ value }}"{% if value == q.response_expected_from %} selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="sap-row">
+                  <label for="edit-text-{{ q.id }}">Query details</label>
+                  <div class="sap-control"><textarea id="edit-text-{{ q.id }}" name="query_text" class="input-long" rows="3" required>{{ q.query_text }}</textarea></div>
+                </div>
+                <div class="sap-actions"><button type="submit" class="button button-secondary">Update note</button></div>
+              </form>
+            </details>
+            {% if q.entry_type == "query" and not q.converted_to_working_paper %}
+              <form method="post" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="convert_to_working_paper">
+                <input type="hidden" name="query_pk" value="{{ q.id }}">
+                <button type="submit" class="button button-secondary button-compact">Convert to Working Paper</button>
+              </form>
+            {% endif %}
+            {% if q.responses.all %}
+              <ul class="doc-attachment-list doc-attachment-list-page">
+                {% for r in q.responses.all %}
+                  <li class="doc-attachment-line doc-attachment-line-page">
+                    <div class="doc-attachment-line-main">
+                      <span class="doc-attachment-date-badge">{{ r.response_date|date:"Y-m-d" }}</span>
+                      <span class="muted">— {{ r.get_responder_type_display }} · {{ r.created_by }}</span>
+                      <span> · {{ r.response_text }}</span>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="muted">No responses yet.</p>
+            {% endif %}
+            {% if q.entry_type == "query" and q.status == "open" %}
+              <details class="note-response-entry">
+                <summary class="button button-secondary button-compact">Enter response</summary>
+                <form method="post" class="sap-form" novalidate>
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="add_response">
+                  <input type="hidden" name="query_pk" value="{{ q.id }}">
+                  <div class="sap-row">
+                    <label for="response-date-{{ q.id }}">Response date</label>
+                    <div class="sap-control"><input id="response-date-{{ q.id }}" type="date" name="response_date" class="input-short" required value="{{ default_date|date:'Y-m-d' }}"></div>
+                  </div>
+                  <div class="sap-row">
+                    <label for="responder-type-{{ q.id }}">Responder</label>
+                    <div class="sap-control">
+                      <select id="responder-type-{{ q.id }}" name="responder_type">
+                        {% for value, label in responder_type_choices %}
+                          <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="sap-row">
+                    <label for="response-text-{{ q.id }}">Response</label>
+                    <div class="sap-control"><textarea id="response-text-{{ q.id }}" name="response_text" class="input-long" rows="3" required></textarea></div>
+                  </div>
+                  <div class="sap-row">
+                    <label for="close-query-{{ q.id }}">Close query</label>
+                    <div class="sap-control"><input id="close-query-{{ q.id }}" type="checkbox" name="close_query" value="1"></div>
+                  </div>
+                  <div class="sap-actions"><button type="submit" class="button button-secondary">Add response</button></div>
+                </form>
+              </details>
+            {% endif %}
+          </div>
+        {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">No notes added yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ block.super }}
+  {% load static %}
+  <script src="{% static 'js/amount-calculator.js' %}?v=1"></script>
+  <script src="{% static 'js/work-area-notes-batch.js' %}?v=14"></script>
+{% endblock %}

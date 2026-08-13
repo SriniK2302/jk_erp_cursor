@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}{% if client %}Edit Client{% else %}Add Client{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if client %}Edit Client{% else %}Add Client{% endif %}</h1>
+      <p class="muted">Maintain client master details in a focused form.</p>
+    </header>
+
+    {% include "clients/includes/client_nav_toolbar.html" %}
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.client_name.id_for_label }}">Client Name</label>
+        <div class="sap-control">
+          {{ form.client_name }}
+          {% if form.client_name.errors %}
+            <span class="field-error">{{ form.client_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.client_short_name.id_for_label }}">Client Short Name</label>
+        <div class="sap-control">
+          {{ form.client_short_name }}
+          {% if form.client_short_name.errors %}
+            <span class="field-error">{{ form.client_short_name.errors.0 }}</span>
+          {% endif %}
+          <span class="muted">Used in engagement screens (e.g. Ramco Systems). Not the 4-character client code.</span>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.client_code.id_for_label }}">Client Code</label>
+        <div class="sap-control">
+          {{ form.client_code }}
+          {% if form.client_code.errors %}
+            <span class="field-error">{{ form.client_code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.classification.id_for_label }}">Classification</label>
+        <div class="sap-control">
+          {{ form.classification }}
+          {% if form.classification.errors %}
+            <span class="field-error">{{ form.classification.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.address_1.id_for_label }}">Address 1</label>
+        <div class="sap-control">
+          {{ form.address_1 }}
+          {% if form.address_1.errors %}
+            <span class="field-error">{{ form.address_1.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.address_2.id_for_label }}">Address 2</label>
+        <div class="sap-control">
+          {{ form.address_2 }}
+          {% if form.address_2.errors %}
+            <span class="field-error">{{ form.address_2.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.area.id_for_label }}">Area</label>
+        <div class="sap-control">
+          {{ form.area }}
+          {% if form.area.errors %}
+            <span class="field-error">{{ form.area.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label>City / State / Pincode</label>
+        <div class="sap-control sap-control-inline sap-control-inline-compact">
+          <div class="sap-inline-field sap-inline-field-city">
+            <label class="sap-inline-label" for="{{ form.city_state_pincode.id_for_label }}">City</label>
+            {{ form.city_state_pincode }}
+            {% if form.city_state_pincode.errors %}
+              <span class="field-error">{{ form.city_state_pincode.errors.0 }}</span>
+            {% endif %}
+          </div>
+          <div class="sap-inline-field sap-inline-field-state">
+            <label class="sap-inline-label" for="{{ form.state.id_for_label }}">State</label>
+            {{ form.state }}
+            {% if form.state.errors %}
+              <span class="field-error">{{ form.state.errors.0 }}</span>
+            {% endif %}
+          </div>
+          <div class="sap-inline-field sap-inline-field-pincode">
+            <label class="sap-inline-label" for="{{ form.pincode.id_for_label }}">Pincode</label>
+            {{ form.pincode }}
+            {% if form.pincode.errors %}
+              <span class="field-error">{{ form.pincode.errors.0 }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.contact_person.id_for_label }}">Contact Person</label>
+        <div class="sap-control">
+          {{ form.contact_person }}
+          {% if form.contact_person.errors %}
+            <span class="field-error">{{ form.contact_person.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.mail_id.id_for_label }}">Mail ID</label>
+        <div class="sap-control">
+          {{ form.mail_id }}
+          {% if form.mail_id.errors %}
+            <span class="field-error">{{ form.mail_id.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.additional_mail_ids.id_for_label }}">Additional Mail IDs</label>
+        <div class="sap-control">
+          {{ form.additional_mail_ids }}
+          {% if form.additional_mail_ids.errors %}
+            <span class="field-error">{{ form.additional_mail_ids.errors.0 }}</span>
+          {% endif %}
+          <p class="muted">Use comma, semicolon, or new line to add multiple email IDs.</p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.billing_gstn.id_for_label }}">Billing GSTN</label>
+        <div class="sap-control">
+          {{ form.billing_gstn }}
+          {% if form.billing_gstn.errors %}
+            <span class="field-error">{{ form.billing_gstn.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.invoice_tax_type.id_for_label }}">Invoice tax type</label>
+        <div class="sap-control">
+          {{ form.invoice_tax_type }}
+          {% if form.invoice_tax_type.errors %}
+            <span class="field-error">{{ form.invoice_tax_type.errors.0 }}</span>
+          {% endif %}
+          <p class="muted invoice-udin-hint">
+            <strong>GST</strong> adds 9% CGST and 9% SGST lines on the taxable value.
+            <strong>IGST</strong> adds one 18% IGST line. Used when building invoice lines from Inv Tv.
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.is_active.id_for_label }}">Is Active</label>
+        <div class="sap-control checkbox-inline">
+          {{ form.is_active }}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'clients' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if client %}Update Client{% else %}Save Client{% endif %}</button>
+      </div>
+    </form>
+
+    {% if client %}
+      <p class="muted">
+        <a href="{% url 'client_documents' client.id %}">Client documents (MOA, AOA, etc.)</a>
+      </p>
+    {% endif %}
+
+    <p class="muted"><a href="{% url 'clients' %}">← Back to Clients</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'clients/js/client-nav.js' %}"></script>
+  <script src="{% static 'clients/js/client-form.js' %}"></script>
+{% endblock %}

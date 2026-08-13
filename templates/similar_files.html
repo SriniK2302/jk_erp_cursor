@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Similar Files · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Similar Files</h1>
+      <p class="muted">
+        Pick one reference workbook. The search folder is always the folder that contains that file
+        (subfolders are included). Matches are byte-for-byte identical files (SHA-256). Nothing is moved or deleted.
+      </p>
+    </header>
+
+    <form method="post" action="{% url 'select_similar_reference_file' %}" class="utility-form-inline">
+      {% csrf_token %}
+      <button type="submit" class="button button-compact button-secondary">Select Reference File</button>
+    </form>
+
+    <form
+      method="post"
+      action="{% url 'similar_files_report_start' %}"
+      id="similar-files-run-form"
+      class="utility-form-stack"
+    >
+      {% csrf_token %}
+      <label for="reference-file" class="muted utility-label">Reference file (one .xlsx / .xlsm path)</label>
+      <input
+        id="reference-file"
+        name="reference_file"
+        type="text"
+        class="utility-input"
+        value="{{ reference_file }}"
+        placeholder="No reference file selected yet"
+      >
+
+      <p class="muted utility-label">Search folder (same as the reference file’s folder)</p>
+      <p id="scan-folder-display" class="utility-input utility-input-readonly">{{ scan_folder|default:"—" }}</p>
+
+      <label for="similar-threshold" class="muted utility-label">Match Threshold (%)</label>
+      <input
+        id="similar-threshold"
+        name="similar_threshold_pct"
+        type="number"
+        min="1"
+        max="100"
+        step="0.1"
+        class="utility-input utility-input-small"
+        value="{{ threshold|default:'95' }}"
+      >
+
+      <button type="submit" id="similar-files-execute-btn" class="button button-compact">Execute</button>
+    </form>
+
+    <div id="similar-files-progress-wrap" class="utility-progress-wrap" hidden>
+      <div
+        class="utility-progress-track"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div id="similar-files-progress-bar" class="utility-progress-bar"></div>
+      </div>
+      <p class="muted utility-progress-text" id="similar-files-progress-text">Preparing scan...</p>
+    </div>
+
+    <p id="similar-files-result" class="muted utility-result" aria-live="polite"></p>
+
+    <div id="similar-files-summary" class="muted" hidden></div>
+
+    <div class="table-wrap" id="similar-files-table-wrap" hidden>
+      <table class="data-grid">
+        <thead>
+          <tr>
+            <th>Match %</th>
+            <th>SHA-256</th>
+            <th>File Path</th>
+          </tr>
+        </thead>
+        <tbody id="similar-files-results-body"></tbody>
+      </table>
+    </div>
+
+    <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("similar-files-run-form");
+    const progressWrap = document.getElementById("similar-files-progress-wrap");
+    const progressBar = document.getElementById("similar-files-progress-bar");
+    const progressText = document.getElementById("similar-files-progress-text");
+    const resultBox = document.getElementById("similar-files-result");
+    const executeBtn = document.getElementById("similar-files-execute-btn");
+    const summaryBox = document.getElementById("similar-files-summary");
+    const tableWrap = document.getElementById("similar-files-table-wrap");
+    const tbody = document.getElementById("similar-files-results-body");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn || !summaryBox || !tableWrap || !tbody) {
+      return;
+    }
+
+    const refInputEl = document.getElementById("reference-file");
+    const scanFolderDisplay = document.getElementById("scan-folder-display");
+
+    function parentDirFromFilePath(filePath) {
+      const trimmed = (filePath || "").trim();
+      if (!trimmed) {
+        return "—";
+      }
+      const norm = trimmed.replace(/\\/g, "/");
+      const slash = norm.lastIndexOf("/");
+      if (slash < 0) {
+        return "—";
+      }
+      const parentNorm = norm.slice(0, slash);
+      return parentNorm.replace(/\//g, "\\");
+    }
+
+    if (refInputEl && scanFolderDisplay) {
+      refInputEl.addEventListener("input", function () {
+        scanFolderDisplay.textContent = parentDirFromFilePath(refInputEl.value);
+      });
+    }
+
+    function getCsrfToken() {
+      const input = form.querySelector("input[name=csrfmiddlewaretoken]");
+      return input ? input.value : "";
+    }
+
+    function renderTable(matches) {
+      tbody.innerHTML = "";
+      if (!Array.isArray(matches) || matches.length === 0) {
+        tableWrap.hidden = true;
+        return;
+      }
+      tableWrap.hidden = false;
+      matches.forEach(function (row) {
+        const tr = document.createElement("tr");
+        [
+          row.overall_similarity_pct,
+          row.sha256_hex,
+          row.path
+        ].forEach(function (cell) {
+          const td = document.createElement("td");
+          td.textContent = cell != null ? String(cell) : "";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const refInput = document.getElementById("reference-file");
+      const thresholdInput = document.getElementById("similar-threshold");
+      const refValue = refInput ? refInput.value.trim() : "";
+      const thresholdValue = thresholdInput ? thresholdInput.value.trim() : "";
+
+      if (!refValue) {
+        resultBox.textContent = "Select a reference file first.";
+        summaryBox.hidden = true;
+        tableWrap.hidden = true;
+        return;
+      }
+      if (!thresholdValue) {
+        resultBox.textContent = "Enter a threshold percentage.";
+        summaryBox.hidden = true;
+        tableWrap.hidden = true;
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      summaryBox.hidden = true;
+      summaryBox.textContent = "";
+      tbody.innerHTML = "";
+      tableWrap.hidden = true;
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Starting scan...";
+      progressBar.style.width = "5%";
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to start scan.");
+        }
+
+        const jobId = payload.job_id;
+        if (!jobId) {
+          throw new Error("Job id missing.");
+        }
+
+        const statusUrl = "{% url 'similar_files_report_status' 'JOB_ID_PLACEHOLDER' %}".replace("JOB_ID_PLACEHOLDER", jobId);
+        let attempts = 0;
+        const maxAttempts = 3600;
+
+        while (attempts < maxAttempts) {
+          attempts += 1;
+          const statusResponse = await fetch(statusUrl, {
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok || !statusPayload.ok) {
+            throw new Error(statusPayload.message || "Failed to read scan status.");
+          }
+
+          const percent = Number(statusPayload.progress_percent || 5);
+          progressBar.style.width = Math.min(Math.max(percent, 5), 100) + "%";
+          progressText.textContent = statusPayload.message || "Processing...";
+
+          if (statusPayload.done) {
+            if (statusPayload.error) {
+              throw new Error(statusPayload.error);
+            }
+            const result = statusPayload.result || {};
+            progressBar.style.width = "100%";
+            progressText.textContent = "Completed.";
+            resultBox.textContent = result.message
+              ? result.message + (result.warning ? " " + result.warning : "")
+              : "Scan completed.";
+            summaryBox.hidden = false;
+            summaryBox.textContent = "";
+            const s1 = document.createElement("span");
+            s1.textContent = "Reference: ";
+            summaryBox.appendChild(s1);
+            const strongRef = document.createElement("strong");
+            strongRef.textContent = result.reference_name || "";
+            summaryBox.appendChild(strongRef);
+            const s2 = document.createElement("span");
+            s2.textContent =
+              " · Scanned files: " + (result.scanned_files || 0) +
+              " · Spreadsheet files: " + (result.spreadsheet_files || 0);
+            summaryBox.appendChild(s2);
+            renderTable(result.matches || []);
+            if (!result.matches || result.matches.length === 0) {
+              tableWrap.hidden = true;
+              resultBox.textContent =
+                (result.message || "") +
+                (result.message ? " " : "") +
+                "No similar files at this threshold.";
+            }
+            return;
+          }
+
+          await new Promise(function (resolve) { window.setTimeout(resolve, 1000); });
+        }
+
+        throw new Error("Scan is still running. Wait and try again.");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Scan failed.";
+        summaryBox.hidden = true;
+        tableWrap.hidden = true;
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

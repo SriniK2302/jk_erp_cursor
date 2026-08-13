@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Rename File Based on Text · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Rename file based on Text</h1>
+    </header>
+
+    <article class="tile-link utility-tile">
+      <form id="select-rename-text-folder-form" method="post" action="{% url 'select_rename_text_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_files_based_on_text' %}"
+        id="rename-by-text-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-text-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-text-folder"
+              name="rename_text_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_text_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-text-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label for="file-name-text-identifier" class="muted utility-label">File name text Identifier</label>
+        <input
+          id="file-name-text-identifier"
+          name="file_name_text_identifier"
+          type="text"
+          class="utility-input"
+          autocomplete="off"
+        >
+
+        <label for="rename-criteria" class="muted utility-label">Rename criteria</label>
+        <select id="rename-criteria" name="rename_criteria" class="utility-input">
+          <option value="remove_left">Remove text to Left</option>
+          <option value="remove_right">Remove text to Right</option>
+        </select>
+
+        <button type="submit" id="execute-rename-by-text-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-by-text-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-by-text-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-by-text-progress-text">Renaming files...</p>
+      </div>
+
+      <p id="rename-by-text-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <p class="muted"><a href="{% url 'rename_files_utilities' %}">← Back to Rename Files</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("rename-by-text-form");
+    const progressWrap = document.getElementById("rename-by-text-progress-wrap");
+    const progressBar = document.getElementById("rename-by-text-progress-bar");
+    const progressText = document.getElementById("rename-by-text-progress-text");
+    const resultBox = document.getElementById("rename-by-text-result");
+    const executeBtn = document.getElementById("execute-rename-by-text-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-text-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Renaming direct files only...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to rename files.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while renaming files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

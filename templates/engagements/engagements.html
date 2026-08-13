@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Engagements · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Engagements</h1>
+      <p class="muted">Maintain engagement keys and key engagement-level mappings.</p>
+      <p class="muted">Active excludes completed; use the status chips to view by category.</p>
+      {% if not user.is_superuser %}
+        <p class="muted">This list shows only engagements you are assigned to (team, division, or work area). New engagements need a team assignment before they appear here.</p>
+      {% endif %}
+    </header>
+
+    <div class="grid-panel" data-grid-root data-grid-no-resize="1" data-grid-id="engagements-list">
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search engagements..."
+          aria-label="Search engagements"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+        <div class="grid-toolbar-actions">
+          {% if user.is_superuser %}
+            <a href="{% url 'engagement_create' %}" class="button button-compact">Add Engagement</a>
+          {% else %}
+            <span class="button button-compact is-disabled" title="Admin only">Add Engagement</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter by status">
+        <span class="grid-filter-bar__label muted">Status:</span>
+        <a href="{% url 'engagements' %}?status=active" class="filter-chip{% if engagement_status_filter == 'active' %} filter-chip--active{% endif %}">Active</a>
+        <a href="{% url 'engagements' %}?status=pending" class="filter-chip{% if engagement_status_filter == 'pending' %} filter-chip--active{% endif %}">Pending</a>
+        <a href="{% url 'engagements' %}?status=scheduled" class="filter-chip{% if engagement_status_filter == 'scheduled' %} filter-chip--active{% endif %}">Scheduled</a>
+        <a href="{% url 'engagements' %}?status=in_progress" class="filter-chip{% if engagement_status_filter == 'in_progress' %} filter-chip--active{% endif %}">In progress</a>
+        <a href="{% url 'engagements' %}?status=completed" class="filter-chip{% if engagement_status_filter == 'completed' %} filter-chip--active{% endif %}">Completed</a>
+        <a href="{% url 'engagements' %}?status=all" class="filter-chip{% if engagement_status_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+      </div>
+
+      <div class="table-wrap table-wrap--engagements">
+        <table class="data-grid engagements-grid">
+          <thead>
+            <tr>
+              <th class="col-eng-client">Client</th>
+              <th class="col-eng-fy">FY</th>
+              <th class="col-eng-service">Service</th>
+              <th class="col-status" title="Status">St</th>
+              <th class="num" title="Schedule rows">Sch</th>
+              <th class="num" title="Documentation mappings">Doc</th>
+              <th class="num" title="Team assignment rows: engagement, divisions, and work areas">Tm</th>
+              <th class="num" title="Engagement-level plus division-level work area rows">WA</th>
+              <th class="col-engagement-reports eng-dropdown-cell" title="Reports and notes for this engagement">Rpt</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in engagements %}
+              <tr data-grid-row>
+                <td class="col-eng-client" title="{{ item.client.client_name }}">{{ item.client.display_name }}</td>
+                <td class="col-eng-fy">{{ item.fiscal_year.fy_no }}</td>
+                <td class="col-eng-service">{{ item.service.service_desc }}</td>
+                <td class="col-status">
+                  {% with status=item.status|default:"Pending" %}
+                    <span
+                      class="status-icon status-icon-{{ status|slugify }}"
+                      title="{{ status }}"
+                      aria-label="{{ status }}"
+                    >
+                      {% if status == "Completed" %}C{% elif status == "In Progress" %}IP{% elif status == "Scheduled" %}S{% else %}P{% endif %}
+                    </span>
+                  {% endwith %}
+                </td>
+                <td class="num">{{ item.schedule_count }}</td>
+                <td class="num">{{ item.documentation_count }}</td>
+                <td class="num">{{ item.team_assignment_count }}</td>
+                <td class="num">{{ item.work_area_count }}</td>
+                <td class="col-engagement-reports eng-dropdown-cell">
+                  <details class="eng-dropdown eng-dropdown--reports">
+                    <summary class="eng-dropdown__summary icon-btn icon-btn-muted" title="Open reports menu" aria-label="Reports menu for {{ item.client.display_name }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </summary>
+                    <div class="eng-dropdown__panel eng-dropdown__panel--reports" role="menu">
+                      {% if can_use_engagements_nav %}
+                        <a href="{% url 'team_assignments_report' %}" class="eng-dropdown__link" role="menuitem">Team assignments report</a>
+                      {% endif %}
+                      <a href="{% url 'engagement_documents_and_notes' item.id %}" class="eng-dropdown__link" role="menuitem">Documents &amp; work notes</a>
+                    </div>
+                  </details>
+                </td>
+                <td class="col-actions">
+                  <div class="row-actions engagement-row-actions-primary">
+                    {% if active_timer_scope.engagement_id == item.id %}
+                      <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="button button-secondary button-compact" title="Stop timer for this engagement">Stop</button>
+                      </form>
+                    {% else %}
+                      <button
+                        type="button"
+                        class="icon-btn icon-btn-muted timer-start-opener"
+                        title="Start timer"
+                        aria-label="Start timer"
+                        data-start-url="{% url 'timer_start_engagement' item.id %}"
+                        data-next="{{ request.get_full_path }}"
+                        data-engagement="{{ item.id }}"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                      </button>
+                    {% endif %}
+                    <a href="{% url 'engagement_schedules' item.id %}" class="icon-btn icon-btn-muted" title="Schedule" aria-label="Schedule">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </a>
+                    <a href="{% url 'engagement_documentation_maps' item.id %}" class="icon-btn icon-btn-muted" title="Documentation" aria-label="Documentation">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                    </a>
+                    {% if user.is_superuser %}
+                      <a href="{% url 'engagement_edit' item.id %}" class="icon-btn icon-btn-edit" title="Edit engagement" aria-label="Edit engagement">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                      </a>
+                    {% endif %}
+                    <details class="eng-dropdown eng-dropdown--more">
+                      <summary class="eng-dropdown__summary icon-btn icon-btn-muted" title="More actions" aria-label="More actions for {{ item.client.display_name }}">⋯</summary>
+                      <div class="eng-dropdown__panel eng-dropdown__panel--actions" role="menu">
+                        <div class="eng-dropdown__meta muted" role="none">
+                          <strong>Email</strong><br>
+                          {{ item.engagement_mail_id|default:"—" }}{% if item.additional_mail_ids %}<br><span class="eng-dropdown__meta-sub">Also: {{ item.additional_mail_ids }}</span>{% endif %}
+                        </div>
+                        <a href="{% url 'engagement_status_remarks' item.id %}" class="eng-dropdown__link" role="menuitem">Status remarks ({{ item.status_remark_count }})</a>
+                        {% if user.is_superuser %}
+                          <a href="{% url 'engagement_team_assignments' item.id %}" class="eng-dropdown__link" role="menuitem">Team assignments</a>
+                          <a href="{% url 'engagement_work_areas' item.id %}" class="eng-dropdown__link" role="menuitem">Engagement work areas</a>
+                          <form method="post" class="eng-dropdown__danger-form" onsubmit="return confirm('Delete this engagement and all schedule rows?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="pk" value="{{ item.id }}">
+                            <input type="hidden" name="return_status" value="{{ engagement_status_filter }}">
+                            <button type="submit" class="eng-dropdown__danger-btn" role="menuitem">Delete engagement…</button>
+                          </form>
+                        {% else %}
+                          <span class="eng-dropdown__disabled" role="menuitem" aria-disabled="true">Edit engagement (admin)</span>
+                          <span class="eng-dropdown__disabled" role="menuitem" aria-disabled="true">Team assignments (admin)</span>
+                          <span class="eng-dropdown__disabled" role="menuitem" aria-disabled="true">Work areas (admin)</span>
+                          <span class="eng-dropdown__disabled" role="menuitem" aria-disabled="true">Delete (admin)</span>
+                        {% endif %}
+                      </div>
+                    </details>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="10" class="muted">
+                  {% if engagement_status_filter == "all" %}
+                    No engagements added yet.
+                  {% else %}
+                    No engagements match this filter.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching engagements found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'manage_engagements' %}">← Back to Manage Engagements</a></p>
+  </section>
+</div>
+{% endblock %}

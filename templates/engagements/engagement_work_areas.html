@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Engagement Work Areas · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Engagement Work Areas</h1>
+      <p class="muted">
+        {{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}
+      </p>
+      <p class="muted">Work areas tied to the whole engagement (not to a division).</p>
+    </header>
+
+    {% if user.is_superuser %}
+    <div class="grid-panel service-wa-pick-disclosure" data-service-wa-pick-disclosure style="margin-bottom: 1rem;">
+      <div class="service-wa-pick-disclosure__toolbar">
+        <h2 class="doc-files-subheading service-wa-pick-disclosure__heading">Standard work areas for this service</h2>
+        <span class="muted service-wa-pick-disclosure__tag">Preparatory · from service checklist</span>
+        <div class="service-wa-pick-disclosure__buttons">
+          <button
+            type="button"
+            class="button button-secondary button-compact"
+            data-service-wa-pick-open
+            aria-expanded="false"
+            aria-controls="service-wa-pick-body-eng-{{ engagement.id }}"
+          >Open list</button>
+          <button
+            type="button"
+            class="button button-secondary button-compact"
+            data-service-wa-pick-close
+            hidden
+            aria-expanded="false"
+            aria-controls="service-wa-pick-body-eng-{{ engagement.id }}"
+          >Close list</button>
+        </div>
+      </div>
+      <div
+        id="service-wa-pick-body-eng-{{ engagement.id }}"
+        class="service-wa-pick-disclosure__body"
+        data-service-wa-pick-body
+        hidden
+      >
+        {% include "engagements/_service_work_area_standard_pick.html" with service_desc=engagement.service.service_desc service_id=engagement.service_id scope_phrase="this engagement" add_selected_label="Add selected to engagement" %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="grid-panel" data-grid-root data-default-sort-col="0" data-default-sort-dir="asc">
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search work areas..."
+          aria-label="Search work areas"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+        <div class="grid-toolbar-actions">
+          {% if user.is_superuser %}
+            <a href="{% url 'engagement_work_area_create' engagement.id %}" class="button button-compact">Add Work Area</a>
+          {% else %}
+            <span class="button button-compact is-disabled" title="Admin only">Add Work Area</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter work areas">
+        <span class="grid-filter-bar__label muted">View:</span>
+        <a href="{% url 'engagement_work_areas' engagement.id %}?status=active" class="filter-chip{% if work_area_status_filter == 'active' %} filter-chip--active{% endif %}">Active</a>
+        <a href="{% url 'engagement_work_areas' engagement.id %}?status=all" class="filter-chip{% if work_area_status_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Work Area</th>
+              <th>Sort Order</th>
+              <th>Status</th>
+              <th>Amount (notes)</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in work_areas %}
+              <tr data-grid-row>
+                <td>{{ row.work_area_name }}</td>
+                <td>{{ row.sort_order }}</td>
+                <td>
+                  {% with status=row.status|default:"Pending" %}
+                    <span
+                      class="status-icon status-icon-{{ status|slugify }}"
+                      title="{{ status }}"
+                      aria-label="{{ status }}"
+                    >
+                      {% if status == "Completed" %}C{% elif status == "In Progress" %}IP{% elif status == "Scheduled" %}S{% else %}P{% endif %}
+                    </span>
+                  {% endwith %}
+                </td>
+                <td class="muted">
+                  {% if row.monetary_amount is not None %}
+                    {{ row.monetary_amount }} {{ row.monetary_amount_unit }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="col-actions">
+                  <div class="row-actions">
+                    {% if active_timer_scope.engagement_work_area_id == row.id %}
+                      <form method="post" action="{% url 'timer_stop' %}" class="inline-form timer-row-stop-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="button button-secondary button-compact" title="Stop timer for this work area">Stop</button>
+                      </form>
+                    {% else %}
+                      <button
+                        type="button"
+                        class="icon-btn icon-btn-muted timer-start-opener"
+                        title="Start timer"
+                        aria-label="Start timer"
+                        data-start-url="{% url 'timer_start_engagement_work_area' engagement.id row.id %}"
+                        data-next="{{ request.get_full_path }}"
+                        data-engagement="{{ engagement.id }}"
+                        data-engagement-work-area="{{ row.id }}"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                      </button>
+                    {% endif %}
+                    <a href="{% url 'engagement_work_area_schedule' engagement.id row.id %}" class="icon-btn icon-btn-muted" title="Planned / actual date ranges ({{ row.schedule_row_count }})" aria-label="Planned and actual dates">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </a>
+                    {% if user.is_superuser %}
+                      <a href="{% url 'engagement_work_area_assignments' engagement.id row.id %}" class="icon-btn icon-btn-muted" title="Team assignments ({{ row.assignment_count }})" aria-label="Team assignments">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      </a>
+                    {% else %}
+                      <span class="icon-btn icon-btn-muted is-disabled" title="Admin only" aria-label="Admin only">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      </span>
+                    {% endif %}
+                    <a href="{% url 'engagement_work_area_documents' engagement.id row.id %}" class="icon-btn icon-btn-muted" title="Work area documents ({{ row.document_count }})" aria-label="Work area documents">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                    </a>
+                    <a href="{% url 'engagement_work_area_queries' engagement.id row.id %}" class="icon-btn icon-btn-muted" title="Work area notes" aria-label="Work area notes">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 5V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </a>
+                    {% if user.is_superuser %}
+                      <a href="{% url 'engagement_work_area_edit' engagement.id row.id %}" class="icon-btn icon-btn-edit" title="Edit" aria-label="Edit">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                      </a>
+                      <form method="post" class="inline-form" onsubmit="return confirm('Delete this work area?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="pk" value="{{ row.id }}">
+                        <button type="submit" class="icon-btn icon-btn-danger" title="Delete" aria-label="Delete">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
+                      </form>
+                    {% else %}
+                      <span class="icon-btn icon-btn-edit is-disabled" title="Admin only" aria-label="Admin only">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                      </span>
+                      <span class="icon-btn icon-btn-danger is-disabled" title="Admin only" aria-label="Admin only">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      </span>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">
+                  {% if work_area_status_filter == 'active' %}
+                    No active engagement work areas.
+                  {% else %}
+                    No engagement work areas added yet.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching work areas found.
+      </p>
+    </div>
+
+    <div class="page-actions page-actions--bulk">
+      {% if user.is_superuser %}
+        {% include "engagements/_work_areas_bulk_controls.html" %}
+      {% endif %}
+      <a href="{% url 'engagement_work_area_notes_list' engagement.id %}" class="button button-secondary">Work area notes list</a>
+    </div>
+
+    <div class="grid-panel">
+      <h2 class="doc-files-subheading">Team list</h2>
+      {% if team_assignments %}
+        <div class="table-wrap">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Team member</th>
+                <th>Planned start</th>
+                <th>Planned finish</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in team_assignments %}
+                <tr>
+                  <td>{{ row.team_member }}</td>
+                  <td>{% if row.planned_start %}{{ row.planned_start|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                  <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="muted">No team members assigned yet.</p>
+      {% endif %}
+      <p class="muted">
+        <a href="{% url 'engagement_team_assignments' engagement.id %}">Open engagement team assignments</a>
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="{% url 'engagements' %}">← Back to Engagements</a>
+      ·
+      <a href="{% url 'work_area_hub' %}">Work areas hub</a>
+      ·
+      <a href="{% url 'engagement_documentation_maps' engagement.id %}">Documentation</a>
+      ·
+      <a href="{% url 'engagement_schedules' engagement.id %}">Schedule</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% load static %}
+{% block extra_scripts %}
+  {{ block.super }}
+  <script src="{% static 'js/work-areas-bulk-actions.js' %}?v=1"></script>
+{% endblock %}

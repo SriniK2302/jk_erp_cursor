@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}{% if engagement %}Edit Engagement{% else %}Add Engagement{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if engagement %}Edit Engagement{% else %}Add Engagement{% endif %}</h1>
+      <p class="muted">Client + FY + Service is the engagement key.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.client.id_for_label }}">Client</label>
+        <div class="sap-control control-with-action">
+          {{ form.client }}
+          <a href="{% url 'client_create' %}" target="_blank" rel="noopener noreferrer" class="label-action-link" title="Add Client">+</a>
+          {% if form.client.errors %}
+            <span class="field-error">{{ form.client.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fiscal_year.id_for_label }}">FY</label>
+        <div class="sap-control control-with-action">
+          {{ form.fiscal_year }}
+          <a href="{% url 'fiscal_year_create' %}" target="_blank" rel="noopener noreferrer" class="label-action-link" title="Add Fiscal Year">+</a>
+          {% if form.fiscal_year.errors %}
+            <span class="field-error">{{ form.fiscal_year.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.service.id_for_label }}">Service</label>
+        <div class="sap-control control-with-action">
+          {{ form.service }}
+          <a href="{% url 'service_create' %}" target="_blank" rel="noopener noreferrer" class="label-action-link" title="Add Service">+</a>
+          {% if form.service.errors %}
+            <span class="field-error">{{ form.service.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fee_amount.id_for_label }}">Fee amount</label>
+        <div class="sap-control" data-amount-formatted-wrap>
+          {{ form.fee_amount }}
+          <p class="muted amount-in-words" data-amount-words hidden></p>
+          {% if form.fee_amount.errors %}
+            <span class="field-error">{{ form.fee_amount.errors.0 }}</span>
+          {% endif %}
+          <span class="muted">Optional. Engagement-level fee; certification may use per-certificate fees later.</span>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.engagement_mail_id.id_for_label }}">Engagement email</label>
+        <div class="sap-control">
+          {{ form.engagement_mail_id }}
+          {% if form.engagement_mail_id.errors %}
+            <span class="field-error">{{ form.engagement_mail_id.errors.0 }}</span>
+          {% endif %}
+          <span class="muted">Defaults to client mail ID if left blank.</span>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.additional_mail_ids.id_for_label }}">Additional mail IDs</label>
+        <div class="sap-control">
+          {{ form.additional_mail_ids }}
+          {% if form.additional_mail_ids.errors %}
+            <span class="field-error">{{ form.additional_mail_ids.errors.0 }}</span>
+          {% endif %}
+          <span class="muted">Use comma, semicolon, or new line to add multiple IDs.</span>
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagements' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if engagement %}Update Engagement{% else %}Save Engagement{% endif %}</button>
+      </div>
+    </form>
+
+    {% if engagement %}
+      <div class="grid-panel">
+        <h2 class="doc-files-subheading">Team list</h2>
+        {% if team_assignments %}
+          <div class="table-wrap">
+            <table class="data-grid">
+              <thead>
+                <tr>
+                  <th>Team member</th>
+                  <th>Planned start</th>
+                  <th>Planned finish</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in team_assignments %}
+                  <tr>
+                    <td>{{ row.team_member }}</td>
+                    <td>{% if row.planned_start %}{{ row.planned_start|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                    <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="muted">No team members assigned yet.</p>
+        {% endif %}
+        <p class="muted">
+          <a href="{% url 'engagement_team_assignments' engagement.id %}">Open engagement team assignments</a>
+        </p>
+      </div>
+    {% endif %}
+
+    <p class="muted"><a href="{% url 'engagements' %}">← Back to Engagements</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {% load static %}
+  <script src="{% static 'js/amount-formatted-input.js' %}?v=1"></script>
+{% endblock %}

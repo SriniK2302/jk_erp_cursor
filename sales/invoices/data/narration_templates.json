@@ -1,0 +1,10 @@
+{
+  "_readme": "Placeholders: {service_remarks} from UDIN (Certification: full fee line). {fy_no} / {FYno} from UDIN.ay_fy.",
+  "default_template": "",
+  "by_service_code": {},
+  "by_service_desc": {
+    "Certification": "{service_remarks}",
+    "Statutory Audit": "Fee for conducting the Statutory Audit for the service. and issuing a report.",
+    "Tax Audit": "Fee for conducting the Tax Audit for the service. and issuing a report."
+  }
+}

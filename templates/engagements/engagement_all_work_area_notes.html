@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}All work area notes · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>All work area notes</h1>
+      <p class="muted">{{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}</p>
+      <p class="muted">Engagement-level work areas and every division’s work areas.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root data-grid-no-resize="1" data-grid-id="engagement-all-work-area-notes">
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search scope, work area, subject, details..."
+          aria-label="Search work area notes"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap work-area-notes-list-grid">
+          <thead>
+            <tr>
+              <th class="col-scope">Scope</th>
+              <th class="col-work-area">Work area</th>
+              <th class="col-date">Date</th>
+              <th class="col-type">Type</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-details">Details</th>
+              <th class="col-responses">Responses</th>
+              <th class="col-status">Status</th>
+              <th class="col-open">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td class="col-scope">
+                  {% if row.engagement_work_area_id %}
+                    Engagement (no division)
+                  {% else %}
+                    Division: {{ row.division_work_area.division.division_name }}
+                  {% endif %}
+                </td>
+                <td class="col-work-area">
+                  {% if row.engagement_work_area_id %}
+                    {{ row.engagement_work_area.work_area_name }}
+                  {% else %}
+                    {{ row.division_work_area.work_area_name }}
+                  {% endif %}
+                </td>
+                <td class="col-date">{{ row.query_date|date:"Y-m-d" }}</td>
+                <td class="col-type">{{ row.get_entry_type_display }}</td>
+                <td class="col-subject">{{ row.subject }}</td>
+                <td class="col-details">{{ row.query_text }}</td>
+                <td class="col-responses">{{ row.response_count }}</td>
+                <td class="col-status">{% if row.entry_type == "query" %}{{ row.get_status_display }}{% else %}—{% endif %}</td>
+                <td class="col-open">
+                  {% if row.engagement_work_area_id %}
+                    <a href="{% url 'engagement_work_area_queries' engagement.id row.engagement_work_area.id %}">Open</a>
+                  {% else %}
+                    <a href="{% url 'engagement_division_work_area_queries' row.division_work_area.division_id row.division_work_area.id %}">Open</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="9" class="muted">No notes across engagement and division work areas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching notes found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="#" onclick="history.back(); return false;">← Back</a>
+      ·
+      <a href="{% url 'engagements' %}">Engagements</a>
+      ·
+      <a href="{% url 'engagement_work_areas' engagement.id %}">Engagement work areas</a>
+      ·
+      <a href="{% url 'engagement_work_area_notes_list' engagement.id %}">Engagement-level notes only</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

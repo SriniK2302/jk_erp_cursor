@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Move to FY Folder Tool · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Move to FY Folder Tool</h1>
+      <p class="muted">Create <strong>FYxx</strong> folder if missing. File name must start with <strong>YYYY MM DD</strong> (10 chars) or <strong>YYYY MM</strong> (7 chars; uses 1st of month for FY).</p>
+    </header>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Move to FY Folder (from date prefix)</span>
+      <span class="tile-subtitle">Direct files only (no subfolders). FY from April–March rules.</span>
+
+      <form id="select-move-to-fy-folder-form" method="post" action="{% url 'select_move_to_fy_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'move_files_to_fy_folder' %}"
+        id="move-to-fy-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="move-to-fy-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="move-to-fy-folder"
+              name="move_to_fy_folder"
+              type="text"
+              class="utility-input"
+              value="{{ move_to_fy_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-move-to-fy-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" id="execute-move-to-fy-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="move-to-fy-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="move-to-fy-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="move-to-fy-progress-text">Moving files into FY folders...</p>
+      </div>
+
+      <p id="move-to-fy-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <p class="muted"><a href="{% url 'organize_files_utilities' %}">← Back to Organize Files</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("move-to-fy-form");
+    const progressWrap = document.getElementById("move-to-fy-progress-wrap");
+    const progressBar = document.getElementById("move-to-fy-progress-bar");
+    const progressText = document.getElementById("move-to-fy-progress-text");
+    const resultBox = document.getElementById("move-to-fy-result");
+    const executeBtn = document.getElementById("execute-move-to-fy-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("move-to-fy-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Moving direct files into FY folders...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to move files into FY folders.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while moving files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+</script>
+{% endblock %}

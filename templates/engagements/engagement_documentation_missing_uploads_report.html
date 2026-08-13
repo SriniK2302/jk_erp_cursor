@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation — missing uploads · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Documentation — missing uploads</h1>
+      <p class="muted">
+        {{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}
+      </p>
+      <p class="muted">
+        Mapped engagement and division documentation items with <strong>no file uploaded</strong> yet.
+        Open <strong>Upload</strong> to add files for that mapping.
+      </p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search scope, document, stage..."
+          aria-label="Search missing uploads"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Scope</th>
+              <th>Standard document</th>
+              <th>Stage</th>
+              <th>List date</th>
+              <th>Upload</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in missing_rows %}
+              <tr data-grid-row>
+                <td>{{ row.scope_label }}</td>
+                <td>{{ row.standard_document }}</td>
+                <td>{{ row.stage_display }}</td>
+                <td>{% if row.list_date %}{{ row.list_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                <td><a href="{{ row.files_url }}" class="button button-compact">Upload</a></td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">Every mapped documentation item has at least one file uploaded.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching rows found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="{% url 'engagement_documentation_maps' engagement.id %}">← Engagement documentation</a>
+      ·
+      <a href="{% url 'engagement_uploaded_documents_report' engagement.id %}">Uploaded documents report</a>
+      ·
+      <a href="{% url 'engagements' %}">Engagements</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

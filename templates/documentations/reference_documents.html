@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Reference documents · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Reference documents</h1>
+      <p class="muted">Technical reference library for the team — methodology, tools, policies, and standards.</p>
+    </header>
+
+    <div class="grid-panel ref-doc-add-row">
+      <a href="{% url 'reference_document_create' %}" class="button button-compact">Add reference document</a>
+    </div>
+
+    <form method="get" class="grid-panel ref-doc-filters-bar" id="ref-doc-filter-form" action="{% url 'reference_documents' %}">
+      <div class="ref-doc-search-inner">
+        <label class="ref-doc-search-grow">
+          <span class="muted" style="display:block; margin-bottom:0.2rem;">Search</span>
+          <input
+            type="search"
+            name="q"
+            id="ref-doc-filter-q"
+            class="input-long"
+            placeholder="Title, description, tags, file name, category, uploader…"
+            value="{{ filter_q }}"
+            aria-label="Search reference documents"
+            autocomplete="off"
+          >
+        </label>
+        <div class="ref-doc-search-side">
+          <div class="ref-doc-filter-check">
+            <span style="display:inline-flex; align-items:center; gap:0.35rem; white-space:nowrap;">
+              <input type="checkbox" name="include_inactive" value="1" id="ref-doc-include-inactive" onchange="this.form.submit()"{% if filter_include_inactive %} checked{% endif %}>
+              <label for="ref-doc-include-inactive" style="font-weight:normal; margin:0;">Show inactive</label>
+            </span>
+          </div>
+          <a href="{% url 'reference_documents' %}" class="button button-secondary button-compact">Clear</a>
+        </div>
+      </div>
+    </form>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap ref-doc-grid">
+          <colgroup>
+            <col class="ref-doc-col-category">
+            <col class="ref-doc-col-title">
+            <col class="ref-doc-col-tags">
+            <col class="ref-doc-col-file">
+            <col class="ref-doc-col-desc">
+            <col class="ref-doc-col-actions">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Title</th>
+              <th>Tags</th>
+              <th>File</th>
+              <th>Description</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in documents %}
+              <tr data-grid-row class="{% if not item.is_active %}ref-doc-row-inactive{% endif %}">
+                <td>{{ item.category }}</td>
+                <td class="ref-doc-cell-text">{{ item.title }}{% if not item.is_active %} <span class="muted">(inactive)</span>{% endif %}</td>
+                <td class="muted ref-doc-cell-text">{% if item.tags %}{{ item.tags }}{% else %}—{% endif %}</td>
+                <td>
+                  <a href="{% url 'reference_document_download' item.pk %}">{{ item.original_filename }}</a>
+                  <span class="muted"> · {{ item.created_by }}</span>
+                </td>
+                <td class="muted ref-doc-cell-text ref-doc-cell-desc">{% if item.description %}{{ item.description|linebreaksbr }}{% else %}—{% endif %}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="reference_documents" edit_url_name="reference_document_edit" edit_pk=item.id pk=item.id delete_action="delete_reference_document" confirm_message="Delete this reference document?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="6" class="muted">{% if filter_q %}No reference documents match this search. Try <strong>Clear</strong> or different words.{% else %}No reference documents yet. Add one to get started.{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="muted">
+      <a href="{% url 'setup' %}">← Back to Setup</a>
+      ·
+      <a href="{% url 'engagement_documentations' %}">Documentation</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById("ref-doc-filter-form");
+  var input = document.getElementById("ref-doc-filter-q");
+  if (!form || !input) return;
+  var timer = null;
+  input.addEventListener("input", function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    }, 450);
+  });
+})();
+</script>
+{% endblock %}

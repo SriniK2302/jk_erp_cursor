@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Edit user · JK ERP{% endblock %}
+
+{% block content %}
+{{ form.media }}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Edit user</h1>
+      <p class="muted">Username cannot be changed here. The team member link is optional (leave blank for admin-only or service accounts). Use <strong>Email</strong> for this login; use <strong>Teams → member → Work email</strong> for a separate firm inbox on the roster. Link a team member only when this login should be tied to HR.</p>
+    </header>
+
+    <div class="sap-row" style="margin-bottom: 1rem;">
+      <span class="muted">Username</span>
+      <div><strong>{{ account.username }}</strong></div>
+    </div>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.email.id_for_label }}">Email</label>
+        <div class="sap-control">
+          {{ form.email }}
+          {% if form.email.help_text %}
+            <p class="muted" style="margin-top: 0.35rem;">{{ form.email.help_text }}</p>
+          {% endif %}
+          {% if form.email.errors %}
+            <span class="field-error">{{ form.email.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.first_name.id_for_label }}">First name</label>
+        <div class="sap-control">
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <span class="field-error">{{ form.first_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.last_name.id_for_label }}">Last name</label>
+        <div class="sap-control">
+          {{ form.last_name }}
+          {% if form.last_name.errors %}
+            <span class="field-error">{{ form.last_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.is_active.id_for_label }}">Active</label>
+        <div class="sap-control">
+          {{ form.is_active }}
+          {% if form.is_active.errors %}
+            <span class="field-error">{{ form.is_active.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.team_member.id_for_label }}">{{ form.team_member.label }}</label>
+        <div class="sap-control">
+          {{ form.team_member }}
+          {% if form.team_member.help_text %}
+            <p class="muted" style="margin-top: 0.35rem;">{{ form.team_member.help_text }}</p>
+          {% endif %}
+          {% if form.team_member.errors %}
+            <span class="field-error">{{ form.team_member.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label>Module access</label>
+        <div class="sap-control">
+          <label class="checkbox-inline">{{ form.can_use_engagements }} {{ form.can_use_engagements.label }}</label><br>
+          <label class="checkbox-inline">{{ form.can_use_setup }} {{ form.can_use_setup.label }}</label><br>
+          <label class="checkbox-inline">{{ form.can_use_tools }} {{ form.can_use_tools.label }}</label>
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'setup_users' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">Save user</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'setup_users' %}">← Back to users</a></p>
+  </section>
+</div>
+{% endblock %}

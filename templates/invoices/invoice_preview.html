@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice {{ invoice.invoice_no }} · Preview</title>
+  <style>
+    :root {
+      --ink: #111;
+      --muted: #333;
+      --border: #000;
+      --brand-blue: #173b6c;
+      --grid-blue: #2f5f98;
+      --a4-w: 210mm;
+      --a4-h: 297mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #3a3a3a;
+      color: var(--ink);
+      font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.35;
+    }
+    .no-print {
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 0.75rem 1rem;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+      font-size: 0.88rem;
+    }
+    .no-print a { color: #9ecbff; margin-right: 1rem; }
+    .no-print button {
+      margin-right: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 1px solid #666;
+      background: #444;
+      color: #fff;
+    }
+    .sheet {
+      width: var(--a4-w);
+      min-height: var(--a4-h);
+      margin: 0 auto 1.5rem;
+      padding: 12mm 14mm;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 4px 24px rgb(0 0 0 / 0.45);
+    }
+    .firm-block {
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.65rem;
+      margin-bottom: 0.75rem;
+    }
+    .firm-name {
+      font-size: 13pt;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--brand-blue);
+    }
+    .firm-sub {
+      font-size: 10.5pt;
+      margin-top: 0.15rem;
+      color: var(--brand-blue);
+      font-weight: 600;
+    }
+    .firm-footer-locations {
+      text-align: center;
+      font-size: 9.5pt;
+      line-height: 1.45;
+      margin-top: 1rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid #999;
+      color: var(--muted);
+    }
+    .firm-footer-locations .addr-line {
+      margin: 0.15rem 0;
+    }
+    .bill-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin: 0.6rem 0 0.5rem;
+      font-weight: 700;
+    }
+    .bill-word {
+      font-size: 16pt;
+      letter-spacing: 0.15em;
+    }
+    .bill-no {
+      font-size: 11pt;
+      font-family: "Courier New", monospace;
+    }
+    .client-grid-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem 1.25rem;
+      align-items: start;
+      font-size: 10.5pt;
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.55rem;
+      margin-bottom: 0.65rem;
+    }
+    .client-grid-col {
+      display: grid;
+      grid-template-columns: 5.75rem 1fr;
+      gap: 0.15rem 0.45rem;
+    }
+    .client-grid-col .lbl { font-weight: 600; }
+    .client-loc-inline {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      column-gap: 0.5rem;
+      white-space: nowrap;
+    }
+    .client-loc-inline .client-loc-seg .lbl { margin-right: 0.2rem; }
+    .items {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+      margin-bottom: 0.5rem;
+      border-top: 1px solid var(--grid-blue);
+      border-bottom: 1px solid var(--grid-blue);
+    }
+    .items th, .items td {
+      border-left: 0;
+      border-right: 0;
+      border-top: 0;
+      border-bottom: 1px solid var(--grid-blue);
+      padding: 0.28rem 0.4rem;
+      vertical-align: top;
+    }
+    .items th {
+      font-weight: 700;
+      text-align: center;
+      background: #f4f8ff;
+      color: #123761;
+      border-bottom-width: 1.5px;
+    }
+    .items td.sr { width: 2rem; text-align: center; }
+    .items td.amt {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      width: 5.5rem;
+    }
+    .items td.rate { text-align: right; width: 4rem; }
+    .total-line {
+      text-align: right;
+      font-weight: 700;
+      font-size: 11pt;
+      margin: 0.35rem 0;
+      padding-right: 0.2rem;
+    }
+    .words-line {
+      font-size: 10pt;
+      font-style: italic;
+      margin: 0.5rem 0 0.65rem;
+      border-top: 1px solid #999;
+      border-bottom: 1px solid #999;
+      padding: 0.35rem 0;
+    }
+    .bank-block {
+      font-size: 9.5pt;
+      margin: 0.5rem 0;
+      line-height: 1.45;
+      font-weight: 400;
+    }
+    .bank-block strong { font-weight: 400; }
+    .sign-block {
+      margin-top: 0.85rem;
+      font-size: 10pt;
+      text-align: right;
+      line-height: 1.5;
+    }
+    .sign-gap {
+      height: 3.6em;
+    }
+    .udin-after-lines {
+      font-size: 9.5pt;
+      margin-top: 0.35rem;
+      padding-top: 0.35rem;
+      line-height: 1.45;
+    }
+    .udin-narration-line {
+      margin-bottom: 0.12rem;
+    }
+    .footer-legal {
+      margin-top: 0.75rem;
+      font-size: 9pt;
+      text-align: center;
+      font-style: italic;
+      color: var(--muted);
+    }
+    @page { size: A4; margin: 11mm; }
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .sheet {
+        margin: 0;
+        padding: 0;
+        min-height: auto;
+        width: 100%;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <a href="{% url 'invoices' %}">← Back to Invoices</a>
+    <a href="{% url 'invoice_edit' invoice.pk %}">Edit invoice</a>
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    <span style="opacity:0.85">A4 · matches firm bill layout (FY25 sample).</span>
+  </div>
+
+  <article class="sheet" aria-label="Invoice preview">
+    <header class="firm-block">
+      <div class="firm-name">{{ letterhead.firm_name|default:"Firm name" }}</div>
+      <div class="firm-sub">{{ letterhead.firm_subtitle|default:"" }}</div>
+    </header>
+
+    <div class="bill-banner">
+      <span class="bill-word">INVOICE</span>
+      <span class="bill-no">Invoice No. {{ invoice.invoice_no }}</span>
+    </div>
+
+    <div class="client-grid-wrap">
+      <div class="client-grid-col">
+        <span class="lbl">Name</span>
+        <span>{{ invoice.client.client_name }}</span>
+        <span class="lbl">Date</span>
+        <span>{{ invoice.invoice_date|date:"d-M-y" }}</span>
+        <span class="lbl">Address</span>
+        <span>
+          {% if invoice.client.address_1 %}{{ invoice.client.address_1 }}{% endif %}
+          {% if invoice.client.address_2 %}<br>{{ invoice.client.address_2 }}{% endif %}
+        </span>
+        {% if invoice.client.area %}
+        <span class="lbl">Area</span>
+        <span>{{ invoice.client.area }}</span>
+        {% endif %}
+        <span class="lbl">City</span>
+        <span class="client-loc-inline">
+          <span class="client-loc-seg">{{ invoice.client.city_state_pincode|default:"—" }}</span>
+          <span class="client-loc-seg"><span class="lbl">State</span> {{ invoice.client.state|default:"—" }}</span>
+          <span class="client-loc-seg"><span class="lbl">Pincode</span> {{ invoice.client.pincode|default:"—" }}</span>
+        </span>
+      </div>
+      <div class="client-grid-col">
+        <span class="lbl">GSTN</span>
+        <span>{{ invoice.client.billing_gstn|default:"—" }}</span>
+        <span class="lbl">Service FY</span>
+        <span>{{ invoice.fiscal_year.fy_no }}</span>
+        <span class="lbl">Tax</span>
+        <span>{{ invoice.client.get_invoice_tax_type_display }}</span>
+      </div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="sr">Sr</th>
+          <th>Description</th>
+          <th class="rate">Rate %</th>
+          <th class="amt">Amount (Rs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in preview_lines %}
+          <tr>
+            <td class="sr">{{ line.line_no }}</td>
+            <td>
+              {% if line.line_type == "Service" %}
+                {% if line.line_description %}{{ line.line_description }}{% else %}Fee for {{ invoice.service.service_desc }}{% endif %}
+              {% else %}
+                {{ line.line_type }} {{ line.percentage|floatformat:2 }}%
+              {% endif %}
+            </td>
+            <td class="rate">
+              {% if line.line_type == "Service" %}—{% else %}{{ line.percentage|floatformat:2 }}%{% endif %}
+            </td>
+            <td class="amt">{{ line.item_amount|floatformat:"0g" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if invoice_udin_maps or narration_one_line %}
+      {% for m in invoice_udin_maps %}
+        <div class="udin-after-lines">
+          {% if forloop.first and narration_one_line %}
+            <div class="udin-narration-line">{{ narration_one_line }}</div>
+          {% endif %}
+          <div>
+            <strong>UDIN:</strong> {{ m.udin.udin }}
+            {% if m.udin.date_of_signing_of_document %} ; Date of signing of document: {{ m.udin.date_of_signing_of_document }}{% endif %}
+            {% if m.udin.created_date_time %} ; Created date/time: {{ m.udin.created_date_time }}{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      {% if not invoice_udin_maps and narration_one_line %}
+        <div class="udin-after-lines">{{ narration_one_line }}</div>
+      {% endif %}
+    {% endif %}
+
+    <div class="total-line">TOTAL Rs.{{ invoice.inv_gross|floatformat:"0g" }}</div>
+    <div class="words-line">{{ amount_in_words }}</div>
+
+    {% if letterhead.bank_pay_instruction or letterhead.bank_ifsc %}
+      <div class="bank-block">
+        {% if letterhead.bank_pay_instruction %}<strong>{{ letterhead.bank_pay_instruction }}</strong><br>{% endif %}
+        {% if letterhead.bank_account_label %}<strong>{{ letterhead.bank_account_label }}</strong>{% endif %}
+        {% if letterhead.bank_account_no %} Number <strong>{{ letterhead.bank_account_no }}</strong><br>{% endif %}
+        {% if letterhead.bank_holder %}Holder: <strong>{{ letterhead.bank_holder }}</strong><br>{% endif %}
+        {% if letterhead.bank_ifsc %}<strong>IFSC: {{ letterhead.bank_ifsc }}</strong>{% endif %}
+      </div>
+    {% endif %}
+
+    <div class="sign-block">
+      {% if letterhead.signatory_prefix %}{{ letterhead.signatory_prefix }}<br>{% endif %}
+      <div class="sign-gap" aria-hidden="true"></div>
+      {% if letterhead.authorised_signatory_name %}{{ letterhead.authorised_signatory_name }}<br>{% endif %}
+      {% if letterhead.signatory_role %}{{ letterhead.signatory_role }}<br>{% endif %}
+      {% if letterhead.firm_pan %}<strong>PAN</strong> : {{ letterhead.firm_pan }}<br>{% endif %}
+      {% if letterhead.firm_gstn %}<strong>GSTN</strong> : {{ letterhead.firm_gstn }}<br>{% endif %}
+    </div>
+
+    {% if letterhead.address_line_1 or letterhead.address_line_2 or letterhead.phone or letterhead.email %}
+      <div class="firm-footer-locations">
+        {% if letterhead.address_line_1 %}
+          <div class="addr-line">{{ letterhead.address_line_1 }}</div>
+        {% endif %}
+        {% if letterhead.address_line_2 %}
+          <div class="addr-line">{{ letterhead.address_line_2 }}</div>
+        {% endif %}
+        {% if letterhead.phone or letterhead.email %}
+          <div class="addr-line">
+            {% if letterhead.phone %}M: {{ letterhead.phone }}{% endif %}
+            {% if letterhead.phone and letterhead.email %} · {% endif %}
+            {% if letterhead.email %}e-mail: {{ letterhead.email }}{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if letterhead.computer_generated_note %}
+      <p class="footer-legal">{{ letterhead.computer_generated_note }}</p>
+    {% endif %}
+  </article>
+</body>
+</html>

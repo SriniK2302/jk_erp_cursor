@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Files · {{ documentation_map.documentation.standard_document }} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Division documentation files</h1>
+      <p class="muted">
+        {{ division.engagement.client.display_name }} · {{ division.engagement.fiscal_year.fy_no }} · {{ division.engagement.service.service_desc }} · {{ division.division_name }}
+      </p>
+      <p class="muted doc-files-context">
+        <strong>{{ documentation_map.documentation.standard_document }}</strong>
+        · {{ documentation_map.documentation.get_document_stage_display }}
+      </p>
+    </header>
+
+    <div class="grid-panel doc-files-panel">
+      <h2 class="doc-files-subheading">Uploaded files</h2>
+      {% if attachments %}
+        <ul class="doc-attachment-list doc-attachment-list-page">
+          {% for att in attachments %}
+            <li class="doc-attachment-line doc-attachment-line-page">
+              <div class="doc-attachment-line-main">
+                <span class="doc-attachment-date-badge">{{ att.document_date|date:"Y-m-d" }}</span>
+                <a class="doc-attachment-link" href="{% url 'engagement_division_documentation_attachment_download' division.id documentation_map.id att.id %}" title="{{ att.original_filename }}"><span class="doc-attachment-filename">{{ att.original_filename }}</span></a>
+                {% if att.description %}
+                  <div class="muted">{{ att.description }}</div>
+                {% endif %}
+              </div>
+              <form method="post" class="inline-form doc-attachment-delete" onsubmit="return confirm('Remove only this file?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_attachment">
+                <input type="hidden" name="pk" value="{{ att.id }}">
+                <button type="submit" class="icon-btn icon-btn-muted doc-attachment-remove" title="Remove this file" aria-label="Remove {{ att.original_filename }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No files uploaded yet.</p>
+      {% endif %}
+
+      <h2 class="doc-files-subheading">Add files</h2>
+      <form method="post" enctype="multipart/form-data" class="doc-attach-form doc-attach-form-page sap-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload_attachment">
+        <div class="sap-row">
+          <label for="doc-date-upload">Document date</label>
+          <div class="sap-control">
+            <input type="date" class="input-compact" id="doc-date-upload" name="document_date" required>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="attach-files-upload">Files</label>
+          <div class="sap-control">
+            <input type="file" name="files" multiple id="attach-files-upload" class="visually-hidden" data-doc-file-input aria-describedby="attach-hint-upload">
+            <div class="doc-attach-file-row">
+              <button type="button" class="button button-secondary" data-doc-file-trigger="attach-files-upload">Choose files…</button>
+              <span class="muted doc-attach-file-hint" id="attach-hint-upload">None selected</span>
+            </div>
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="upload-description">Description</label>
+          <div class="sap-control">
+            <textarea
+              id="upload-description"
+              name="description"
+              class="input-long"
+              rows="4"
+              placeholder="Describe these files"
+            ></textarea>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Upload</button>
+        </div>
+      </form>
+    </div>
+
+    <p class="muted page-actions">
+      <a href="{% url 'engagement_division_documentation_maps' division.id %}">← Back to Division Documentation</a>
+      ·
+      <a href="{% url 'engagement_division_documentation_map_edit' division.id documentation_map.id %}">Edit this mapping</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("[data-doc-file-trigger]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-doc-file-trigger");
+      var input = document.getElementById(id);
+      if (input) input.click();
+    });
+  });
+  document.querySelectorAll("[data-doc-file-input]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      var form = input.closest("form");
+      var hint = form && form.querySelector(".doc-attach-file-hint");
+      if (!hint) return;
+      if (!input.files || !input.files.length) {
+        hint.textContent = "None selected";
+        return;
+      }
+      hint.textContent = Array.from(input.files)
+        .map(function (f) {
+          return f.name;
+        })
+        .join(", ");
+    });
+  });
+});
+</script>
+{% endblock %}

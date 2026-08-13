@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Setup · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Setup</h1>
+      <p class="muted">Choose a setup module.</p>
+    </header>
+
+    {# Setup tiles: keep in strict ascending order by tile-title (A–Z). #}
+    <nav class="tile-grid" aria-label="Setup modules">
+      <a class="tile-link" href="{% url 'chart_of_accounts' %}">
+        <span class="tile-title">Chart of Accounts</span>
+        <span class="tile-subtitle">Maintain account name/code and PL/BS account type mapping</span>
+      </a>
+      <a class="tile-link" href="{% url 'client_classifications' %}">
+        <span class="tile-title">Client Classifications</span>
+        <span class="tile-subtitle">Maintain client classification master data</span>
+      </a>
+      <a class="tile-link" href="{% url 'clients' %}">
+        <span class="tile-title">Clients</span>
+        <span class="tile-subtitle">Manage client master data</span>
+      </a>
+      <a class="tile-link" href="{% url 'engagement_documentations' %}">
+        <span class="tile-title">Documentation</span>
+        <span class="tile-subtitle">Standard documents by stage, with optional Word (.doc/.docx) templates</span>
+      </a>
+      <a class="tile-link" href="{% url 'fiscal_years' %}">
+        <span class="tile-title">Fiscal Years</span>
+        <span class="tile-subtitle">Manage GL financial year definitions</span>
+      </a>
+      <a class="tile-link" href="{% url 'grades' %}">
+        <span class="tile-title">Grades</span>
+        <span class="tile-subtitle">Manage HR grade master data</span>
+      </a>
+      <a class="tile-link" href="{% url 'qualifications' %}">
+        <span class="tile-title">Qualifications</span>
+        <span class="tile-subtitle">Manage HR qualification master data</span>
+      </a>
+      <a class="tile-link" href="{% url 'reference_documents' %}">
+        <span class="tile-title">Reference documents</span>
+        <span class="tile-subtitle">Firm-wide reference materials (library to be expanded)</span>
+      </a>
+      <a class="tile-link" href="{% url 'sales_ledger_settings' %}">
+        <span class="tile-title">Sales Ledger Settings</span>
+        <span class="tile-subtitle">Sales ledger options and defaults (expand as needed)</span>
+      </a>
+      <a class="tile-link" href="{% url 'services' %}">
+        <span class="tile-title">Services</span>
+        <span class="tile-subtitle">Manage service master data</span>
+      </a>
+      <a class="tile-link" href="{% url 'engagement_checklist_templates' %}">
+        <span class="tile-title">Statutory Audit Check List</span>
+        <span class="tile-subtitle">By service: work areas and actionable checklist lines for the team</span>
+      </a>
+      <a class="tile-link" href="{% url 'team_grade_maps' %}">
+        <span class="tile-title">Team Grade Map</span>
+        <span class="tile-subtitle">Map team members to grades over time</span>
+      </a>
+      <a class="tile-link" href="{% url 'team_qualification_maps' %}">
+        <span class="tile-title">Team Qualification Map</span>
+        <span class="tile-subtitle">Map team members to qualifications over time</span>
+      </a>
+      <a class="tile-link" href="{% url 'teams' %}">
+        <span class="tile-title">Teams</span>
+        <span class="tile-subtitle">Manage HR team members and roll dates</span>
+      </a>
+      <a class="tile-link" href="{% url 'certification_fee_rates' %}">
+        <span class="tile-title">UDIN Certification Fees</span>
+        <span class="tile-subtitle">Bulk Inv TV amt by client and certification service</span>
+      </a>
+      {% if user.is_superuser %}
+      <a class="tile-link" href="{% url 'setup_users' %}">
+        <span class="tile-title">Users</span>
+        <span class="tile-subtitle">Email, active flag, and link to team member</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <p class="muted"><a href="{% url 'home' %}">← Back to Home</a></p>
+  </section>
+</div>
+{% endblock %}

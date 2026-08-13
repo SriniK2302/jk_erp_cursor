@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Work Areas — By Division · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work Areas — By engagement division</h1>
+      <p class="muted">Select a division to open its division-level work areas.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search divisions..."
+          aria-label="Search divisions"
+          data-grid-search
+        >
+        <div class="grid-toolbar-actions">
+          <span class="muted grid-count" data-grid-count></span>
+          {% if user.is_superuser %}
+            <form method="post" class="inline-form" id="bulk-confirmation-mail-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="send_confirmation_mail_all">
+              <input type="hidden" name="status" value="{{ work_area_status_filter|default:'active' }}">
+              <button type="submit" class="button button-compact" id="bulk-confirmation-mail-btn">Send confirmation mail</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+      {% if user.is_superuser %}
+        <div id="bulk-confirmation-progress" class="muted" style="display:none; margin: 8px 0 10px;">
+          <span>Sending confirmation mails... please wait.</span>
+          <div style="height:8px; margin-top:6px; border-radius:999px; background:rgba(255,255,255,0.18); overflow:hidden;">
+            <div id="bulk-confirmation-progress-bar" style="height:8px; width:0%; border-radius:999px; background:#7db7f0; transition:width .18s linear;"></div>
+          </div>
+        </div>
+      {% endif %}
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter divisions">
+        <span class="grid-filter-bar__label muted">View:</span>
+        <a href="{% url 'work_area_pick_division' %}?status=active" class="filter-chip{% if work_area_status_filter == 'active' %} filter-chip--active{% endif %}">Active</a>
+        <a href="{% url 'work_area_pick_division' %}?status=all" class="filter-chip{% if work_area_status_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>FY</th>
+              <th>Service</th>
+              <th>Division</th>
+              <th>Work areas</th>
+              <th class="col-actions">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in divisions %}
+              <tr data-grid-row>
+                <td>{{ item.engagement.client.display_name }}</td>
+                <td>{{ item.engagement.fiscal_year.fy_no }}</td>
+                <td>{{ item.engagement.service.service_desc }}</td>
+                <td>{{ item.division_name }}</td>
+                <td>{{ item.work_area_count }}</td>
+                <td class="col-actions">
+                  <a href="{% url 'engagement_division_work_areas' item.id %}" class="button button-compact">Open</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="6" class="muted">
+                  {% if work_area_status_filter == 'active' %}
+                    No active engagement divisions found.
+                  {% else %}
+                    No engagement divisions found.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching divisions found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'work_area_hub' %}">← Back to Work Areas</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  "use strict";
+  const form = document.getElementById("bulk-confirmation-mail-form");
+  const btn = document.getElementById("bulk-confirmation-mail-btn");
+  const box = document.getElementById("bulk-confirmation-progress");
+  const bar = document.getElementById("bulk-confirmation-progress-bar");
+  if (!form || !btn || !box || !bar) {
+    return;
+  }
+  let timer = null;
+  form.addEventListener("submit", function () {
+    btn.disabled = true;
+    box.style.display = "block";
+    let pct = 8;
+    bar.style.width = pct + "%";
+    timer = window.setInterval(function () {
+      pct = pct >= 92 ? 24 : pct + 8;
+      bar.style.width = pct + "%";
+    }, 180);
+  });
+  window.addEventListener("beforeunload", function () {
+    if (timer) {
+      window.clearInterval(timer);
+    }
+  });
+})();
+</script>
+{% endblock %}

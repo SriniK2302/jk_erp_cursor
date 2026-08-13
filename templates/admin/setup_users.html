@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Users · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Users</h1>
+      <p class="muted">Map each login to an HR team member (optional) and keep email on file. Superusers only.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search users..."
+          aria-label="Search users"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Team member</th>
+              <th>Active</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in users %}
+              <tr data-grid-row>
+                <td>{{ row.username }}</td>
+                <td>{% if row.email %}{{ row.email }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if row.linked_team_member %}
+                    {{ row.linked_team_member.first_name }} {{ row.linked_team_member.last_name }} ({{ row.linked_team_member.code }})
+                    {% if row.linked_team_member.work_email %}
+                      <span class="muted"> · {{ row.linked_team_member.work_email }}</span>
+                    {% endif %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>{% if row.is_active %}Yes{% else %}No{% endif %}</td>
+                <td class="col-actions">
+                  <div class="row-actions">
+                    <a href="{% url 'setup_user_edit' row.id %}" class="icon-btn icon-btn-edit" title="Edit" aria-label="Edit">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">No users found.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching users found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

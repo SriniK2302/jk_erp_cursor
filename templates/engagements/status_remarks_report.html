@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Status Remarks Report · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Status remarks report</h1>
+      <p class="muted">Remarks at engagement, division, and work area levels for engagements you can access.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search client, division, work area, remarks..."
+          aria-label="Search status remarks"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter remark level">
+        <span class="grid-filter-bar__label muted">Level:</span>
+        <a href="{% url 'status_remarks_report' %}?level=all" class="filter-chip{% if remark_level_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+        <a href="{% url 'status_remarks_report' %}?level=engagement" class="filter-chip{% if remark_level_filter == 'engagement' %} filter-chip--active{% endif %}">Engagement</a>
+        <a href="{% url 'status_remarks_report' %}?level=division" class="filter-chip{% if remark_level_filter == 'division' %} filter-chip--active{% endif %}">Division</a>
+        <a href="{% url 'status_remarks_report' %}?level=work_area" class="filter-chip{% if remark_level_filter == 'work_area' %} filter-chip--active{% endif %}">Work area</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap status-remarks-grid">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>FY</th>
+              <th>Service</th>
+              <th>Scope</th>
+              <th>Division</th>
+              <th>Work area</th>
+              <th>Remark date</th>
+              <th class="col-remarks">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td>{{ row.client_name }}</td>
+                <td>{{ row.fy_no }}</td>
+                <td>{{ row.service_desc }}</td>
+                <td>{{ row.scope }}</td>
+                <td>{{ row.division_name }}</td>
+                <td>{{ row.work_area_name }}</td>
+                <td>{{ row.remark_date|date:"Y-m-d" }}</td>
+                <td class="col-remarks">{{ row.remarks }}</td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="8" class="muted">No status remarks found for this level.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching status remarks found.
+      </p>
+    </div>
+
+    <p class="muted"><a href="{% url 'manage_engagements' %}">← Back to Manage Engagements</a></p>
+  </section>
+</div>
+{% endblock %}

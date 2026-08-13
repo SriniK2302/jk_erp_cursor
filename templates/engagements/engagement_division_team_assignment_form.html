@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{% if assignment %}Edit Division Team Assignment{% else %}Add Division Team Assignment{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if assignment %}Edit Division Team Assignment{% else %}Add Division Team Assignment{% endif %}</h1>
+      <p class="muted">
+        {{ division.engagement.client.display_name }} · {{ division.engagement.fiscal_year.fy_no }} · {{ division.engagement.service.service_desc }} · {{ division.division_name }}
+      </p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="form-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      <div class="sap-row">
+        <label for="{{ form.team_member.id_for_label }}">Team Member</label>
+        <div class="sap-control">
+          {{ form.team_member }}
+          {% if form.team_member.errors %}
+            <span class="field-error">{{ form.team_member.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_start.id_for_label }}">Planned Start</label>
+        <div class="sap-control">
+          {{ form.planned_start }}
+          {% if form.planned_start.errors %}
+            <span class="field-error">{{ form.planned_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_finish.id_for_label }}">Planned Finish</label>
+        <div class="sap-control">
+          {{ form.planned_finish }}
+          {% if form.planned_finish.errors %}
+            <span class="field-error">{{ form.planned_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_division_team_assignments' division.id %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if assignment %}Update Assignment{% else %}Save Assignment{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted">
+      Dates are pre-filled from division planned dates. If missing, engagement schedule dates are used.
+      Planned dates must fit the member's role periods (Team Grade Map), or on-roll dates if no grades are mapped.
+      You can add several rows for the same team member with different date ranges; ranges must not overlap (no shared day).
+    </p>
+    <p class="muted"><a href="{% url 'engagement_division_team_assignments' division.id %}">← Back to Division Team Assignments</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  "use strict";
+  const memberSelect = document.getElementById("{{ form.team_member.id_for_label }}");
+  const plannedStartInput = document.getElementById("{{ form.planned_start.id_for_label }}");
+  if (!memberSelect || !plannedStartInput) {
+    return;
+  }
+  let rollMap = {};
+  try {
+    rollMap = JSON.parse(memberSelect.getAttribute("data-roll-earliest-map") || "{}");
+  } catch (err) {
+    rollMap = {};
+  }
+  function autoAdjustPlannedStart() {
+    const selectedId = memberSelect.value;
+    const earliest = rollMap[selectedId];
+    if (!earliest) {
+      plannedStartInput.removeAttribute("min");
+      return;
+    }
+    plannedStartInput.min = earliest;
+    if (plannedStartInput.value && plannedStartInput.value < earliest) {
+      plannedStartInput.value = earliest;
+    }
+  }
+  memberSelect.addEventListener("change", autoAdjustPlannedStart);
+  autoAdjustPlannedStart();
+})();
+</script>
+{% endblock %}

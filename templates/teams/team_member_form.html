@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{% if member %}Edit Team Member{% else %}Add Team Member{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if member %}Edit Team Member{% else %}Add Team Member{% endif %}</h1>
+      <p class="muted">Maintain team member master details in a focused form.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.first_name.id_for_label }}">First Name</label>
+        <div class="sap-control">
+          {{ form.first_name }}
+          {% if form.first_name.errors %}
+            <span class="field-error">{{ form.first_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+        <div class="sap-control">
+          {{ form.last_name }}
+          {% if form.last_name.errors %}
+            <span class="field-error">{{ form.last_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.called_as.id_for_label }}">Called As</label>
+        <div class="sap-control">
+          {{ form.called_as }}
+          {% if form.called_as.errors %}
+            <span class="field-error">{{ form.called_as.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.code.id_for_label }}">Code</label>
+        <div class="sap-control">
+          {{ form.code }}
+          {% if form.code.errors %}
+            <span class="field-error">{{ form.code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.work_email.id_for_label }}">Work email (optional)</label>
+        <div class="sap-control">
+          {{ form.work_email }}
+          <p class="muted" style="margin-top: 0.35rem;">Firm or work inbox for HR listings. Login email stays on the user record (Setup → Users) when you link a user to this member.</p>
+          {% if form.work_email.errors %}
+            <span class="field-error">{{ form.work_email.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'teams' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if member %}Update Team Member{% else %}Save Team Member{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'teams' %}">← Back to Teams</a></p>
+  </section>
+</div>
+{% endblock %}

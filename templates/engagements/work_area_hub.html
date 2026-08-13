@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Work Areas · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work Areas</h1>
+      <p class="muted">
+        Choose whether work areas sit on the whole engagement or on a specific engagement division.
+        Each work area can have several planned/actual schedule rows, bounded by the engagement schedule
+        (and, for divisions, by the division planned dates when set).
+      </p>
+    </header>
+
+    <nav class="tile-grid" aria-label="Work area scope">
+      <a class="tile-link" href="{% url 'work_area_pick_engagement' %}">
+        <span class="tile-title">By engagement</span>
+        <span class="tile-subtitle">Pick an engagement, then define engagement-level work areas and their schedules</span>
+      </a>
+      <a class="tile-link" href="{% url 'work_area_pick_division' %}">
+        <span class="tile-title">By engagement division</span>
+        <span class="tile-subtitle">Pick a division, then define division-level work areas and their schedules</span>
+      </a>
+    </nav>
+
+    <p class="muted"><a href="{% url 'manage_engagements' %}">← Back to Manage Engagements</a></p>
+  </section>
+</div>
+{% endblock %}

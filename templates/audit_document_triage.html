@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Audit document triage · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Audit document triage</h1>
+      <p class="muted">Search a <strong>review folder</strong> (recursive) using the same phrase rules as File Content Search — now including <strong>PDF</strong>, <strong>Word (.docx)</strong>, <strong>PowerPoint (.pptx)</strong>, and <strong>Excel</strong>. Optionally also match the phrase in the <strong>file name</strong>. Then move matches into a category folder under your <strong>destination base</strong> so the review pile shrinks.</p>
+    </header>
+
+    {% if messages %}
+      <ul class="messages" style="list-style: none; padding: 0; margin: 0 0 1rem;">
+        {% for message in messages %}
+          <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <div class="sap-row" style="margin-bottom: 0.75rem;">
+      <label for="triage-source-folder">Review folder</label>
+      <div class="sap-control" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+        <input type="text" id="triage-source-folder" class="utility-input" style="flex: 1; min-width: 12rem;" value="{{ triage_source_folder }}" placeholder="Folder to clear (contains mixed documents)" autocomplete="off">
+        <form method="post" action="{% url 'select_audit_triage_source' %}" class="utility-form-inline">
+          {% csrf_token %}
+          <button type="submit" class="button button-compact button-secondary">Select folder</button>
+        </form>
+      </div>
+    </div>
+    <div class="sap-row" style="margin-bottom: 1rem;">
+      <label for="triage-dest-base">Destination base</label>
+      <div class="sap-control" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+        <input type="text" id="triage-dest-base" class="utility-input" style="flex: 1; min-width: 12rem;" value="{{ triage_dest_base }}" placeholder="Sorted files go under …/01_Audit_Appointment etc." autocomplete="off">
+        <form method="post" action="{% url 'select_audit_triage_dest' %}" class="utility-form-inline">
+          {% csrf_token %}
+          <button type="submit" class="button button-compact button-secondary">Select base</button>
+        </form>
+      </div>
+    </div>
+
+    <style>
+      .audit-triage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+        gap: 0.75rem;
+        align-items: start;
+      }
+      .audit-triage-card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.65rem 0.75rem;
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+      }
+      .audit-triage-card h2 {
+        margin: 0 0 0.25rem;
+        font-size: 1rem;
+      }
+      .audit-triage-card .muted {
+        font-size: 0.82rem;
+        margin: 0 0 0.5rem;
+      }
+      .audit-triage-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.35rem;
+      }
+      .audit-triage-matches {
+        margin: 0.35rem 0 0;
+        padding-left: 1rem;
+        max-height: 7rem;
+        overflow: auto;
+        font-size: 0.82rem;
+      }
+      .audit-triage-status {
+        margin: 0.35rem 0 0;
+        font-size: 0.82rem;
+      }
+    </style>
+
+    <div class="audit-triage-grid" aria-label="Triage categories">
+      {% for c in categories %}
+        <article class="audit-triage-card" data-folder-slug="{{ c.folder_slug }}">
+          <h2>{{ c.label }}</h2>
+          <p class="muted">{{ c.notes }}</p>
+          <label class="muted utility-label" for="phrase-{{ c.key }}">Phrase (in order, first 500 words of extracted text)</label>
+          <input type="text" id="phrase-{{ c.key }}" class="utility-input" value="{{ c.default_phrase }}" autocomplete="off">
+          <label style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.35rem; font-size: 0.88rem; cursor: pointer;">
+            <input type="checkbox" id="inc-{{ c.key }}" checked>
+            Also match file name
+          </label>
+          <label class="muted utility-label" for="slug-{{ c.key }}" style="margin-top: 0.35rem;">Target subfolder</label>
+          <input type="text" id="slug-{{ c.key }}" class="utility-input" value="{{ c.folder_slug }}" readonly>
+          <div class="audit-triage-actions">
+            <button type="button" class="button button-compact" data-search="{{ c.key }}">Search</button>
+            <button type="button" class="button button-compact button-secondary" data-move="{{ c.key }}" disabled>Move matches</button>
+          </div>
+          <p class="audit-triage-status muted" id="status-{{ c.key }}" aria-live="polite"></p>
+          <ul class="audit-triage-matches muted" id="matches-{{ c.key }}" hidden></ul>
+        </article>
+      {% endfor %}
+    </div>
+
+    <p class="muted" style="margin-top: 1.25rem;">
+      <a href="{% url 'audit_document_renaming_filing' %}">← Audit rules</a>
+      ·
+      <a href="{% url 'utilities' %}">File and Folder Utilities</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    var scanUrl = "{% url 'audit_triage_scan' %}";
+    var moveUrl = "{% url 'audit_triage_move' %}";
+    var csrf = document.querySelector("[name=csrfmiddlewaretoken]");
+    var csrfVal = csrf ? csrf.value : "";
+    var srcEl = document.getElementById("triage-source-folder");
+    var destEl = document.getElementById("triage-dest-base");
+    var lastByKey = {};
+
+    function setStatus(key, text) {
+      var el = document.getElementById("status-" + key);
+      if (el) el.textContent = text || "";
+    }
+
+    function renderMatches(key, paths) {
+      var ul = document.getElementById("matches-" + key);
+      var btnMove = document.querySelector("[data-move=\"" + key + "\"]");
+      if (!ul) return;
+      ul.innerHTML = "";
+      if (!paths || !paths.length) {
+        ul.hidden = true;
+        if (btnMove) btnMove.disabled = true;
+        return;
+      }
+      ul.hidden = false;
+      paths.forEach(function (p) {
+        var li = document.createElement("li");
+        li.textContent = p;
+        ul.appendChild(li);
+      });
+      if (btnMove) btnMove.disabled = false;
+    }
+
+    document.querySelectorAll("[data-search]").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        var key = btn.getAttribute("data-search");
+        var phraseEl = document.getElementById("phrase-" + key);
+        var incEl = document.getElementById("inc-" + key);
+        var folder = srcEl ? srcEl.value.trim() : "";
+        var phrase = phraseEl ? phraseEl.value.trim() : "";
+        if (!folder) {
+          setStatus(key, "Set review folder first.");
+          return;
+        }
+        if (!phrase) {
+          setStatus(key, "Enter a phrase.");
+          return;
+        }
+        setStatus(key, "Searching…");
+        renderMatches(key, []);
+        lastByKey[key] = [];
+        var fd = new FormData();
+        fd.append("csrfmiddlewaretoken", csrfVal);
+        fd.append("triage_source_folder", folder);
+        fd.append("phrase", phrase);
+        if (incEl && incEl.checked) fd.append("include_filename", "1");
+        try {
+          var res = await fetch(scanUrl, { method: "POST", body: fd, headers: { "X-Requested-With": "XMLHttpRequest" } });
+          var data = await res.json();
+          if (!data.ok) throw new Error(data.message || "Search failed");
+          lastByKey[key] = data.matches || [];
+          setStatus(key, data.message + (data.warning ? " " + data.warning : ""));
+          renderMatches(key, lastByKey[key]);
+        } catch (e) {
+          setStatus(key, e.message || "Search error");
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-move]").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        var key = btn.getAttribute("data-move");
+        var paths = lastByKey[key] || [];
+        var slugEl = document.getElementById("slug-" + key);
+        var folder = srcEl ? srcEl.value.trim() : "";
+        var dest = destEl ? destEl.value.trim() : "";
+        var slug = slugEl ? slugEl.value.trim() : "";
+        if (!paths.length) {
+          setStatus(key, "Search first — no matches to move.");
+          return;
+        }
+        if (!dest) {
+          setStatus(key, "Set destination base first.");
+          return;
+        }
+        setStatus(key, "Moving…");
+        var fd = new FormData();
+        fd.append("csrfmiddlewaretoken", csrfVal);
+        fd.append("triage_source_folder", folder);
+        fd.append("triage_dest_base", dest);
+        fd.append("folder_slug", slug);
+        fd.append("paths_json", JSON.stringify(paths));
+        try {
+          var res = await fetch(moveUrl, { method: "POST", body: fd, headers: { "X-Requested-With": "XMLHttpRequest" } });
+          var data = await res.json();
+          if (!data.ok) throw new Error(data.message || "Move failed");
+          setStatus(key, data.message + (data.warning ? " " + data.warning : ""));
+          lastByKey[key] = [];
+          renderMatches(key, []);
+        } catch (e) {
+          setStatus(key, e.message || "Move error");
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

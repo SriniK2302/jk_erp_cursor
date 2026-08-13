@@ -1,0 +1,144 @@
+{
+  "version": 2,
+  "description": "Canonical Word placeholders for engagement documentation templates. Use the exact `token` string in the .docx body. Fill Word supplies values from the engagement, client, fiscal year, mapping list date, and `settings.INVOICE_LETTERHEAD` where noted.",
+  "tokens": [
+    {
+      "id": "letter_date",
+      "token": "{{LETTER_DATE}}",
+      "required": true,
+      "notes": "List date from the documentation mapping when Fill Word is used (d.m.y, e.g. 1.7.2025); otherwise today’s local date."
+    },
+    {
+      "id": "mr_date",
+      "token": "{{MR_DATE}}",
+      "required": false,
+      "notes": "Same value as {{LETTER_DATE}} — use in management-representation / MR templates."
+    },
+    {
+      "id": "client_name",
+      "token": "{{CLIENT_NAME}}",
+      "required": true,
+      "notes": "Legal / display client name."
+    },
+    {
+      "id": "client_place",
+      "token": "{{CLIENT_PLACE}}",
+      "required": false,
+      "notes": "Short place under client name: `Client.area` if set, else first segment of `city_state_pincode` before a comma, else full `city_state_pincode`."
+    },
+    {
+      "id": "client_address_line_1",
+      "token": "{{CLIENT_ADDRESS_LINE_1}}",
+      "required": false,
+      "notes": "Client address line 1"
+    },
+    {
+      "id": "client_address_line_2",
+      "token": "{{CLIENT_ADDRESS_LINE_2}}",
+      "required": false,
+      "notes": "Client address line 2"
+    },
+    {
+      "id": "client_address_line_3",
+      "token": "{{CLIENT_ADDRESS_LINE_3}}",
+      "required": false,
+      "notes": "Client address line 3"
+    },
+    {
+      "id": "fy_year",
+      "token": "{{FY_YEAR}}",
+      "required": true,
+      "notes": "Fiscal year code (e.g. FY26)."
+    },
+    {
+      "id": "fy_end_year",
+      "token": "{{FY_END_YEAR}}",
+      "required": false,
+      "notes": "Calendar year of the fiscal year `end_date` (e.g. 2026 for year ended 31 March 2026)."
+    },
+    {
+      "id": "fy_end_date_phrase",
+      "token": "{{FY_END_DATE_PHRASE}}",
+      "required": false,
+      "notes": "Fiscal year end in words: `31 March 2026` from `FiscalYear.end_date`."
+    },
+    {
+      "id": "fy_end_day_month",
+      "token": "{{FY_END_DAY_MONTH}}",
+      "required": false,
+      "notes": "Day and month only: `31 March` (no year)."
+    },
+    {
+      "id": "year_ended_phrase",
+      "token": "{{YEAR_ENDED_PHRASE}}",
+      "required": false,
+      "notes": "Literal phrase: `year ended 31 March 2026` when end date exists; empty otherwise."
+    },
+    {
+      "id": "frf",
+      "token": "{{FRF}}",
+      "required": false,
+      "notes": "Firm PAN / GST line from letterhead."
+    },
+    {
+      "id": "audit_fee_amount",
+      "token": "{{AUDIT_FEE_AMOUNT}}",
+      "required": false,
+      "notes": "Engagement audit fee in figures when set."
+    },
+    {
+      "id": "audit_fee_words",
+      "token": "{{AUDIT_FEE_WORDS}}",
+      "required": false,
+      "notes": "Reserved for fee in words (not populated yet)."
+    },
+    {
+      "id": "partner_name",
+      "token": "{{PARTNER_NAME}}",
+      "required": false,
+      "notes": "Letterhead `authorised_signatory_name` (firm signatory on invoices — not the client MR signatory)."
+    },
+    {
+      "id": "membership_no",
+      "token": "{{MEMBERSHIP_NO}}",
+      "required": false,
+      "notes": "Reserved for ICAI membership no. (not populated yet)."
+    },
+    {
+      "id": "service_desc",
+      "token": "{{SERVICE_DESC}}",
+      "required": false,
+      "notes": "Engagement service description."
+    },
+    {
+      "id": "auditor_to_line_1",
+      "token": "{{AUDITOR_TO_LINE_1}}",
+      "required": false,
+      "notes": "Firm name for “To” block: `INVOICE_LETTERHEAD.firm_name` (title-cased if all caps)."
+    },
+    {
+      "id": "auditor_to_line_2",
+      "token": "{{AUDITOR_TO_LINE_2}}",
+      "required": false,
+      "notes": "Second line: `firm_subtitle` (e.g. Chartered Accountants)."
+    },
+    {
+      "id": "auditor_to_line_3",
+      "token": "{{AUDITOR_TO_LINE_3}}",
+      "required": false,
+      "notes": "Office city: `firm_office_city` if set in letterhead, else parsed from last segment of `address_line_1` before 6-digit PIN."
+    },
+    {
+      "id": "signatory_name",
+      "token": "{{SIGNATORY_NAME}}",
+      "required": false,
+      "notes": "Client `contact_person` (management representation signatory). Extend master data if you need a dedicated director field."
+    },
+    {
+      "id": "signatory_designation",
+      "token": "{{SIGNATORY_DESIGNATION}}",
+      "required": false,
+      "notes": "Optional: `INVOICE_LETTERHEAD.management_rep_signatory_designation` for a firm-wide default; empty if unset."
+    }
+  ]
+}

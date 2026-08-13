@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Fiscal Years · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Fiscal Years</h1>
+      <p class="muted">Maintain financial years used by GL processes.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search fiscal years..."
+          aria-label="Search fiscal years"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>FY No</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>User</th>
+              <th>Created On</th>
+              <th>Updated On</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fy in fiscal_years %}
+              <tr data-grid-row>
+                <td>{{ fy.fy_no }}</td>
+                <td>{{ fy.start_date|date:"Y-m-d" }}</td>
+                <td>{{ fy.end_date|date:"Y-m-d" }}</td>
+                <td>{{ fy.created_by.username }}</td>
+                <td>{{ fy.created_on|date:"Y-m-d H:i" }}</td>
+                <td>{{ fy.updated_on|date:"Y-m-d H:i" }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="fiscal_years" edit_url_name="fiscal_year_edit" edit_pk=fy.id pk=fy.id delete_action="delete" confirm_message="Delete this fiscal year?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="7" class="muted">No fiscal years added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching fiscal years found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'fiscal_year_create' %}" class="button">Add Fiscal Year</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

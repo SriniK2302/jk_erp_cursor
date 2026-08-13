@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Work area notes · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work area notes</h1>
+      <p class="muted">{{ notes_list_subtitle }}</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root data-grid-no-resize="1" data-grid-id="{{ notes_list_grid_id }}">
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search work area, subject, details..."
+          aria-label="Search work area notes"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap work-area-notes-list-grid">
+          <thead>
+            <tr>
+              <th class="col-work-area">Work area</th>
+              <th class="col-date">Date</th>
+              <th class="col-type">Type</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-details">Details</th>
+              <th class="col-responses">Responses</th>
+              <th class="col-status">Status</th>
+              <th class="col-open">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if is_division_scope %}
+              {% regroup rows by division_work_area.work_area_name as grouped_rows %}
+              {% for group in grouped_rows %}
+                {% for row in group.list %}
+                  <tr data-grid-row{% if forloop.last %} class="work-area-group-end"{% endif %}>
+                    <td class="col-work-area">{{ row.division_work_area.work_area_name }}</td>
+                    <td class="col-date">{{ row.query_date|date:"Y-m-d" }}</td>
+                    <td class="col-type">{{ row.get_entry_type_display }}</td>
+                    <td class="col-subject">{{ row.subject }}</td>
+                    <td class="col-details">{{ row.query_text }}</td>
+                    <td class="col-responses">{{ row.response_count }}</td>
+                    <td class="col-status">{{ row.get_status_display }}</td>
+                    <td class="col-open"><a href="{% url 'engagement_division_work_area_queries' division.id row.division_work_area.id %}">Open</a></td>
+                  </tr>
+                {% endfor %}
+              {% empty %}
+                <tr data-grid-empty>
+                  <td colspan="8" class="muted">{{ notes_list_empty_message }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              {% regroup rows by engagement_work_area.work_area_name as grouped_rows %}
+              {% for group in grouped_rows %}
+                {% for row in group.list %}
+                  <tr data-grid-row{% if forloop.last %} class="work-area-group-end"{% endif %}>
+                    <td class="col-work-area">{{ row.engagement_work_area.work_area_name }}</td>
+                    <td class="col-date">{{ row.query_date|date:"Y-m-d" }}</td>
+                    <td class="col-type">{{ row.get_entry_type_display }}</td>
+                    <td class="col-subject">{{ row.subject }}</td>
+                    <td class="col-details">{{ row.query_text }}</td>
+                    <td class="col-responses">{{ row.response_count }}</td>
+                    <td class="col-status">{{ row.get_status_display }}</td>
+                    <td class="col-open"><a href="{% url 'engagement_work_area_queries' engagement.id row.engagement_work_area.id %}">Open</a></td>
+                  </tr>
+                {% endfor %}
+              {% empty %}
+                <tr data-grid-empty>
+                  <td colspan="8" class="muted">{{ notes_list_empty_message }}</td>
+                </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching notes found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="{{ notes_list_back_url }}">{{ notes_list_back_label }}</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Invoices · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Manage Invoices</h1>
+      <p class="muted">Choose a module: invoices, UDIN data, receipts, or reports.</p>
+    </header>
+
+    <nav class="tile-grid" aria-label="Sales and UDIN modules">
+      <a class="tile-link" href="{% url 'invoices' %}">
+        <span class="tile-title">Invoices</span>
+        <span class="tile-subtitle">Review issued invoices, add rows, preview and edit</span>
+      </a>
+      <a class="tile-link" href="{% url 'udins' %}">
+        <span class="tile-title">UDINs</span>
+        <span class="tile-subtitle">Manage working UDIN records and import from source</span>
+      </a>
+      <a class="tile-link" href="{% url 'udins_source' %}">
+        <span class="tile-title">UDIN Source</span>
+        <span class="tile-subtitle">Import ICAI UDIN Excel and maintain header mapping</span>
+      </a>
+      <a class="tile-link" href="{% url 'receipts' %}">
+        <span class="tile-title">Receipts</span>
+        <span class="tile-subtitle">Record and track payment receipts (coming soon)</span>
+      </a>
+      <a class="tile-link" href="{% url 'invoice_reports' %}">
+        <span class="tile-title">Reports</span>
+        <span class="tile-subtitle">Sales and invoice reports (links will be added here)</span>
+      </a>
+    </nav>
+
+    <p class="muted">
+      <a href="{% url 'setup' %}">← Back to Setup</a>
+      ·
+      <a href="{% url 'home' %}">← Back to Home</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

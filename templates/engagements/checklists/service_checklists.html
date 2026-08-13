@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Statutory Audit Check List · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Statutory Audit Check List</h1>
+      <p class="muted">
+        For each service, pick one work area at a time, or add a new one on a clean screen.
+        Checklist lines stay saved when you switch work areas.
+      </p>
+    </header>
+
+    {% if no_services %}
+      <p class="muted">Add at least one service under Setup before defining check lists.</p>
+      <p class="muted"><a href="{% url 'services' %}">Go to Services</a></p>
+    {% else %}
+      {% url 'engagement_checklist_templates' as checklist_base %}
+      <form method="get" class="sap-form engagement-checklist-service-form" action="">
+        <div class="sap-row">
+          <label for="checklist-service-select">Service</label>
+          <div class="sap-control">
+            <select id="checklist-service-select" name="service" class="input-long" onchange="this.form.submit()">
+              {% for s in services %}
+                <option value="{{ s.id }}"{% if s.id == selected_service_id %} selected{% endif %}>
+                  {{ s.service_desc }} ({{ s.service_code }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </form>
+
+      {% if work_area_spinner_list or is_new_work_area %}
+        <div class="engagement-checklist-wa-nav" data-checklist-wa-nav>
+          <div class="engagement-checklist-wa-nav__top">
+            <div class="engagement-checklist-wa-nav__spinner">
+              <label for="wa-spinner">Work area</label>
+              <div class="engagement-checklist-wa-nav__controls">
+                {% if prev_wa_url %}
+                  <a href="{{ prev_wa_url }}" class="button button-secondary button-compact engagement-checklist-wa-step" title="Previous work area">◀</a>
+                {% else %}
+                  <span class="button button-secondary button-compact engagement-checklist-wa-step is-disabled" title="No previous work area">◀</span>
+                {% endif %}
+                <select
+                  id="wa-spinner"
+                  class="input-long engagement-checklist-wa-select"
+                  aria-label="Select work area"
+                  onchange="if (this.value) window.location.href = this.value;"
+                >
+                  {% for w in work_area_spinner_list %}
+                    <option
+                      value="{{ checklist_base }}?service={{ selected_service_id }}&work_area={{ w.id }}"
+                      {% if focused_work_area and focused_work_area.pk == w.pk %}selected{% endif %}
+                    >{{ w.name }}</option>
+                  {% endfor %}
+                  <option value="{{ new_work_area_url }}"{% if is_new_work_area %} selected{% endif %}>— New work area —</option>
+                </select>
+                {% if next_wa_url %}
+                  <a href="{{ next_wa_url }}" class="button button-secondary button-compact engagement-checklist-wa-step" title="Next work area">▶</a>
+                {% else %}
+                  <span class="button button-secondary button-compact engagement-checklist-wa-step is-disabled" title="No next work area">▶</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="engagement-checklist-wa-nav__actions">
+              {% if focused_work_area %}
+                <button type="button" class="button button-secondary button-compact" data-wa-rename-open title="Edit work area name">Edit</button>
+              {% endif %}
+              <a href="{{ new_work_area_url }}" class="button button-compact engagement-checklist-wa-nav__add" title="Open a clear screen to add another work area (existing areas stay saved)">New work area</a>
+            </div>
+          </div>
+          {% if focused_work_area %}
+            <form method="post" class="engagement-checklist-wa-nav__rename" data-wa-rename-panel autocomplete="off" hidden>
+              {% csrf_token %}
+              <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+              <input type="hidden" name="action" value="rename_work_area">
+              <input type="hidden" name="work_area_id" value="{{ focused_work_area.pk }}">
+              <label class="visually-hidden" for="wa-nav-name-{{ focused_work_area.pk }}">Edit work area name</label>
+              <input
+                id="wa-nav-name-{{ focused_work_area.pk }}"
+                type="text"
+                name="work_area_name"
+                value="{{ focused_work_area.name }}"
+                maxlength="200"
+                class="input-medium"
+                data-wa-rename-input
+                data-original-value="{{ focused_work_area.name }}"
+              >
+              <button type="submit" class="button button-secondary button-compact" title="Save work area name">Save</button>
+              <button type="button" class="button button-secondary button-compact" data-wa-rename-cancel title="Cancel editing">Cancel</button>
+            </form>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="engagement-checklist-wa-nav engagement-checklist-wa-nav--empty">
+          <p class="muted engagement-checklist-wa-nav__empty-msg">No work areas for this service yet.</p>
+          <a href="{{ new_work_area_url }}" class="button button-compact engagement-checklist-wa-nav__add" title="Open a clear screen to add a work area">New work area</a>
+        </div>
+      {% endif %}
+
+      {% if is_new_work_area %}
+        <section class="engagement-checklist-work-area engagement-checklist-work-area--clean">
+          <h2 class="engagement-checklist-clean-title">New work area</h2>
+          <p class="muted">
+            Existing work areas for this service stay saved in the database.
+            Enter a name and save to add another.
+          </p>
+          <form method="post" class="engagement-checklist-new-wa-form" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+            <input type="hidden" name="action" value="add_work_area">
+            <label class="visually-hidden" for="new-work-area-name">Work area name</label>
+            <input id="new-work-area-name" type="text" name="work_area_name" maxlength="200" class="input-medium" placeholder="Work area name" autofocus>
+            <button type="submit" class="button button-secondary button-compact" title="Save new work area">Save</button>
+          </form>
+          <p class="muted engagement-checklist-cancel-row">
+            <a href="{{ checklist_base }}?service={{ selected_service_id }}{% if work_area_spinner_list %}&work_area={{ work_area_spinner_list.0.pk }}{% endif %}">Cancel</a>
+          </p>
+        </section>
+      {% elif focused_work_area %}
+        {% with wa=focused_work_area %}
+        <section class="engagement-checklist-work-area">
+          <header class="engagement-checklist-work-area__head">
+            <p class="engagement-checklist-wa-panel-intro muted">Checklist lines for <strong>{{ wa.name }}</strong></p>
+            <form method="post" class="inline-form engagement-checklist-remove-wa" onsubmit="return confirm('Remove this work area and all of its checklist items?');" autocomplete="off">
+              {% csrf_token %}
+              <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+              <input type="hidden" name="action" value="delete_work_area">
+              <input type="hidden" name="work_area_id" value="{{ wa.id }}">
+              <button type="submit" class="icon-btn icon-btn-danger" title="Remove this work area and all checklist items" aria-label="Remove this work area and all checklist items">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </button>
+            </form>
+          </header>
+
+          <div class="engagement-checklist-items-header" aria-hidden="true">
+            <span class="engagement-checklist-sl-h">Sl.</span>
+            <span class="engagement-checklist-col-item">Checklist item</span>
+            <span class="engagement-checklist-col-actions"></span>
+          </div>
+
+          <form method="post" class="engagement-checklist-add-line-top" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+            <input type="hidden" name="action" value="add_item">
+            <input type="hidden" name="work_area_id" value="{{ wa.id }}">
+            <span class="engagement-checklist-sl engagement-checklist-sl--next" title="Next serial no.">{{ wa.items.count|add:1 }}</span>
+            <div class="engagement-checklist-add-line-top__fields">
+              <label class="visually-hidden" for="new-item-{{ wa.id }}">New checklist item</label>
+              <textarea id="new-item-{{ wa.id }}" name="item_line" maxlength="500" class="input-long engagement-checklist-text-autogrow" rows="1" data-autogrow placeholder="New actionable line for the team…"></textarea>
+              <button type="submit" class="button button-compact" title="Add this line">Add</button>
+            </div>
+            <span class="engagement-checklist-add-line-top__spacer" aria-hidden="true"></span>
+          </form>
+
+          <ul class="engagement-checklist-items">
+            {% for it in wa.items.all %}
+              <li class="engagement-checklist-items__row">
+                <span class="engagement-checklist-sl" title="Serial no. within this work area">{{ forloop.counter }}</span>
+                <form method="post" class="engagement-checklist-item-row-form" autocomplete="off">
+                  {% csrf_token %}
+                  <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+                  <input type="hidden" name="action" value="update_item">
+                  <input type="hidden" name="item_id" value="{{ it.id }}">
+                  <label class="visually-hidden" for="item-line-{{ it.id }}">Checklist item {{ forloop.counter }}</label>
+                  <textarea
+                    id="item-line-{{ it.id }}"
+                    name="item_line"
+                    maxlength="500"
+                    class="input-long engagement-checklist-text-autogrow"
+                    rows="1"
+                    data-autogrow
+                  >{{ it.line_text }}</textarea>
+                  <button type="submit" class="icon-btn icon-btn-muted engagement-checklist-item-save" title="Save this line" aria-label="Save this line">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                  </button>
+                </form>
+                <form method="post" class="inline-form engagement-checklist-item-delete" onsubmit="return confirm('Remove this checklist line?');" autocomplete="off">
+                  {% csrf_token %}
+                  <input type="hidden" name="service_id" value="{{ selected_service_id }}">
+                  <input type="hidden" name="action" value="delete_item">
+                  <input type="hidden" name="item_id" value="{{ it.id }}">
+                  <button type="submit" class="icon-btn icon-btn-danger" title="Remove this checklist line" aria-label="Remove this checklist line">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
+                </form>
+              </li>
+            {% empty %}
+              <li class="engagement-checklist-items__row engagement-checklist-items__row--empty muted" role="status">
+                <span class="engagement-checklist-sl">—</span>
+                <span class="engagement-checklist-empty-msg">No checklist items yet. Use <strong>Add</strong> above.</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endwith %}
+      {% endif %}
+    {% endif %}
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/engagement-checklist-autogrow.js' %}"></script>
+{% endblock %}

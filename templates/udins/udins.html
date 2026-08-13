@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}UDINs · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>UDINs</h1>
+      <p class="muted">Working UDIN register — copy from UDIN Source, then bill via Invoices.</p>
+    </header>
+
+    {% if bulk_zip_download_url %}
+      <div class="home-frame" style="margin-bottom: 0.75rem; padding: 0.75rem 1rem; border: 1px solid var(--border, #444); border-radius: 6px;">
+        <p style="margin: 0 0 0.5rem 0;"><strong>Bulk invoice PDFs ready</strong></p>
+        <p class="muted" style="margin: 0 0 0.75rem 0;">
+          ZIP is saved on the server under <code>media/bulk_invoice_exports/</code> and can be downloaded again here.
+        </p>
+        <a href="{{ bulk_zip_download_url }}" class="button">Download invoice PDFs (ZIP)</a>
+      </div>
+    {% endif %}
+
+    <div class="sales-top-actions">
+      <form method="post" class="sales-top-actions__import">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="import_from_source">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <button type="submit" class="button button-secondary" title="Copy each source row onto the UDINs register. Source rows are kept unchanged.">
+          Copy from UDIN Source
+        </button>
+      </form>
+      <a href="{% url 'udins_source' %}" class="button button-secondary">UDIN Source</a>
+      <a href="{% url 'invoices' %}" class="button button-secondary">Invoices</a>
+      <a href="{% url 'sales_hub' %}" class="button button-secondary">Manage Invoices</a>
+    </div>
+
+    <div class="udins-bulk-actions">
+      <form method="post" class="udins-bulk-row udins-bulk-row--fee">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_fill_client_from_remarks">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks udins-bulk-remarks--spacer" aria-hidden="true"></div>
+        <div class="udins-bulk-main udins-bulk-main--fee">
+          <p class="muted" style="margin:0;align-self:center;">
+            Set Client from client code in Remarks (all UDINs — e.g. SVSM in “20260511 SVSM CGP Certificate …”).
+          </p>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Fill Client from Remarks</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_update_client_by_remarks_prefix">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks">
+          <label class="udins-bulk-label" for="{{ bulk_client_form.prefix.id_for_label }}">{{ bulk_client_form.prefix.label }}</label>
+          {{ bulk_client_form.prefix }}
+        </div>
+        <div class="udins-bulk-main">
+          <div class="udins-bulk-field">
+            <label class="udins-bulk-label" for="{{ bulk_client_form.client.id_for_label }}">{{ bulk_client_form.client.label }}</label>
+            {{ bulk_client_form.client }}
+          </div>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Update Client by Text Match</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_update_service_by_remarks_prefix">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks">
+          <label class="udins-bulk-label" for="{{ bulk_service_form.prefix.id_for_label }}">{{ bulk_service_form.prefix.label }}</label>
+          {{ bulk_service_form.prefix }}
+        </div>
+        <div class="udins-bulk-main">
+          <div class="udins-bulk-field">
+            <label class="udins-bulk-label" for="{{ bulk_service_form.service.id_for_label }}">{{ bulk_service_form.service.label }}</label>
+            {{ bulk_service_form.service }}
+          </div>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Update Service by Text Match</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row udins-bulk-row--fee">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_update_inv_tv_by_client_service">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks udins-bulk-remarks--spacer" aria-hidden="true"></div>
+        <div class="udins-bulk-main udins-bulk-main--fee">
+          <div class="udins-bulk-field">
+            <label class="udins-bulk-label" for="{{ bulk_inv_tv_form.client.id_for_label }}">{{ bulk_inv_tv_form.client.label }}</label>
+            {{ bulk_inv_tv_form.client }}
+          </div>
+          <div class="udins-bulk-field">
+            <label class="udins-bulk-label" for="{{ bulk_inv_tv_form.service.id_for_label }}">{{ bulk_inv_tv_form.service.label }}</label>
+            {{ bulk_inv_tv_form.service }}
+          </div>
+          <div class="udins-bulk-field">
+            <label class="udins-bulk-label" for="{{ bulk_inv_tv_form.fee_amount.id_for_label }}">{{ bulk_inv_tv_form.fee_amount.label }}</label>
+            {{ bulk_inv_tv_form.fee_amount }}
+          </div>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Set Inv TV by Client + Service</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row udins-bulk-row--fee">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_fill_service_remarks_certification">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks udins-bulk-remarks--spacer" aria-hidden="true"></div>
+        <div class="udins-bulk-main udins-bulk-main--fee">
+          <p class="muted" style="margin:0;align-self:center;">
+            Certification only: drop client code from Remarks into Service remarks (for invoice narration).
+          </p>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Fill service remarks (Certification)</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row udins-bulk-row--fee">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_fill_service_fy">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks udins-bulk-remarks--spacer" aria-hidden="true"></div>
+        <div class="udins-bulk-main udins-bulk-main--fee">
+          <p class="muted" style="margin:0;align-self:center;">
+            Certification: Service FY from document date only. Audit: FY26/FY27 from remarks or AY/FY.
+          </p>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Fill Service FY</button>
+        </div>
+      </form>
+
+      <form method="post" class="udins-bulk-row udins-bulk-row--fee">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_apply_certification_fees">
+        <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+        <div class="udins-bulk-remarks udins-bulk-remarks--spacer" aria-hidden="true"></div>
+        <div class="udins-bulk-main udins-bulk-main--fee">
+          <p class="muted" style="margin:0;align-self:center;">
+            All Certification UDINs: set Inv TV amt from client fee periods (Engagements → Certification fees). Blank amounts only — one click, every applicable row.
+          </p>
+        </div>
+        <div class="udins-bulk-submit">
+          <button type="submit" class="button button-secondary">Fill Inv TV amt (Certification)</button>
+        </div>
+      </form>
+    </div>
+
+    <form id="udins-bulk-invoice-form" method="post" action="" class="visually-hidden" aria-hidden="true">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="bulk_generate_invoices">
+      <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+    </form>
+
+    <div class="grid-panel" data-grid-root data-grid-id="udins" data-grid-layout-version="2" data-default-sort-col="3" data-default-sort-dir="asc">
+      <div class="grid-filter-bar">
+        <span class="grid-filter-bar__label muted">Invoice Status:</span>
+        <a
+          href="?invoice_status=all"
+          class="filter-chip {% if invoice_status == 'all' %}filter-chip--active{% endif %}"
+        >
+          Show All
+        </a>
+        <a
+          href="?invoice_status=invoiced"
+          class="filter-chip {% if invoice_status == 'invoiced' %}filter-chip--active{% endif %}"
+        >
+          Invoiced
+        </a>
+        <a
+          href="?invoice_status=pending"
+          class="filter-chip {% if invoice_status == 'pending' %}filter-chip--active{% endif %}"
+        >
+          Pending
+        </a>
+      </div>
+      <div class="grid-toolbar">
+        <button type="submit" form="udins-bulk-invoice-form" class="button button-secondary" title="Creates one invoice per selected UDIN and downloads a ZIP of A4 PDFs. Uses Microsoft Edge when available; otherwise run: playwright install chromium">
+          Generate invoices (PDF ZIP)…
+        </button>
+        <input type="search" class="grid-search" placeholder="Search UDINs..." aria-label="Search UDINs" data-grid-search>
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+      <div class="table-wrap" data-udins-scroll-top style="margin-bottom: 4px;">
+        <div data-udins-scroll-inner style="height: 1px;"></div>
+      </div>
+      <div class="table-wrap" data-udins-scroll-bottom>
+        <table class="data-grid udins-grid">
+          <colgroup>
+            <col style="width:2.75rem">
+            <col style="width:10rem">
+            <col style="width:10.5rem">
+            <col style="width:6.25rem">
+            <col style="width:5.5rem">
+            <col style="width:7.5rem">
+            <col style="width:6.25rem">
+            <col style="width:4.25rem">
+            <col style="width:24rem">
+            <col style="width:4rem">
+            <col style="width:7.5rem">
+            <col style="width:5.5rem">
+            <col style="width:5.25rem">
+            <col style="width:7.8rem">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="col-select" scope="col">
+                <input type="checkbox" data-udins-select-all title="Select all eligible UDINs on this page" aria-label="Select all eligible UDINs on this page">
+              </th>
+              <th>UDIN No</th>
+              <th class="col-remarks">Remarks</th>
+              <th class="col-signing-date">Date of signing<br>of document</th>
+              <th>Create Date</th>
+              <th>Client</th>
+              <th>Service</th>
+              <th>Service FY</th>
+              <th class="col-service-remarks" data-col-min-px="352">Service remarks</th>
+              <th>Status</th>
+              <th>Inv No</th>
+              <th>Inv Date</th>
+              <th>Inv TV amt</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td class="col-select">
+                  {% if not row.is_invoiced %}
+                    <input type="checkbox" name="udin_ids" value="{{ row.id }}" form="udins-bulk-invoice-form" aria-label="Select UDIN {{ row.udin }}">
+                  {% endif %}
+                </td>
+                <td>{{ row.udin }}</td>
+                <td class="col-remarks">{{ row.remarks }}</td>
+                <td class="col-signing-date">{{ row.date_of_signing_of_document }}</td>
+                <td>{{ row.create_date|date:"d-m-Y" }}</td>
+                <td>{% if row.client %}{{ row.client.client_short_name }}{% endif %}</td>
+                <td>{% if row.service %}{{ row.service.service_desc }}{% endif %}</td>
+                <td>{{ row.ay_fy }}</td>
+                <td class="col-service-remarks">{{ row.service_remarks }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.inv_no }}</td>
+                <td>{{ row.inv_date|date:"d-m-Y" }}</td>
+                <td>{% if row.inv_tv_amount is not None %}{{ row.inv_tv_amount|floatformat:"0g" }}{% endif %}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="udins" edit_url_name="udin_edit" edit_pk=row.id pk=row.id delete_action="delete" confirm_message="Delete this UDIN?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="14" class="muted">No UDIN records yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted grid-no-results" data-grid-no-results hidden>No matching UDINs found.</p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'udin_create' %}" class="button">Add UDIN</a>
+    </div>
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const root = document.querySelector("[data-grid-root]");
+    const selectAll = document.querySelector("[data-udins-select-all]");
+    if (root && selectAll) {
+      const eligible = () =>
+        Array.from(root.querySelectorAll('input[name="udin_ids"][form="udins-bulk-invoice-form"]'));
+      selectAll.addEventListener("change", function () {
+        const on = selectAll.checked;
+        eligible().forEach(function (cb) {
+          cb.checked = on;
+        });
+      });
+      root.addEventListener("change", function (e) {
+        const t = e.target;
+        if (!t || t.name !== "udin_ids") {
+          return;
+        }
+        const boxes = eligible();
+        if (!boxes.length) {
+          selectAll.checked = false;
+          selectAll.indeterminate = false;
+          return;
+        }
+        const n = boxes.filter(function (b) {
+          return b.checked;
+        }).length;
+        selectAll.checked = n === boxes.length;
+        selectAll.indeterminate = n > 0 && n < boxes.length;
+      });
+    }
+
+    const topWrap = document.querySelector("[data-udins-scroll-top]");
+    const topInner = document.querySelector("[data-udins-scroll-inner]");
+    const bottomWrap = document.querySelector("[data-udins-scroll-bottom]");
+    const table = bottomWrap ? bottomWrap.querySelector(".data-grid") : null;
+    if (!topWrap || !topInner || !bottomWrap || !table) {
+      return;
+    }
+
+    function syncWidth() {
+      topInner.style.width = table.scrollWidth + "px";
+    }
+
+    let syncing = false;
+    topWrap.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      bottomWrap.scrollLeft = topWrap.scrollLeft;
+      syncing = false;
+    });
+    bottomWrap.addEventListener("scroll", function () {
+      if (syncing) return;
+      syncing = true;
+      topWrap.scrollLeft = bottomWrap.scrollLeft;
+      syncing = false;
+    });
+
+    syncWidth();
+    window.addEventListener("resize", syncWidth);
+  })();
+</script>
+{% endblock %}

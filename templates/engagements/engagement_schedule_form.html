@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{% if schedule %}Edit Schedule{% else %}Add Schedule{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if schedule %}Edit Schedule{% else %}Add Schedule{% endif %}</h1>
+      <p class="muted">
+        {{ engagement.client.display_name }} · {{ engagement.fiscal_year.fy_no }} · {{ engagement.service.service_desc }}
+      </p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.planned_start.id_for_label }}">Planned Start</label>
+        <div class="sap-control">
+          {{ form.planned_start }}
+          {% if form.planned_start.errors %}
+            <span class="field-error">{{ form.planned_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.planned_finish.id_for_label }}">Planned Finish</label>
+        <div class="sap-control">
+          {{ form.planned_finish }}
+          {% if form.planned_finish.errors %}
+            <span class="field-error">{{ form.planned_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.actual_start.id_for_label }}">Actual Start</label>
+        <div class="sap-control">
+          {{ form.actual_start }}
+          {% if form.actual_start.errors %}
+            <span class="field-error">{{ form.actual_start.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.actual_finish.id_for_label }}">Actual Finish</label>
+        <div class="sap-control">
+          {{ form.actual_finish }}
+          {% if form.actual_finish.errors %}
+            <span class="field-error">{{ form.actual_finish.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'engagement_schedules' engagement.id %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if schedule %}Update Schedule{% else %}Save Schedule{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'engagement_schedules' engagement.id %}">← Back to Engagement Schedule</a></p>
+  </section>
+</div>
+{% endblock %}

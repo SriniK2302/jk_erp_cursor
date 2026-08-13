@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Work Area Notes Report · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Work area notes report</h1>
+      <p class="muted">Work-area notes (query + status) across engagements you can access.</p>
+      <p class="muted">Use Draft to open a prefilled Outlook compose window; review and send manually.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search client, work area, subject, WP number..."
+          aria-label="Search work area notes"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter work area notes">
+        <span class="grid-filter-bar__label muted">Type:</span>
+        <a href="{% url 'work_area_notes_report' %}?type=all&expected={{ query_expected_filter }}&status={{ query_status_filter }}" class="filter-chip{% if query_type_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+        <a href="{% url 'work_area_notes_report' %}?type=query&expected={{ query_expected_filter }}&status={{ query_status_filter }}" class="filter-chip{% if query_type_filter == 'query' %} filter-chip--active{% endif %}">Query</a>
+        <a href="{% url 'work_area_notes_report' %}?type=remark&expected={{ query_expected_filter }}&status={{ query_status_filter }}" class="filter-chip{% if query_type_filter == 'remark' %} filter-chip--active{% endif %}">Remark</a>
+        <span class="grid-filter-bar__label muted">Expected from:</span>
+        <a href="{% url 'work_area_notes_report' %}?expected=all&status={{ query_status_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_expected_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+        <a href="{% url 'work_area_notes_report' %}?expected=internal&status={{ query_status_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_expected_filter == 'internal' %} filter-chip--active{% endif %}">Internal</a>
+        <a href="{% url 'work_area_notes_report' %}?expected=client&status={{ query_status_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_expected_filter == 'client' %} filter-chip--active{% endif %}">Client</a>
+        <span class="grid-filter-bar__label muted">Status:</span>
+        <a href="{% url 'work_area_notes_report' %}?status=all&expected={{ query_expected_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_status_filter == 'all' %} filter-chip--active{% endif %}">All</a>
+        <a href="{% url 'work_area_notes_report' %}?status=open&expected={{ query_expected_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_status_filter == 'open' %} filter-chip--active{% endif %}">Open</a>
+        <a href="{% url 'work_area_notes_report' %}?status=closed&expected={{ query_expected_filter }}&type={{ query_type_filter }}" class="filter-chip{% if query_status_filter == 'closed' %} filter-chip--active{% endif %}">Closed</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap work-area-notes-list-grid">
+          <thead>
+            <tr>
+              <th class="col-work-area">Work area</th>
+              <th class="col-date">Date</th>
+              <th class="col-type">Type</th>
+              <th class="col-subject">Subject</th>
+              <th class="col-details">Details</th>
+              <th class="col-responses">Responses</th>
+              <th class="col-status">Status</th>
+              <th class="col-open">Draft</th>
+              <th class="col-open">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% regroup rows by context_line as grouped_rows %}
+            {% for group in grouped_rows %}
+              <tr data-grid-row class="notes-context-row">
+                <td colspan="9"><strong>{{ group.grouper }}</strong></td>
+              </tr>
+              {% for row in group.list %}
+                <tr data-grid-row{% if forloop.last %} class="work-area-group-end"{% endif %}>
+                  <td class="col-work-area">{{ row.work_area_name }}</td>
+                  <td class="col-date">{{ row.query_date|date:"Y-m-d" }}</td>
+                  <td class="col-type">{{ row.entry_type }}</td>
+                  <td class="col-subject">{{ row.subject }}</td>
+                  <td class="col-details">{{ row.details }}</td>
+                  <td class="col-responses">{{ row.response_count }}</td>
+                  <td class="col-status">{{ row.status }}</td>
+                  <td class="col-open">
+                    {% if row.has_draft_recipients %}
+                      {% if row.drafted_before %}
+                        <span class="muted">Drafted</span>
+                        <a href="{{ row.draft_action_url_repeat }}">Repeat</a>
+                      {% else %}
+                        <a href="{{ row.draft_action_url }}">Draft</a>
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="col-open"><a href="{{ row.query_url }}">Open</a></td>
+                </tr>
+              {% endfor %}
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="9" class="muted">No work area notes found for selected filters.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching work area notes found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="#" onclick="history.back(); return false;">← Back</a>
+      ·
+      <a href="{% url 'manage_engagements' %}">Manage Engagements</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

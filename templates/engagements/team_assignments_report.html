@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Team assignments report · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Team assignments report</h1>
+      <p class="muted">
+        Assignments at engagement, division, engagement work area, and division work area levels.
+        Rows are limited to engagements you can access (same scope as My Engagements).
+      </p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search client, division, work area, team member..."
+          aria-label="Search team assignments"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="grid-filter-bar" role="toolbar" aria-label="Filter assignment status">
+        <span class="grid-filter-bar__label muted">View:</span>
+        <a href="{% url 'team_assignments_report' %}?status=current" class="filter-chip{% if assignment_status_filter == 'current' %} filter-chip--active{% endif %}">Current</a>
+        <a href="{% url 'team_assignments_report' %}?status=completed" class="filter-chip{% if assignment_status_filter == 'completed' %} filter-chip--active{% endif %}">Completed</a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid data-grid-wrap">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>FY</th>
+              <th>Service</th>
+              <th>Scope</th>
+              <th>Division</th>
+              <th>Work area</th>
+              <th>Team member</th>
+              <th>Planned start</th>
+              <th>Planned finish</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr data-grid-row>
+                <td>{{ row.client_name }}</td>
+                <td>{{ row.fy_no }}</td>
+                <td>{{ row.service_desc }}</td>
+                <td>{{ row.scope }}</td>
+                <td>{{ row.division_name }}</td>
+                <td>{{ row.work_area_name }}</td>
+                <td>{{ row.team_member }}</td>
+                <td>{% if row.planned_start %}{{ row.planned_start|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                <td>{% if row.planned_finish %}{{ row.planned_finish|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="9" class="muted">
+                  {% if assignment_status_filter == 'completed' %}
+                    No completed team assignment rows for engagements you can access.
+                  {% else %}
+                    No current team assignment rows for engagements you can access.
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching rows found.
+      </p>
+    </div>
+
+    <p class="muted">
+      <a href="#" onclick="history.back(); return false;">← Back</a>
+      ·
+      <a href="{% url 'manage_engagements' %}">Manage Engagements</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

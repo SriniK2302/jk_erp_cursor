@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}{% if qualification_period %}Edit Qualification{% else %}Add Qualification{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if qualification_period %}Edit Qualification{% else %}Add Qualification{% endif %} · {{ member.first_name }} {{ member.last_name }}</h1>
+      <p class="muted">Map qualification periods as the team member acquires new qualifications.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.qualification.id_for_label }}">Qualification</label>
+        <div class="sap-control">
+          {{ form.qualification }}
+          {% if form.qualification.errors %}
+            <span class="field-error">{{ form.qualification.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.from_date.id_for_label }}">From Date</label>
+        <div class="sap-control">
+          {{ form.from_date }}
+          {% if form.from_date.errors %}
+            <span class="field-error">{{ form.from_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.to_date.id_for_label }}">To Date</label>
+        <div class="sap-control">
+          {{ form.to_date }}
+          {% if form.to_date.errors %}
+            <span class="field-error">{{ form.to_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'teams' %}?member={{ member.id }}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if qualification_period %}Update Qualification{% else %}Save Qualification{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'teams' %}?member={{ member.id }}">← Back to Team Member</a></p>
+  </section>
+</div>
+{% endblock %}

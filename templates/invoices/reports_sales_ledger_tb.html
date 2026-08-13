@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Ledger TB · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Sales Ledger TB</h1>
+      <p class="muted">Computed from saved invoices and invoice lines (nothing stored for this report). <strong>Invoice date</strong> defines the period; <strong>Service FY</strong> on the invoice is for MIS only.</p>
+      <p class="muted invoice-udin-hint"><strong>Opening (b/f):</strong> trade receivables (clients) and tax liabilities (CGST/SGST/IGST) carried from all prior invoice dates; cumulative <strong>Service</strong> credits are shown as <em>Balance carried over from prior years</em>. <strong>Current period:</strong> normal Service and tax lines. Debit rows remain one line per client per section. Use <strong>Invoice status</strong> to include all saved invoices, or only <strong>Authorised</strong> / <strong>Fresh</strong> (same meaning as on the invoice form).</p>
+    </header>
+
+    {% if fiscal_years %}
+      <form method="get" class="sap-form" action="{% url 'invoice_reports_sales_ledger_tb' %}">
+        <div class="sap-row">
+          <label for="id_fy">Fiscal period (by invoice date)</label>
+          <div class="sap-control">
+            <select name="fy" id="id_fy" class="input-medium" required>
+              {% for fy in fiscal_years %}
+                <option value="{{ fy.pk }}"{% if selected_fy and fy.pk == selected_fy.pk %} selected{% endif %}>
+                  {{ fy.fy_no }} — {{ fy.start_date|date:"Y-m-d" }} to {{ fy.end_date|date:"Y-m-d" }}
+                  {% if current_fy and fy.pk == current_fy.pk %} (current){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            {% if current_fy %}
+              <p class="muted invoice-udin-hint">Current FY by calendar: <strong>{{ current_fy.fy_no }}</strong> (pre-selected when you open this page).</p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sap-row">
+          <label for="id_status">Invoice status</label>
+          <div class="sap-control">
+            <select name="status" id="id_status" class="input-medium">
+              <option value="all"{% if status_filter == "all" %} selected{% endif %}>All</option>
+              <option value="authorised"{% if status_filter == "authorised" %} selected{% endif %}>Authorised</option>
+              <option value="fresh"{% if status_filter == "fresh" %} selected{% endif %}>Fresh</option>
+            </select>
+            <p class="muted invoice-udin-hint">Authorised = cleared for GL-style reporting; Fresh = not yet authorised.</p>
+          </div>
+        </div>
+        <div class="sap-actions">
+          <button type="submit" class="button">Show report</button>
+        </div>
+      </form>
+
+      {% if report_submitted and selected_fy and tb %}
+        <h2 style="margin-top: 1.25rem; font-size: 1.1rem; font-weight: 600;">
+          {{ selected_fy.fy_no }}
+          · {% if status_filter == "authorised" %}Authorised only{% elif status_filter == "fresh" %}Fresh only{% else %}All statuses{% endif %}
+          · {{ tb.period_invoice_count }} invoice{{ tb.period_invoice_count|pluralize }} in period
+          · {{ tb.opening_invoice_count }} prior invoice{{ tb.opening_invoice_count|pluralize }} (b/f)
+        </h2>
+        {% if tb.balanced %}
+          <p class="muted">Debit and credit totals match (within 0.01).</p>
+        {% else %}
+          <p class="field-error">Totals differ by {{ tb.difference|floatformat:"2g" }} — check invoices missing lines or unexpected line types.</p>
+        {% endif %}
+
+        <div class="table-wrap" style="margin-top: 0.75rem;">
+          <table class="data-grid data-grid-wrap" aria-label="Sales ledger trial balance">
+            <caption class="visually-hidden">Account debit and credit columns</caption>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th class="num">Debit</th>
+                <th class="num">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="3" class="muted"><strong>Opening (b/f)</strong> — invoice date before {{ selected_fy.start_date|date:"Y-m-d" }}</td>
+              </tr>
+              {% if tb.opening_invoice_count == 0 %}
+                <tr><td colspan="3" class="muted">No prior invoices.</td></tr>
+              {% else %}
+                {% for row in tb.opening.client_rows %}
+                  <tr>
+                    <td>
+                      {{ row.name }}
+                      {% if row.invoice_count %}
+                        <span class="muted">· {{ row.invoice_count }} invoice{{ row.invoice_count|pluralize }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="num">{{ row.debit|floatformat:"2g" }}</td>
+                    <td class="num"></td>
+                  </tr>
+                {% endfor %}
+                {% for row in tb.opening.tax_rows %}
+                  <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="num"></td>
+                    <td class="num">{{ row.credit|floatformat:"2g" }}</td>
+                  </tr>
+                {% endfor %}
+                <tr>
+                  <td>{{ tb.opening.balance_carried_label }}</td>
+                  <td class="num"></td>
+                  <td class="num">{{ tb.opening.balance_carried_credit|floatformat:"2g" }}</td>
+                </tr>
+                {% for row in tb.opening.credit_rows_other %}
+                  <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="num"></td>
+                    <td class="num">{{ row.credit|floatformat:"2g" }}</td>
+                  </tr>
+                {% endfor %}
+              {% endif %}
+
+              <tr>
+                <td colspan="3" class="muted"><strong>Current period</strong> — {{ selected_fy.start_date|date:"Y-m-d" }} to {{ selected_fy.end_date|date:"Y-m-d" }}</td>
+              </tr>
+              {% if tb.period_invoice_count == 0 %}
+                <tr><td colspan="3" class="muted">No invoices in this fiscal period.</td></tr>
+              {% else %}
+                {% for row in tb.period.client_rows %}
+                  <tr>
+                    <td>
+                      {{ row.name }}
+                      {% if row.invoice_count %}
+                        <span class="muted">· {{ row.invoice_count }} invoice{{ row.invoice_count|pluralize }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="num">{{ row.debit|floatformat:"2g" }}</td>
+                    <td class="num"></td>
+                  </tr>
+                {% endfor %}
+                {% for row in tb.period.credit_rows_known %}
+                  <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="num"></td>
+                    <td class="num">{{ row.credit|floatformat:"2g" }}</td>
+                  </tr>
+                {% endfor %}
+                {% for row in tb.period.credit_rows_other %}
+                  <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="num"></td>
+                    <td class="num">{{ row.credit|floatformat:"2g" }}</td>
+                  </tr>
+                {% endfor %}
+              {% endif %}
+
+              <tr>
+                <td><strong>Total (opening + period)</strong></td>
+                <td class="num"><strong>{{ tb.grand_total_dr|floatformat:"2g" }}</strong></td>
+                <td class="num"><strong>{{ tb.grand_total_cr|floatformat:"2g" }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">No fiscal years are defined yet. Add them under <a href="{% url 'fiscal_years' %}">Setup → GL → Fiscal years</a>.</p>
+    {% endif %}
+
+    <p class="muted" style="margin-top: 1.25rem;">
+      <a href="{% url 'invoice_reports' %}">← Reports</a>
+      ·
+      <a href="{% url 'sales_hub' %}">Manage Invoices hub</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

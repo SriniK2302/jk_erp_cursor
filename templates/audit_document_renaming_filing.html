@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Document Renaming and Filing · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Audit Document Renaming and Filing</h1>
+      <p class="muted">Rules for <strong>audit</strong> and <strong>accounts</strong> working papers only. In scope: <strong>Word</strong>, <strong>PDF</strong>, <strong>PowerPoint</strong>, and <strong>Excel</strong>. Enforcement, path checks, and an activity log will plug into this page later; rule text is defined in <code>utilities/audit_accounts_documents.py</code> so code and UI stay aligned.</p>
+    </header>
+
+    <h2 style="font-size: 1.05rem; margin: 1.25rem 0 0.5rem;">Document types in scope</h2>
+    <div class="table-wrap">
+      <table class="data-grid data-grid-wrap" aria-label="File types for audit and accounts rules">
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extensions</th>
+            <th>Typical use</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in file_classes %}
+            <tr>
+              <td>{{ c.label }}</td>
+              <td><code>{% for e in c.extensions %}{{ e }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
+              <td class="muted">{{ c.role }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top: 0.5rem; font-size: 0.88rem;">Combined allow-list: {% for e in all_extensions %}<code>{{ e }}</code>{% if not forloop.last %} {% endif %}{% endfor %}</p>
+
+    <h2 style="font-size: 1.05rem; margin: 1.25rem 0 0.5rem;">Naming rules</h2>
+    <ol class="muted" style="margin-top: 0; padding-left: 1.25rem; max-width: 52rem;">
+      {% for line in naming_rules %}
+        <li style="margin-bottom: 0.35rem;">{{ line }}</li>
+      {% endfor %}
+    </ol>
+
+    <h2 style="font-size: 1.05rem; margin: 1.25rem 0 0.5rem;">Filing rules</h2>
+    <ol class="muted" style="margin-top: 0; padding-left: 1.25rem; max-width: 52rem;">
+      {% for line in filing_rules %}
+        <li style="margin-bottom: 0.35rem;">{{ line }}</li>
+      {% endfor %}
+    </ol>
+
+    <p class="muted" style="margin-top: 1rem; max-width: 52rem;">{{ out_of_scope_note }}</p>
+
+    <h2 style="font-size: 1.05rem; margin: 1.25rem 0 0.5rem;">Triage by phrase</h2>
+    <p class="muted">Find appointment, acceptance, terms, management representation, and final-accounts files by phrase, then move them into category folders: <a href="{% url 'audit_document_triage' %}">Open audit document triage</a>.</p>
+
+    <h2 style="font-size: 1.05rem; margin: 1.25rem 0 0.5rem;">Related tools</h2>
+    <ul class="muted">
+      <li><a href="{% url 'rename_files_utilities' %}">Rename Files</a> — generic disk renames (date prefix, text, content date).</li>
+      <li><a href="{% url 'organize_files_utilities' %}">Organize Files</a> — FY moves and name-contains moves.</li>
+    </ul>
+
+    <p class="muted" style="margin-top: 1.25rem;">
+      <a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

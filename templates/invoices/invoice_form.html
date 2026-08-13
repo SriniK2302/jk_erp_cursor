@@ -1,0 +1,642 @@
+{% extends "base.html" %}
+
+{% block title %}{% if invoice %}Edit Invoice{% else %}Add Invoice{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if invoice %}Edit Invoice{% else %}Add Invoice{% endif %}</h1>
+      <p class="muted">Add one or more <strong>UDIN fee lines</strong> (description + amount). Tax lines are computed from the sum of amounts. The same UDIN may appear twice for separate fees — you will get a caution.</p>
+      {% if invoice %}
+        <p class="muted invoice-edit-nav">
+          <a class="button button-secondary" href="{% url 'invoice_preview' invoice.pk %}" target="_blank" rel="noopener noreferrer">A4 client preview</a>
+          Opens a print-ready A4 page (save as PDF from the browser).
+        </p>
+        <p class="muted invoice-edit-nav" style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center;">
+          <span class="muted" style="margin-right: 0.25rem;">By invoice date (earlier ← → later):</span>
+          {% if invoice_nav_prev %}
+            <a class="button button-secondary" href="{% url 'invoice_edit' invoice_nav_prev.pk %}" title="{{ invoice_nav_prev.invoice_no }} · {{ invoice_nav_prev.invoice_date }}">← Previous</a>
+          {% else %}
+            <span class="button button-secondary is-disabled" aria-disabled="true">← Previous</span>
+          {% endif %}
+          {% if invoice_nav_next %}
+            <a class="button button-secondary" href="{% url 'invoice_edit' invoice_nav_next.pk %}" title="{{ invoice_nav_next.invoice_no }} · {{ invoice_nav_next.invoice_date }}">Next →</a>
+          {% else %}
+            <span class="button button-secondary is-disabled" aria-disabled="true">Next →</span>
+          {% endif %}
+        </p>
+      {% endif %}
+    </header>
+
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <form method="post" class="sap-form" novalidate id="invoice-main-form">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <p class="field-error">{{ form.non_field_errors.0 }}</p>
+      {% endif %}
+
+      {{ map_formset.management_form }}
+
+      <div class="sap-row sap-row-lines">
+        <span>UDIN fee lines</span>
+        <div class="sap-control">
+          <div class="table-wrap">
+            <table class="data-grid invoice-map-grid" aria-label="UDIN fee lines">
+              <thead>
+                <tr>
+                  <th class="col-sr">#</th>
+                  <th>UDIN</th>
+                  <th>Service (from UDIN)</th>
+                  <th class="num">Amount (Rs)</th>
+                  <th class="col-del">Remove</th>
+                </tr>
+              </thead>
+              <tbody id="inv-map-tbody">
+                {% for mf in map_formset.forms %}
+                  <tr class="inv-map-row" data-map-row>
+                    <td class="col-sr inv-map-sr">{{ forloop.counter }}</td>
+                    <td>
+                      {{ mf.udin }}
+                      {% if mf.udin.errors %}<span class="field-error">{{ mf.udin.errors.0 }}</span>{% endif %}
+                    </td>
+                    <td>
+                      {{ mf.service_desc }}
+                      {% if mf.service_desc.errors %}<span class="field-error">{{ mf.service_desc.errors.0 }}</span>{% endif %}
+                    </td>
+                    <td class="num">
+                      {{ mf.line_amount }}
+                      {% if mf.line_amount.errors %}<span class="field-error">{{ mf.line_amount.errors.0 }}</span>{% endif %}
+                    </td>
+                    <td class="col-del">
+                      {% if map_formset.can_delete %}
+                        <label class="inv-map-delete-label">{{ mf.DELETE }} <span class="muted">Del</span></label>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="muted invoice-udin-hint">
+            <button type="button" class="button button-secondary" id="inv-map-add-row">Add fee line</button>
+            All UDINs must belong to the <strong>same client</strong>. Amounts are summed for GST / IGST.
+          </p>
+          {% if map_formset.non_form_errors %}
+            <p class="field-error">{{ map_formset.non_form_errors.0 }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <span>Client</span>
+        <div class="sap-control">
+          <div id="invoice_map_client_display" class="invoice-udin-derived invoice-udin-derived--medium" aria-live="polite">—</div>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <span>Invoice tax type</span>
+        <div class="sap-control">
+          <div id="invoice_udin_tax_type_display" class="invoice-udin-derived" aria-live="polite">—</div>
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.invoice_date.id_for_label }}">Invoice date</label>
+        <div class="sap-control">
+          {{ form.invoice_date }}
+          {% if form.invoice_date.errors %}
+            <span class="field-error">{{ form.invoice_date.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.invoice_no.id_for_label }}">Inv No</label>
+        <div class="sap-control">
+          {{ form.invoice_no }}
+          {% if form.invoice_no.errors %}
+            <span class="field-error">{{ form.invoice_no.errors.0 }}</span>
+          {% endif %}
+          {% if is_invoice_create %}
+            <p class="muted invoice-udin-hint">
+              Defaults from the first UDIN line’s <strong>Inv Date</strong> when you pick a UDIN (otherwise today). Inv No is suggested from invoice date, client code, and FY count (001, 002, …).
+            </p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fiscal_year.id_for_label }}">Service FY</label>
+        <div class="sap-control">
+          {{ form.fiscal_year }}
+          {% if form.fiscal_year.errors %}
+            <span class="field-error">{{ form.fiscal_year.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+        <div class="sap-control">
+          {{ form.status }}
+          {% if form.status.errors %}
+            <span class="field-error">{{ form.status.errors.0 }}</span>
+          {% endif %}
+          {% if form.status.help_text %}
+            <p class="muted invoice-udin-hint">{{ form.status.help_text }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.narration.id_for_label }}">{{ form.narration.label }}</label>
+        <div class="sap-control">
+          {{ form.narration }}
+          {% if form.narration.errors %}
+            <span class="field-error">{{ form.narration.errors.0 }}</span>
+          {% endif %}
+          <p class="muted invoice-udin-hint">Printed once at the top of the UDIN block on the bill.</p>
+        </div>
+      </div>
+
+      <div class="sap-row sap-row-lines">
+        <span>Computed invoice lines</span>
+        <div class="sap-control">
+          <div class="table-wrap">
+            <table class="data-grid invoice-lines-grid" aria-label="Computed invoice lines">
+              <thead>
+                <tr>
+                  <th>Line no</th>
+                  <th>Line type</th>
+                  <th>Remarks</th>
+                  <th>Line base amount</th>
+                  <th>Percentage</th>
+                  <th>Item amount</th>
+                </tr>
+              </thead>
+              <tbody id="invoice_lines_tbody"></tbody>
+            </table>
+          </div>
+          <p class="muted invoice-udin-hint">
+            Preview only — exact rows are saved from your UDIN map and tax type.
+          </p>
+        </div>
+      </div>
+
+      <div class="sap-row sap-row--invoice-totals">
+        <span>Inv Tv (taxable)</span>
+        <div class="sap-control sap-control--invoice-totals">
+          <div id="invoice_tv_display" class="invoice-udin-derived invoice-totals-amount" aria-live="polite">—</div>
+        </div>
+      </div>
+
+      <div class="sap-row sap-row--invoice-totals">
+        <span>Taxes</span>
+        <div class="sap-control sap-control--invoice-totals">
+          <div id="invoice_taxes_display" class="invoice-udin-derived invoice-totals-amount" aria-live="polite">—</div>
+        </div>
+      </div>
+
+      <div class="sap-row sap-row--invoice-totals">
+        <span>Inv Gross</span>
+        <div class="sap-control sap-control--invoice-totals">
+          <div id="invoice_gross_display" class="invoice-udin-derived invoice-totals-amount" aria-live="polite">—</div>
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'invoices' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if invoice %}Update Invoice{% else %}Save Invoice{% endif %}</button>
+      </div>
+    </form>
+
+    <table class="visually-hidden" aria-hidden="true">
+      <tbody id="inv-map-empty-template">
+        <tr class="inv-map-row" data-map-row>
+          <td class="col-sr inv-map-sr">0</td>
+          <td>{{ map_formset.empty_form.udin }}</td>
+          <td>{{ map_formset.empty_form.service_desc }}</td>
+          <td class="num">{{ map_formset.empty_form.line_amount }}</td>
+          <td class="col-del">
+            {% if map_formset.can_delete %}
+              <label class="inv-map-delete-label">{{ map_formset.empty_form.DELETE }} <span class="muted">Del</span></label>
+            {% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="muted">
+      <a href="{% url 'invoices' %}">← Back to Invoices</a>
+      &nbsp;|&nbsp;
+      <a href="{% url 'udins' %}">Go to UDINs</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ udin_choice_meta|json_script:"invoice-udin-meta" }}
+  <style>
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    .invoice-lines-grid th, .invoice-map-grid th { white-space: nowrap; }
+    .invoice-lines-grid { table-layout: fixed; width: 100%; }
+    .invoice-lines-grid th:nth-child(1), .invoice-lines-grid td:nth-child(1) { width: 3rem; }
+    .invoice-lines-grid th:nth-child(2), .invoice-lines-grid td:nth-child(2) { width: 6.5rem; }
+    .invoice-lines-grid th:nth-child(3), .invoice-lines-grid td:nth-child(3) { width: 30%; }
+    .invoice-lines-grid th:nth-child(4), .invoice-lines-grid td:nth-child(4),
+    .invoice-lines-grid th:nth-child(6), .invoice-lines-grid td:nth-child(6) { width: 7.5rem; text-align: right; }
+    .invoice-lines-grid th:nth-child(5), .invoice-lines-grid td:nth-child(5) { width: 5rem; text-align: right; }
+    .invoice-map-grid { table-layout: fixed; width: 100%; }
+    .invoice-map-grid .col-sr { width: 2.5rem; text-align: center; }
+    .invoice-map-grid th:nth-child(2), .invoice-map-grid td:nth-child(2) { width: 38%; }
+    .invoice-map-grid th:nth-child(3), .invoice-map-grid td:nth-child(3) { width: 28%; }
+    .invoice-map-grid th:nth-child(4), .invoice-map-grid td:nth-child(4) { width: 9.5rem; }
+    .invoice-map-grid .col-del { width: 4rem; white-space: nowrap; }
+    .invoice-map-delete-label { font-weight: 400; cursor: pointer; }
+    .invoice-map-grid .num { text-align: right; }
+    .invoice-map-grid .inv-map-amount { width: 100%; text-align: right; }
+    .invoice-map-grid .inv-map-udin-select { width: 100%; }
+    .invoice-map-grid input[name$="-service_desc"] { width: 100%; }
+    #inv-map-empty-template { display: none; }
+    .sap-form .sap-row--invoice-totals {
+      align-items: center;
+      grid-template-columns: 180px max-content;
+    }
+    .sap-form .sap-control--invoice-totals {
+      width: auto;
+      min-width: 0;
+      max-width: 10.5rem;
+    }
+    .sap-form .invoice-totals-amount {
+      width: 100%;
+      box-sizing: border-box;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      padding: 0.25rem 0.45rem;
+      min-height: auto;
+    }
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var isCreate = {{ is_invoice_create|yesno:"true,false" }};
+      var nextNoUrl = "{% url 'invoice_next_no' %}";
+      var prefix = "maps";
+      var tbody = document.getElementById("inv-map-tbody");
+      var templateRow = document.querySelector("#inv-map-empty-template tr");
+      var totalInput = document.querySelector('[name="' + prefix + '-TOTAL_FORMS"]');
+      var dateEl = document.getElementById("id_invoice_date");
+      var invNo = document.getElementById("id_invoice_no");
+      var linesTbody = document.getElementById("invoice_lines_tbody");
+      var taxesDisplay = document.getElementById("invoice_taxes_display");
+      var grossDisplay = document.getElementById("invoice_gross_display");
+      var tvDisplay = document.getElementById("invoice_tv_display");
+      var taxTypeDisplay = document.getElementById("invoice_udin_tax_type_display");
+      var clientEl = document.getElementById("invoice_map_client_display");
+      var narrationEl = document.getElementById("id_narration");
+      var fiscalYearEl = document.getElementById("id_fiscal_year");
+      if (!tbody || !totalInput || !templateRow) return;
+
+      var metaEl = document.getElementById("invoice-udin-meta");
+      var meta = {};
+      try {
+        meta = metaEl ? JSON.parse(metaEl.textContent) : {};
+      } catch (e) {}
+
+      var userTouchedNarration = !!(narrationEl && narrationEl.value.trim());
+      if (narrationEl) {
+        narrationEl.addEventListener("input", function () {
+          userTouchedNarration = true;
+        });
+      }
+
+      function round2(x) {
+        return Math.round((Number(x) + Number.EPSILON) * 100) / 100;
+      }
+
+      function formatMoneyDisplay(n) {
+        var x = round2(n);
+        return x.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      }
+
+      function injectSelectedFyInNarration() {
+        if (!narrationEl) return;
+        var text = (narrationEl.value || "").trim();
+        if (!text) return;
+        var fy = "";
+        if (fiscalYearEl) {
+          var selectedOpt = fiscalYearEl.options && fiscalYearEl.selectedIndex >= 0 ? fiscalYearEl.options[fiscalYearEl.selectedIndex] : null;
+          fy = selectedOpt ? (selectedOpt.text || "").trim() : "";
+        }
+        var next = text.replace(/(\bservice\b)(?:\s+FY)?(?:\s+[A-Za-z0-9/-]+)?([.,])?/i, function (_, prefix) {
+          return prefix + (fy ? " " + fy : "") + ",";
+        });
+        narrationEl.value = next;
+      }
+
+      function syncFiscalYearFromFirstUdin() {
+        if (!fiscalYearEl) return;
+        var pk = firstUdinPk();
+        if (!pk || !meta[pk]) return;
+        var ay = (meta[pk].ay_fy || "").trim();
+        if (!ay) return;
+        var want = ay.toLowerCase();
+        var opts = fiscalYearEl.options;
+        for (var i = 0; i < opts.length; i++) {
+          if ((opts[i].text || "").trim().toLowerCase() === want) {
+            fiscalYearEl.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      var userTouchedInvoiceDate = false;
+      if (dateEl) {
+        dateEl.addEventListener("input", function () {
+          userTouchedInvoiceDate = !!(dateEl.value || "").trim();
+        });
+      }
+
+      function syncInvoiceDateFromFirstUdin() {
+        if (!isCreate || !dateEl || userTouchedInvoiceDate) return;
+        var pk = firstUdinPk();
+        if (!pk || !meta[pk]) return;
+        var d = (meta[pk].inv_date || "").trim();
+        if (!d) return;
+        dateEl.value = d;
+      }
+
+      function getRowUdins() {
+        var selects = tbody.querySelectorAll('select[name^="' + prefix + '-"][name$="-udin"]');
+        var out = [];
+        selects.forEach(function (sel) {
+          out.push((sel.value || "").trim());
+        });
+        return out;
+      }
+
+      function checkDuplicateUdins() {
+        var vals = getRowUdins().filter(function (v) {
+          return v.length > 0;
+        });
+        var uniq = {};
+        var dup = false;
+        vals.forEach(function (v) {
+          if (uniq[v]) dup = true;
+          uniq[v] = true;
+        });
+        if (dup) {
+          window.alert("Caution: The same UDIN is selected more than once on this invoice. Continue only if that is intentional.");
+        }
+      }
+
+      function firstUdinPk() {
+        var pks = getRowUdins();
+        for (var i = 0; i < pks.length; i++) {
+          if (pks[i]) return pks[i];
+        }
+        return "";
+      }
+
+      function refreshDerivedFromMaps() {
+        var pks = getRowUdins();
+        var firstPk = firstUdinPk();
+        if (!firstPk || !meta[firstPk]) {
+          if (clientEl) clientEl.textContent = "—";
+          if (taxTypeDisplay) taxTypeDisplay.textContent = "—";
+          renderLinesPreview([], "GST");
+          return;
+        }
+        var m = meta[firstPk];
+        if (clientEl) clientEl.textContent = m.client || "—";
+        var tt = m.invoice_tax_type || "GST";
+        if (taxTypeDisplay) taxTypeDisplay.textContent = tt === "IGST" ? "IGST (18% on taxable)" : "GST (9% CGST + 9% SGST on taxable)";
+        var serviceRows = [];
+        tbody.querySelectorAll('input[name^="' + prefix + '-"][name$="-line_amount"]').forEach(function (inp, idx) {
+          var row = inp.closest("tr");
+          if (!row) return;
+          var del = row.querySelector('input[name$="-DELETE"]');
+          if (del && del.checked) return;
+          var sel = row.querySelector('select[name$="-udin"]');
+          if (!sel || !(sel.value || "").trim()) return;
+          var desc = row.querySelector('input[name$="-service_desc"]');
+          var n = parseFloat((inp.value || "").replace(",", ".")) || 0;
+          if (n >= 0) {
+            serviceRows.push({
+              amount: n,
+              remark: desc ? (desc.value || "").trim() : "",
+            });
+          }
+        });
+        renderLinesPreview(serviceRows, tt);
+      }
+
+      function renderLinesPreview(serviceRows, taxType) {
+        if (!linesTbody) return;
+        linesTbody.innerHTML = "";
+        var tv = serviceRows.reduce(function (a, r) {
+          return a + r.amount;
+        }, 0);
+        tv = round2(tv);
+        if (tvDisplay) tvDisplay.textContent = serviceRows.length ? formatMoneyDisplay(tv) : "—";
+        if (!serviceRows.length) {
+          if (taxesDisplay) taxesDisplay.textContent = "—";
+          if (grossDisplay) grossDisplay.textContent = "—";
+          return;
+        }
+        var lineNo = 1;
+        serviceRows.forEach(function (row) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" +
+            lineNo++ +
+            "</td><td>Service</td><td>" +
+            (row.remark || "") +
+            "</td><td>" +
+            formatMoneyDisplay(row.amount) +
+            "</td><td>100%</td><td>" +
+            formatMoneyDisplay(row.amount) +
+            "</td>";
+          linesTbody.appendChild(tr);
+        });
+        var taxTot = 0;
+        if (taxType === "IGST") {
+          var ig = round2(tv * 0.18);
+          taxTot = ig;
+          var tr2 = document.createElement("tr");
+          tr2.innerHTML =
+            "<td>" +
+            lineNo +
+            "</td><td>IGST</td><td></td><td>" +
+            formatMoneyDisplay(tv) +
+            "</td><td>18%</td><td>" +
+            formatMoneyDisplay(ig) +
+            "</td>";
+          linesTbody.appendChild(tr2);
+        } else {
+          var half = round2(tv * 0.09);
+          taxTot = round2(half * 2);
+          ["CGST", "SGST"].forEach(function (lbl) {
+            var tr3 = document.createElement("tr");
+            tr3.innerHTML =
+              "<td>" +
+              lineNo++ +
+              "</td><td>" +
+              lbl +
+              "</td><td></td><td>" +
+              formatMoneyDisplay(tv) +
+              "</td><td>9%</td><td>" +
+              formatMoneyDisplay(half) +
+              "</td>";
+            linesTbody.appendChild(tr3);
+          });
+        }
+        var gross = round2(tv + taxTot);
+        if (taxesDisplay) taxesDisplay.textContent = formatMoneyDisplay(taxTot);
+        if (grossDisplay) grossDisplay.textContent = formatMoneyDisplay(gross);
+      }
+
+      function wireRow(row) {
+        var sel = row.querySelector('select[name$="-udin"]');
+        var amt = row.querySelector('input[name$="-line_amount"]');
+        var desc = row.querySelector('input[name$="-service_desc"]');
+        var del = row.querySelector('input[name$="-DELETE"]');
+        function buildLineDesc(m) {
+          var svc = (m.default_line_desc || "").trim();
+          var rem = (m.udin_remarks || "").trim();
+          return rem ? (svc + " - " + rem) : svc;
+        }
+        function onUdinChange() {
+          var pk = (sel && sel.value) || "";
+          if (sel && meta[pk]) {
+            if (desc) desc.value = buildLineDesc(meta[pk]);
+            if (amt && meta[pk].hasTv && meta[pk].tv != null && String(meta[pk].tv).trim() !== "") {
+              amt.value = String(meta[pk].tv);
+            }
+            if (narrationEl && !userTouchedNarration && meta[pk].narration_suggestion != null) {
+              narrationEl.value = meta[pk].narration_suggestion;
+            }
+          }
+          syncFiscalYearFromFirstUdin();
+          syncInvoiceDateFromFirstUdin();
+          if (narrationEl && !userTouchedNarration) injectSelectedFyInNarration();
+          checkDuplicateUdins();
+          refreshDerivedFromMaps();
+          refreshSuggestedInvNo();
+        }
+        if (sel) {
+          sel.addEventListener("change", onUdinChange);
+        }
+        if (amt) {
+          amt.addEventListener("input", refreshDerivedFromMaps);
+          amt.addEventListener("change", refreshDerivedFromMaps);
+        }
+        if (del) del.addEventListener("change", refreshDerivedFromMaps);
+      }
+
+      function renumberRows() {
+        var rows = tbody.querySelectorAll("[data-map-row]");
+        rows.forEach(function (tr, i) {
+          var sr = tr.querySelector(".inv-map-sr");
+          if (sr) sr.textContent = String(i + 1);
+        });
+      }
+
+      tbody.querySelectorAll("[data-map-row]").forEach(wireRow);
+
+      function applyInitialNarrationFromFirstUdin() {
+        if (!narrationEl || userTouchedNarration) return;
+        var cur = (narrationEl.value || "").trim();
+        if (cur !== "") return;
+        var pk = firstUdinPk();
+        if (!pk || !meta[pk]) return;
+        var sug = meta[pk].narration_suggestion;
+        if (sug == null) return;
+        sug = String(sug).trim();
+        if (sug === "") return;
+        narrationEl.value = sug;
+        syncFiscalYearFromFirstUdin();
+        injectSelectedFyInNarration();
+      }
+      applyInitialNarrationFromFirstUdin();
+
+      document.getElementById("inv-map-add-row").addEventListener("click", function () {
+        var total = parseInt(totalInput.value, 10) || 0;
+        var idx = total;
+        var clone = templateRow.cloneNode(true);
+        clone.querySelectorAll("[name]").forEach(function (el) {
+          el.name = (el.name || "").replace(/__prefix__/g, String(idx));
+          if (el.id) el.id = el.id.replace(/__prefix__/g, String(idx));
+        });
+        clone.querySelectorAll("label[for]").forEach(function (lab) {
+          var f = lab.getAttribute("for");
+          if (f) lab.setAttribute("for", f.replace(/__prefix__/g, String(idx)));
+        });
+        tbody.appendChild(clone);
+        totalInput.value = String(total + 1);
+        wireRow(clone);
+        renumberRows();
+        refreshDerivedFromMaps();
+      });
+
+      var userTouchedInvNo = false;
+      if (invNo) {
+        invNo.addEventListener("input", function () {
+          userTouchedInvNo = (invNo.value || "").length > 0;
+        });
+      }
+
+      function refreshSuggestedInvNo() {
+        if (!isCreate || !invNo || !dateEl || userTouchedInvNo) return;
+        var pk = firstUdinPk();
+        var d = (dateEl.value || "").trim();
+        if (!pk || !d || !meta[pk] || !meta[pk].client_id) return;
+        var url =
+          nextNoUrl +
+          "?client_id=" +
+          encodeURIComponent(meta[pk].client_id) +
+          "&invoice_date=" +
+          encodeURIComponent(d);
+        fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(function (r) {
+            if (!r.ok) return null;
+            return r.json();
+          })
+          .then(function (data) {
+            if (!data || !data.invoice_no) return;
+            invNo.value = data.invoice_no;
+          })
+          .catch(function () {});
+      }
+
+      if (dateEl) {
+        dateEl.addEventListener("change", function () {
+          userTouchedInvoiceDate = !!(dateEl.value || "").trim();
+          refreshSuggestedInvNo();
+        });
+      }
+      if (fiscalYearEl) {
+        fiscalYearEl.addEventListener("change", function () {
+          if (!userTouchedNarration) injectSelectedFyInNarration();
+        });
+      }
+
+      refreshDerivedFromMaps();
+      syncFiscalYearFromFirstUdin();
+      syncInvoiceDateFromFirstUdin();
+      refreshSuggestedInvNo();
+      if (!userTouchedNarration) injectSelectedFyInNarration();
+    });
+  </script>
+{% endblock %}
+

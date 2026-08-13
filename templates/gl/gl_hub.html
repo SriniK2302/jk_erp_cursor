@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}GL · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>General ledger (GL)</h1>
+      <p class="muted">Chart of accounts, periods, sales ledger mapping, and sales-side reporting.</p>
+    </header>
+
+    <nav class="tile-grid" aria-label="General ledger modules">
+      <a class="tile-link" href="{% url 'chart_of_accounts' %}">
+        <span class="tile-title">Chart of Accounts</span>
+        <span class="tile-subtitle">Account codes, names, and PL/BS types</span>
+      </a>
+      <a class="tile-link" href="{% url 'fiscal_years' %}">
+        <span class="tile-title">Fiscal Years</span>
+        <span class="tile-subtitle">GL financial year date ranges</span>
+      </a>
+      <a class="tile-link" href="{% url 'sales_ledger_settings' %}">
+        <span class="tile-title">Sales Ledger Settings</span>
+        <span class="tile-subtitle">Receivables, fee income, and GST output account mapping</span>
+      </a>
+      <a class="tile-link" href="{% url 'invoice_reports_sales_ledger_tb' %}">
+        <span class="tile-title">Sales Ledger TB</span>
+        <span class="tile-subtitle">Trial balance from invoices (by invoice date)</span>
+      </a>
+      <a class="tile-link" href="{% url 'gl_trial_balance' %}">
+        <span class="tile-title">Trial Balance</span>
+        <span class="tile-subtitle">Posting-date TB by FY; opening BS + Retained Earnings when the FY has no activity</span>
+      </a>
+    </nav>
+
+    <p class="muted">
+      <a href="{% url 'setup' %}">← Setup</a>
+      ·
+      <a href="{% url 'home' %}">← Home</a>
+    </p>
+  </section>
+</div>
+{% endblock %}

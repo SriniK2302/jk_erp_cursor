@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Team Grade Map · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Team Grade Map</h1>
+      <p class="muted">Map team members to grades with effective dates.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search grade mappings..."
+          aria-label="Search grade mappings"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Team Member</th>
+              <th>Member Code</th>
+              <th>Grade</th>
+              <th>Grade Code</th>
+              <th>From Date</th>
+              <th>To Date</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mapping in grade_maps %}
+              <tr data-grid-row>
+                <td>{{ mapping.team_member.first_name }} {{ mapping.team_member.last_name }}</td>
+                <td>{{ mapping.team_member.code }}</td>
+                <td>{{ mapping.grade.grade_desc }}</td>
+                <td>{{ mapping.grade.grade_code }}</td>
+                <td>{{ mapping.from_date|date:"Y-m-d" }}</td>
+                <td>{% if mapping.to_date %}{{ mapping.to_date|date:"Y-m-d" }}{% else %}Present{% endif %}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="team_grade_maps" edit_url_name="team_grade_map_edit" edit_pk=mapping.id pk=mapping.id delete_action="delete" confirm_message="Delete this grade mapping?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="7" class="muted">No grade mappings added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching grade mappings found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'team_grade_map_create' %}" class="button">Add Grade Mapping</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}
