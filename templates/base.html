@@ -80,6 +80,7 @@
     window.TIMER_RECENT_TASKS_URL = {% if can_use_engagements_nav %}"{% url 'timer_recent_tasks' %}"{% else %}""{% endif %};
   </script>
   <script src="{% static 'js/timer-start-dialog.js' %}?v=7"></script>
+  <script src="{% static 'js/eng-dropdown-close.js' %}?v=1"></script>
   {% endif %}
   {% block extra_scripts %}{% endblock %}
 </body>

@@ -177,9 +177,9 @@
             <p><strong>{{ q.subject }}</strong>{% if q.service_checklist_item %} <span class="muted">· {{ q.service_checklist_item.line_text }}</span>{% endif %} <span class="muted">· {{ q.query_date|date:"Y-m-d" }} · {{ q.get_entry_type_display }}{% if q.entry_type == "query" %} · {{ q.get_response_expected_from_display }} · {{ q.get_status_display }} · Responses: {{ q.responses.count }}{% endif %} · {% if q.amount %}Amount: {{ q.amount }} {{ q.get_amount_unit_display }} · {% endif %}{% if q.entry_type == "query" %}WP: {% if q.working_paper_no %}{{ q.working_paper_no }}{% else %}Not converted{% endif %}{% endif %}</span></p>
             <div class="note-body-scroll">{{ q.query_text }}</div>
             <p class="muted">Raised by {{ q.created_by }} on {{ q.created_on|date:"Y-m-d H:i" }}</p>
-            {% if q.attachments.all %}
+            {% if q.work_documents.all %}
               <ul class="doc-attachment-list doc-attachment-list-page">
-                {% for att in q.attachments.all %}
+                {% for att in q.work_documents.all %}
                   <li class="doc-attachment-line doc-attachment-line-page">
                     <div class="doc-attachment-line-main doc-attachment-line-with-actions">
                       <span class="doc-attachment-date-badge">{{ att.created_on|date:"Y-m-d" }}</span>

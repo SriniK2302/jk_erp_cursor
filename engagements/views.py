@@ -81,6 +81,7 @@ from .models import (
     DivisionWorkAreaDocument,
     AuditQuery,
     AuditQueryAttachment,
+    WorkDocument,
     AuditQueryMailDraftLog,
     AuditQueryResponse,
     DivisionWorkAreaStatusRemark,
@@ -2810,8 +2811,12 @@ def engagement_work_area_queries(request, engagement_pk, work_area_pk):
             if upload is None:
                 messages.error(request, "Select a file to upload.")
             else:
-                AuditQueryAttachment.objects.create(
-                    query=query,
+                WorkDocument.objects.create(
+                    scope_type=WorkDocument.SCOPE_ENGAGEMENT,
+                    source_type=WorkDocument.SOURCE_AUDIT_QUERY,
+                    engagement=engagement,
+                    engagement_work_area=work_area,
+                    audit_query=query,
                     file=upload,
                     original_filename=(upload.name or "file")[:255],
                     document_reference_no=(
@@ -2825,12 +2830,13 @@ def engagement_work_area_queries(request, engagement_pk, work_area_pk):
                 AuditQuery, pk=request.POST.get("query_pk"), engagement_work_area=work_area
             )
             attachment = get_object_or_404(
-                AuditQueryAttachment,
+                WorkDocument,
                 pk=request.POST.get("attachment_pk"),
-                query=query,
+                audit_query=query,
             )
             attachment.delete()
             messages.success(request, "Document deleted.")
+
         elif action == "edit_query":
             query = get_object_or_404(
                 AuditQuery, pk=request.POST.get("query_pk"), engagement_work_area=work_area
@@ -2883,7 +2889,7 @@ def engagement_work_area_queries(request, engagement_pk, work_area_pk):
         work_area.audit_queries.select_related(
             "created_by", "service_checklist_item"
         )
-        .prefetch_related("responses__created_by", "attachments")
+        .prefetch_related("responses__created_by", "work_documents__created_by")
         .all()
     )
     ctx = work_area_notes_page_context(
@@ -2892,6 +2898,7 @@ def engagement_work_area_queries(request, engagement_pk, work_area_pk):
         engagement=engagement,
         engagement_work_area=True,
     )
+
     ctx["default_date"] = timezone.localdate()
     return render(request, "engagements/work_area_queries.html", ctx)
 
@@ -2933,12 +2940,13 @@ def engagement_query_attachment_download(
         pk=engagement_pk,
     )
     attachment = get_object_or_404(
-        AuditQueryAttachment.objects.select_related("query__engagement_work_area__engagement"),
+        WorkDocument.objects.select_related("engagement_work_area__engagement"),
         pk=pk,
-        query_id=query_pk,
-        query__engagement_work_area_id=work_area_pk,
-        query__engagement_work_area__engagement_id=engagement.pk,
+        audit_query_id=query_pk,
+        engagement_work_area_id=work_area_pk,
+        engagement_work_area__engagement_id=engagement.pk,
     )
+
     if not attachment.file:
         raise Http404
     safe_name = get_valid_filename(attachment.original_filename) or "download"
@@ -3507,8 +3515,12 @@ def engagement_division_work_area_queries(request, division_pk, work_area_pk):
             if upload is None:
                 messages.error(request, "Select a file to upload.")
             else:
-                AuditQueryAttachment.objects.create(
-                    query=query,
+                WorkDocument.objects.create(
+                    scope_type=WorkDocument.SCOPE_DIVISION,
+                    source_type=WorkDocument.SOURCE_AUDIT_QUERY,
+                    division=division,
+                    division_work_area=work_area,
+                    audit_query=query,
                     file=upload,
                     original_filename=(upload.name or "file")[:255],
                     document_reference_no=(
@@ -3522,12 +3534,13 @@ def engagement_division_work_area_queries(request, division_pk, work_area_pk):
                 AuditQuery, pk=request.POST.get("query_pk"), division_work_area=work_area
             )
             attachment = get_object_or_404(
-                AuditQueryAttachment,
+                WorkDocument,
                 pk=request.POST.get("attachment_pk"),
-                query=query,
+                audit_query=query,
             )
             attachment.delete()
             messages.success(request, "Document deleted.")
+
         elif action == "edit_query":
             query = get_object_or_404(
                 AuditQuery, pk=request.POST.get("query_pk"), division_work_area=work_area
@@ -3580,7 +3593,7 @@ def engagement_division_work_area_queries(request, division_pk, work_area_pk):
         work_area.audit_queries.select_related(
             "created_by", "service_checklist_item"
         )
-        .prefetch_related("responses__created_by", "attachments")
+        .prefetch_related("responses__created_by", "work_documents__created_by")
         .all()
     )
     ctx = work_area_notes_page_context(
@@ -3590,6 +3603,7 @@ def engagement_division_work_area_queries(request, division_pk, work_area_pk):
         division=division,
         engagement_work_area=False,
     )
+
     ctx["default_date"] = timezone.localdate()
     return render(request, "engagements/work_area_queries.html", ctx)
 
@@ -3633,12 +3647,13 @@ def engagement_division_query_attachment_download(
         pk=division_pk,
     )
     attachment = get_object_or_404(
-        AuditQueryAttachment.objects.select_related("query__division_work_area__division"),
+        WorkDocument.objects.select_related("division_work_area__division"),
         pk=pk,
-        query_id=query_pk,
-        query__division_work_area_id=work_area_pk,
-        query__division_work_area__division_id=division.pk,
+        audit_query_id=query_pk,
+        division_work_area_id=work_area_pk,
+        division_work_area__division_id=division.pk,
     )
+
     if not attachment.file:
         raise Http404
     safe_name = get_valid_filename(attachment.original_filename) or "download"
