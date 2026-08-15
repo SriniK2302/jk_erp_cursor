@@ -1,0 +1,61 @@
+import uuid
+
+from django.conf import settings
+from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+from django.utils.text import get_valid_filename
+
+from .division_work_area import DivisionWorkArea
+
+def _division_work_area_document_upload_to(instance, filename):
+    safe = get_valid_filename(filename) or "upload"
+    unique = f"{uuid.uuid4().hex}_{safe}"
+    wid = instance.work_area_id
+    did = instance.work_area.division_id
+    return f"division_work_area_documents/{did}/{wid}/{unique}"
+
+
+class DivisionWorkAreaDocument(models.Model):
+    work_area = models.ForeignKey(
+        DivisionWorkArea,
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    document_date = models.DateField()
+    description = models.CharField(max_length=255)
+    document_reference_no = models.CharField(
+        max_length=100, blank=True, default="", db_index=True
+    )
+    remarks = models.TextField(blank=True, default="")
+    file = models.FileField(upload_to=_division_work_area_document_upload_to)
+    original_filename = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_division_work_area_documents",
+    )
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "division_work_area_documents"
+        ordering = ["-document_date", "original_filename", "pk"]
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.original_filename:
+            raw = getattr(self.file, "name", "") or ""
+            base = raw.replace("\\", "/").rsplit("/", 1)[-1]
+            self.original_filename = (base or "file")[:255]
+        self.description = (self.description or "").strip()
+        self.document_reference_no = (self.document_reference_no or "").strip()
+        self.remarks = (self.remarks or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.work_area.work_area_name} | {self.original_filename}"
+
+
+@receiver(post_delete, sender=DivisionWorkAreaDocument)
+def _delete_division_work_area_document_file(sender, instance, **kwargs):
+    if instance.file:
+        instance.file.delete(save=False)

@@ -1,0 +1,5 @@
+STATUS_PENDING = "Pending"
+STATUS_SCHEDULED = "Scheduled"
+STATUS_IN_PROGRESS = "In Progress"
+STATUS_COMPLETED = "Completed"
+CLOSURE_SOURCE_ENGAGEMENT_AUTO = "engagement_auto_close"

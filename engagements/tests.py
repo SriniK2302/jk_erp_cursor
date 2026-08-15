@@ -78,6 +78,39 @@ from .work_area_notes_batch import (
 )
 
 
+def grant_engagements_module_access(user):
+    group, _ = Group.objects.get_or_create(name="module_engagements")
+    user.groups.add(group)
+    return group
+
+
+def assign_user_to_engagement(user, engagement, *, created_by=None):
+    """Grant module access and a team assignment so engagement-scoped views return 200."""
+    grant_engagements_module_access(user)
+    created_by = created_by or user
+    code = f"U{user.pk}"[-4:].rjust(4, "0")
+    member, _ = TeamMember.objects.get_or_create(
+        user=user,
+        defaults={
+            "first_name": "Test",
+            "last_name": "Member",
+            "called_as": f"TM{user.pk}",
+            "code": code,
+            "created_by": created_by,
+        },
+    )
+    EngagementTeamAssignment.objects.get_or_create(
+        engagement=engagement,
+        team_member=member,
+        defaults={
+            "planned_start": date(2000, 1, 1),
+            "planned_finish": date(2000, 12, 31),
+            "created_by": created_by,
+        },
+    )
+    return member
+
+
 class ChecklistItemsPayloadTests(TestCase):
     def test_payload_trims_line_text(self):
         class _Obj:
@@ -1486,6 +1519,7 @@ class EngagementDivisionDocumentationMapFormTests(TestCase):
             created_by=self.user,
         )
         self.documentation_2.applicable_classifications.add(self.classification)
+        assign_user_to_engagement(self.user, self.engagement)
 
     def test_queryset_excludes_documentation_for_other_classifications(self):
         llp, _ = ClientClassification.objects.get_or_create(
@@ -2398,6 +2432,7 @@ class EngagementDocumentationAttachmentTests(TestCase):
             },
         )
         self.media_dir = tempfile.mkdtemp()
+        assign_user_to_engagement(self.user, self.engagement)
 
     def tearDown(self):
         shutil.rmtree(self.media_dir, ignore_errors=True)
@@ -2731,6 +2766,7 @@ class EngagementDivisionDocumentationAttachmentTests(TestCase):
             },
         )
         self.media_dir = tempfile.mkdtemp()
+        assign_user_to_engagement(self.user, self.engagement)
 
     def tearDown(self):
         shutil.rmtree(self.media_dir, ignore_errors=True)
@@ -3064,6 +3100,7 @@ class DivisionWorkAreaStatusRemarkTests(TestCase):
                 "work_area_pk": self.work_area.pk,
             },
         )
+        assign_user_to_engagement(self.user, self.engagement)
 
     def test_add_status_remark(self):
         self.client.force_login(self.user)
@@ -3136,40 +3173,36 @@ class StatusRemarksReportTests(TestCase):
         )
 
     def test_status_remarks_report_shows_all_levels(self):
-        EngagementStatusRemark.objects.create(
-            engagement=self.engagement,
-            remark_date=date(2046, 5, 1),
-            remarks="Eng level note",
+        AuditQuery.objects.create(
+            engagement_work_area=self.eng_work_area,
+            query_date=date(2046, 5, 3),
+            entry_type=AuditQuery.ENTRY_TYPE_REMARK,
+            subject="Eng WA note",
+            query_text="Eng WA note",
+            response_expected_from=AuditQuery.RESPONDER_INTERNAL,
+            status=AuditQuery.STATUS_CLOSED,
             created_by=self.user,
         )
-        EngagementDivisionStatusRemark.objects.create(
-            division=self.division,
-            remark_date=date(2046, 5, 2),
-            remarks="Division note",
-            created_by=self.user,
-        )
-        EngagementWorkAreaStatusRemark.objects.create(
-            work_area=self.eng_work_area,
-            remark_date=date(2046, 5, 3),
-            remarks="Eng WA note",
-            created_by=self.user,
-        )
-        DivisionWorkAreaStatusRemark.objects.create(
-            work_area=self.div_work_area,
-            remark_date=date(2046, 5, 4),
-            remarks="Div WA note",
+        AuditQuery.objects.create(
+            division_work_area=self.div_work_area,
+            query_date=date(2046, 5, 4),
+            entry_type=AuditQuery.ENTRY_TYPE_REMARK,
+            subject="Div WA note",
+            query_text="Div WA note",
+            response_expected_from=AuditQuery.RESPONDER_INTERNAL,
+            status=AuditQuery.STATUS_CLOSED,
             created_by=self.user,
         )
 
         self.client.force_login(self.user)
         response = self.client.get(reverse("status_remarks_report"))
+        self.assertRedirects(
+            response,
+            f"{reverse('work_area_notes_report')}?type=remark",
+            fetch_redirect_response=False,
+        )
+        response = self.client.get(reverse("work_area_notes_report"), {"type": "remark"})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Engagement")
-        self.assertContains(response, "Division")
-        self.assertContains(response, "Eng. work area")
-        self.assertContains(response, "Div. work area")
-        self.assertContains(response, "Eng level note")
-        self.assertContains(response, "Division note")
         self.assertContains(response, "Eng WA note")
         self.assertContains(response, "Div WA note")
 
@@ -6067,6 +6100,7 @@ class WorkAreaPlanReverseUpdateTests(TestCase):
         self.user = get_user_model().objects.create_user(
             username="wa_reverse_user",
             password="pass12345",
+            is_superuser=True,
         )
         self.classification, _ = ClientClassification.objects.get_or_create(
             classification_name="Others",
@@ -6089,6 +6123,11 @@ class WorkAreaPlanReverseUpdateTests(TestCase):
         self.service = Service.objects.create(
             service_desc="Taxation Services",
             service_code="TAX2",
+            created_by=self.user,
+        )
+        self.documentation = EngagementDocumentation.objects.create(
+            standard_document="Work area doc",
+            document_stage=EngagementDocumentation.PRE_ENGAGEMENT,
             created_by=self.user,
         )
         self.engagement = Engagement.objects.create(
@@ -6116,6 +6155,8 @@ class WorkAreaPlanReverseUpdateTests(TestCase):
             sort_order=0,
             created_by=self.user,
         )
+
+        assign_user_to_engagement(self.user, self.engagement)
 
     def test_engagement_work_area_create_backfills_engagement_schedule(self):
         self.client.force_login(self.user)
@@ -6187,7 +6228,11 @@ class WorkAreaPlanReverseUpdateTests(TestCase):
         )
         response = self.client.post(
             reverse("engagement_division_work_area_create", args=[self.division.pk]),
-            {"work_area_name": "Inserted Work", "sort_order": "3"},
+            {
+                "work_area_name": "Inserted Work",
+                "sort_order": "3",
+                "documentation": self.documentation.pk,
+            },
         )
         self.assertEqual(response.status_code, 302)
         actual = list(
@@ -6224,7 +6269,11 @@ class WorkAreaPlanReverseUpdateTests(TestCase):
                 "engagement_division_work_area_edit",
                 args=[self.division.pk, work_b.pk],
             ),
-            {"work_area_name": "Work B", "sort_order": "3"},
+            {
+                "work_area_name": "Work B",
+                "sort_order": "3",
+                "documentation": self.documentation.pk,
+            },
         )
         self.assertEqual(response.status_code, 302)
         actual = list(
@@ -6647,15 +6696,21 @@ class EngagementsListStatusFilterTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse("engagements"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "List Audit")
-        self.assertNotContains(response, "List Tax")
+        service_names = list(
+            response.context["engagements"].values_list("service__service_desc", flat=True)
+        )
+        self.assertIn("List Audit", service_names)
+        self.assertNotIn("List Tax", service_names)
 
     def test_completed_filter_shows_only_completed(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("engagements"), {"status": "completed"})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "List Tax")
-        self.assertNotContains(response, "List Audit")
+        service_names = list(
+            response.context["engagements"].values_list("service__service_desc", flat=True)
+        )
+        self.assertIn("List Tax", service_names)
+        self.assertNotIn("List Audit", service_names)
 
     def test_all_filter_shows_both(self):
         self.client.force_login(self.user)
@@ -6766,6 +6821,7 @@ class ClosedEntityReopenPermissionTests(TestCase):
             actual_finish=date(2065, 5, 22),
             created_by=self.superuser,
         )
+        grant_engagements_module_access(self.user)
 
     def test_non_superuser_cannot_reopen_closed_engagement(self):
         self.client.force_login(self.user)
@@ -6781,7 +6837,7 @@ class ClosedEntityReopenPermissionTests(TestCase):
                 "actual_finish": "",
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 403)
         self.engagement_schedule.refresh_from_db()
         self.assertEqual(self.engagement_schedule.actual_finish, date(2065, 5, 22))
 
@@ -6816,7 +6872,7 @@ class ClosedEntityReopenPermissionTests(TestCase):
                 "actual_finish": "",
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 403)
         self.division.refresh_from_db()
         self.assertEqual(self.division.actual_finish, date(2065, 5, 22))
 
@@ -6834,7 +6890,7 @@ class ClosedEntityReopenPermissionTests(TestCase):
                 "actual_finish": "",
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 403)
         self.eng_wa_period.refresh_from_db()
         self.assertEqual(self.eng_wa_period.actual_finish, date(2065, 5, 22))
 
@@ -6852,7 +6908,7 @@ class ClosedEntityReopenPermissionTests(TestCase):
                 "actual_finish": "",
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 403)
         self.div_wa_period.refresh_from_db()
         self.assertEqual(self.div_wa_period.actual_finish, date(2065, 5, 22))
 
