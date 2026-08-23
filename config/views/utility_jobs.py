@@ -8,6 +8,8 @@ _SIMILAR_REF_JOBS_LOCK = threading.Lock()
 _SIMILAR_REF_JOBS: dict[str, dict] = {}
 _EXCEL_IMPORT_JOBS_LOCK = threading.Lock()
 _EXCEL_IMPORT_JOBS: dict[str, dict] = {}
+_MOVE_ALL_JOBS_LOCK = threading.Lock()
+_MOVE_ALL_JOBS: dict[str, dict] = {}
 def _save_excel_import_preferences(
     request,
     *,
@@ -374,6 +376,87 @@ def _start_excel_import_job(
     thread = threading.Thread(
         target=run, name=f"excel-import-{job_id}", daemon=True
     )
+    thread.start()
+
+
+def _move_all_progress_percent(phase: str, current: int, total: int | None) -> int:
+    if phase == "collecting":
+        if total:
+            return 20
+        return min(15, 5 + (current // 250))
+    if phase == "moving":
+        if total and total > 0:
+            return 20 + int((current / total) * 70)
+        return 85
+    if phase == "cleanup":
+        return 95
+    if phase in {"done", "error"}:
+        return 100
+    return 5
+
+
+def _start_move_all_files_job(job_id: str, source_root: Path, target_root: Path) -> None:
+    def run() -> None:
+        try:
+            def progress_callback(phase: str, current: int, total: int | None, message: str) -> None:
+                with _MOVE_ALL_JOBS_LOCK:
+                    job = _MOVE_ALL_JOBS.get(job_id)
+                    if not job:
+                        return
+                    job["phase"] = phase
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = message
+                    job["progress_percent"] = _move_all_progress_percent(phase, current, total)
+
+            report = move_all_files_flat(
+                source_root=source_root,
+                target_root=target_root,
+                progress_callback=progress_callback,
+            )
+
+            payload = {
+                "ok": True,
+                "source_root": str(report.source_root),
+                "target_root": str(report.target_root),
+                "scanned_files": report.scanned_files,
+                "moved_files": report.moved_files,
+                "moved_bytes": report.moved_bytes,
+                "renamed_count": report.renamed_count,
+                "deleted_folders": report.deleted_folders,
+                "skipped_count": report.skipped_count,
+                "message": (
+                    f"Moved {report.moved_files} files to '{report.target_root}'. "
+                    f"Renamed {report.renamed_count} for name conflicts. "
+                    f"Removed {report.deleted_folders} empty folders."
+                ),
+            }
+            if report.skipped_count:
+                payload["warning"] = (
+                    f"Skipped {report.skipped_count} files/folders due to access errors."
+                )
+
+            with _MOVE_ALL_JOBS_LOCK:
+                job = _MOVE_ALL_JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["phase"] = "done"
+                    job["progress_percent"] = 100
+                    job["message"] = "Move all files completed."
+                    job["result"] = payload
+                    job["updated_at"] = time.time()
+        except Exception as exc:  # broad catch to keep job state visible to UI
+            with _MOVE_ALL_JOBS_LOCK:
+                job = _MOVE_ALL_JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["phase"] = "error"
+                    job["progress_percent"] = 100
+                    job["message"] = str(exc)
+                    job["error"] = str(exc)
+                    job["updated_at"] = time.time()
+
+    thread = threading.Thread(target=run, name=f"move-all-job-{job_id}", daemon=True)
     thread.start()
 
 

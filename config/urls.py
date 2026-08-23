@@ -215,6 +215,16 @@ urlpatterns = [
         name='select_content_search_folder',
     ),
     path(
+        'utilities/select-move-all-source-folder/',
+        views.select_move_all_source_folder,
+        name='select_move_all_source_folder',
+    ),
+    path(
+        'utilities/select-move-all-target-folder/',
+        views.select_move_all_target_folder,
+        name='select_move_all_target_folder',
+    ),
+    path(
         'utilities/select-rename-date-prefix-folder/',
         views.select_rename_date_prefix_folder,
         name='select_rename_date_prefix_folder',
@@ -298,6 +308,16 @@ urlpatterns = [
         'utilities/delete-duplicate-files/status/<str:job_id>/',
         views.duplicate_delete_status,
         name='duplicate_delete_status',
+    ),
+    path(
+        'utilities/move-all-files/',
+        views.move_all_files,
+        name='move_all_files',
+    ),
+    path(
+        'utilities/move-all-files/status/<str:job_id>/',
+        views.move_all_files_status,
+        name='move_all_files_status',
     ),
     path(
         'utilities/similar-files/find/',

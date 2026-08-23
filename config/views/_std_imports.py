@@ -19,6 +19,7 @@ from hr.teams.models import (
 from utilities.delete_duplicate_files import move_duplicate_files_by_signature
 from utilities.delete_empty_folders import choose_root_folder, delete_empty_folders_under
 from utilities.file_content_search import scan_folder_for_phrase
+from utilities.move_all_files import move_all_files_flat
 from utilities.move_files_to_fy_folder import move_direct_files_to_fy_folders
 from utilities.move_files_by_name_contains import move_direct_files_name_contains
 from utilities.rename_files_by_content_date import rename_direct_files_by_content_date

@@ -16,6 +16,8 @@ def utilities(request):
     duplicate_source_folder = request.session.get("utilities_duplicate_source_folder", "")
     duplicate_target_folder = request.session.get("utilities_duplicate_target_folder", "")
     content_search_folder = request.session.get("utilities_content_search_folder", "")
+    move_all_source_folder = request.session.get("utilities_move_all_source_folder", "")
+    move_all_target_folder = request.session.get("utilities_move_all_target_folder", "")
     return render(
         request,
         "utilities.html",
@@ -24,6 +26,8 @@ def utilities(request):
             "duplicate_source_folder": duplicate_source_folder,
             "duplicate_target_folder": duplicate_target_folder,
             "content_search_folder": content_search_folder,
+            "move_all_source_folder": move_all_source_folder,
+            "move_all_target_folder": move_all_target_folder,
         },
     )
 
@@ -438,6 +442,48 @@ def select_duplicate_target_folder(request):
 
     request.session["utilities_duplicate_target_folder"] = str(root_path)
     messages.success(request, f"Selected duplicate target folder: {root_path}")
+    return redirect("utilities")
+
+
+@login_required
+@require_POST
+def select_move_all_source_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("utilities")
+
+    if root_path is None:
+        messages.info(request, "Source folder selection cancelled.")
+        return redirect("utilities")
+
+    request.session["utilities_move_all_source_folder"] = str(root_path)
+    messages.success(request, f"Selected move-all-files source folder: {root_path}")
+    return redirect("utilities")
+
+
+@login_required
+@require_POST
+def select_move_all_target_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("utilities")
+
+    if root_path is None:
+        messages.info(request, "Target folder selection cancelled.")
+        return redirect("utilities")
+
+    request.session["utilities_move_all_target_folder"] = str(root_path)
+    messages.success(request, f"Selected move-all-files target folder: {root_path}")
     return redirect("utilities")
 
 
@@ -1100,6 +1146,108 @@ def delete_duplicate_files(request):
 def duplicate_delete_status(request, job_id):
     with _DUPLICATE_JOBS_LOCK:
         job = _DUPLICATE_JOBS.get(job_id)
+
+    if not job:
+        return JsonResponse({"ok": False, "message": "Job not found."}, status=404)
+
+    response_payload = {
+        "ok": True,
+        "job_id": job_id,
+        "done": job["done"],
+        "phase": job["phase"],
+        "current": job["current"],
+        "total": job["total"],
+        "progress_percent": job["progress_percent"],
+        "message": job["message"],
+    }
+    if job.get("error"):
+        response_payload["error"] = job["error"]
+    if job.get("result"):
+        response_payload["result"] = job["result"]
+    return JsonResponse(response_payload)
+
+
+@login_required
+@require_POST
+def move_all_files(request):
+    source_folder = (
+        (request.POST.get("move_all_source_folder") or "").strip()
+        or request.session.get("utilities_move_all_source_folder", "")
+    )
+    target_folder = (
+        (request.POST.get("move_all_target_folder") or "").strip()
+        or request.session.get("utilities_move_all_target_folder", "")
+    )
+
+    if not source_folder:
+        return JsonResponse(
+            {"ok": False, "message": "Select a source folder first."},
+            status=400,
+        )
+    if not target_folder:
+        return JsonResponse(
+            {"ok": False, "message": "Select a target folder first."},
+            status=400,
+        )
+
+    source_root = Path(source_folder).expanduser()
+    target_root = Path(target_folder).expanduser()
+
+    if not source_root.exists() or not source_root.is_dir():
+        return JsonResponse(
+            {"ok": False, "message": f"Source folder not found: {source_root}"},
+            status=400,
+        )
+    if not target_root.exists() or not target_root.is_dir():
+        return JsonResponse(
+            {"ok": False, "message": f"Target folder not found: {target_root}"},
+            status=400,
+        )
+
+    request.session["utilities_move_all_source_folder"] = str(source_root)
+    request.session["utilities_move_all_target_folder"] = str(target_root)
+
+    try:
+        source_resolved = source_root.resolve()
+        target_resolved = target_root.resolve()
+        if source_resolved == target_resolved:
+            raise ValueError("Source and target folders cannot be the same.")
+        if source_resolved.is_relative_to(target_resolved) or target_resolved.is_relative_to(source_resolved):
+            raise ValueError("Source and target folders cannot be nested within each other.")
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+
+    job_id = str(uuid.uuid4())
+    with _MOVE_ALL_JOBS_LOCK:
+        _MOVE_ALL_JOBS[job_id] = {
+            "done": False,
+            "phase": "queued",
+            "current": 0,
+            "total": None,
+            "progress_percent": 5,
+            "message": "Job queued...",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+            "updated_at": time.time(),
+        }
+
+    _start_move_all_files_job(job_id=job_id, source_root=source_root, target_root=target_root)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "message": "Move all files started.",
+        }
+    )
+
+
+@login_required
+@require_GET
+def move_all_files_status(request, job_id):
+    with _MOVE_ALL_JOBS_LOCK:
+        job = _MOVE_ALL_JOBS.get(job_id)
 
     if not job:
         return JsonResponse({"ok": False, "message": "Job not found."}, status=404)
