@@ -9,6 +9,7 @@ unbounded.
 
 from __future__ import annotations
 
+import csv
 import math
 import re
 from datetime import date, datetime, time
@@ -28,12 +29,19 @@ from psycopg import sql
 from utilities.pg_row_delete import connect_with_params
 
 EXCEL_FILETYPES = [
+    ("Excel and CSV files", "*.xlsx *.xlsm *.xltx *.xltm *.csv"),
     ("Excel workbooks", "*.xlsx *.xlsm *.xltx *.xltm"),
+    ("CSV files", "*.csv"),
     ("All files", "*.*"),
 ]
 
+
+# Synthetic single "sheet" name used for CSV files (which have no sheets).
+CSV_SHEET_NAME = "Sheet1"
+
 # Default width when information_schema has no length (e.g. VARCHAR without max)
 MIN_VARCHAR_LEN = 255
+
 
 
 def choose_excel_file() -> Path | None:
@@ -61,8 +69,48 @@ def choose_excel_file() -> Path | None:
     return Path(selected)
 
 
+def _csv_cell_value(raw: str | None) -> Any:
+    """Infer int/float/bool from a CSV string cell; keep everything else as trimmed text."""
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    if s.upper() in ("TRUE", "FALSE"):
+        return s.upper() == "TRUE"
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    return s
+
+
+def _read_csv_rows(path: Path) -> tuple[list[str], list[list[Any]]]:
+    with path.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.reader(fh)
+        rows = list(reader)
+    if not rows:
+        return [], []
+    headers = [_header_cell_str(c) for c in rows[0]]
+    width = len(headers)
+    data: list[list[Any]] = []
+    for row in rows[1:]:
+        if len(row) < width:
+            row = row + [None] * (width - len(row))
+        else:
+            row = row[:width]
+        data.append([_csv_cell_value(c) for c in row])
+    return headers, data
+
+
 def list_sheet_names(path: Path) -> list[str]:
     path = path.resolve()
+    if path.suffix.lower() == ".csv":
+        return [CSV_SHEET_NAME]
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         return [ws.title for ws in wb.worksheets]
@@ -72,6 +120,9 @@ def list_sheet_names(path: Path) -> list[str]:
 
 def read_sheet_headers_only(path: Path, sheet_name: str) -> list[str]:
     path = path.resolve()
+    if path.suffix.lower() == ".csv":
+        headers, _ = _read_csv_rows(path)
+        return headers
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         if sheet_name not in wb.sheetnames:
@@ -118,6 +169,8 @@ def _cell_raw(value: Any) -> Any:
 def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[list[Any]]]:
     """Header row as strings; data rows preserve int/float/bool/datetime/str."""
     path = path.resolve()
+    if path.suffix.lower() == ".csv":
+        return _read_csv_rows(path)
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         if sheet_name not in wb.sheetnames:
@@ -140,6 +193,7 @@ def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[li
         return headers, data
     finally:
         wb.close()
+
 
 
 def read_sheet_rows(path: Path, sheet_name: str) -> tuple[list[str], list[list[Any]]]:
@@ -248,12 +302,15 @@ def _fetch_public_column_metadata(
     """
     lower(column_name) -> column metadata for ``public`` table (case-insensitive name).
 
-    Includes fields needed for coercion without scanning sheet rows for types.
+    Includes fields needed for coercion without scanning sheet rows for types,
+    plus identity/serial/generated flags used to exclude auto and calculated
+    columns from Excel-to-table matching.
     """
     cur.execute(
         """
         SELECT column_name, data_type, character_maximum_length,
-               numeric_precision, numeric_scale, udt_name
+               numeric_precision, numeric_scale, udt_name,
+               is_identity, column_default, is_generated
         FROM information_schema.columns
         WHERE table_catalog = current_database()
           AND table_schema = 'public'
@@ -263,14 +320,11 @@ def _fetch_public_column_metadata(
     )
     out: dict[str, dict[str, Any]] = {}
     for row in cur.fetchall():
-        cname, dtype, cmax, nprec, nscale, udt = (
-            row[0],
-            row[1],
-            row[2],
-            row[3],
-            row[4],
-            row[5],
+        cname, dtype, cmax, nprec, nscale, udt, is_identity, col_default, is_generated = row
+        is_auto = (is_identity == "YES") or bool(
+            col_default and "nextval(" in col_default
         )
+        is_calculated = is_generated == "ALWAYS"
         out[cname.lower()] = {
             "column_name": cname,
             "data_type": dtype,
@@ -278,8 +332,11 @@ def _fetch_public_column_metadata(
             "numeric_precision": nprec,
             "numeric_scale": nscale,
             "udt_name": udt,
+            "is_auto": is_auto,
+            "is_calculated": is_calculated,
         }
     return out
+
 
 
 def _coercion_pg_type_from_db_meta(meta: dict[str, Any] | None) -> str:
@@ -941,7 +998,17 @@ def inspect_import_column_mapping(
         for name in selected_import_names
         if name.lower() in by_lower
     ]
-    table_only_columns = [c for c in existing_cols if c.lower() not in selected_lower]
+
+    # Table columns not present in the selected Excel columns are expected
+    # (auto/identity columns, calculated columns, or simply table columns
+    # the source doesn't populate) and are never reported as a problem.
+    table_only_columns = [
+        c
+        for c in existing_cols
+        if c.lower() not in selected_lower
+        and not (column_meta.get(c.lower()) or {}).get("is_auto")
+        and not (column_meta.get(c.lower()) or {}).get("is_calculated")
+    ]
 
     for pair in selected_pairs:
         matches = pair["sanitized_name"].lower() in by_lower
@@ -954,19 +1021,7 @@ def inspect_import_column_mapping(
             pair["postgres_column"] = None
             pair["postgres_type"] = None
 
-    table_only_details: list[dict[str, Any]] = []
-    for col in table_only_columns:
-        meta = column_meta.get(col.lower())
-        table_only_details.append(
-            {
-                "postgres_column": col,
-                "postgres_type": _coercion_pg_type_from_db_meta(meta)
-                if meta
-                else None,
-            }
-        )
-
-    exact_match = not missing_in_table and not table_only_columns
+    exact_match = not missing_in_table
     return {
         "table_name": table_name,
         "selected_excel_count": len(selected_pairs),
@@ -975,9 +1030,9 @@ def inspect_import_column_mapping(
         "matched_columns": matched_in_table,
         "missing_in_table": missing_in_table,
         "table_only_columns": table_only_columns,
-        "table_only_details": table_only_details,
         "exact_match": exact_match,
     }
+
 
 
 def _header_key_label(h: str) -> str:

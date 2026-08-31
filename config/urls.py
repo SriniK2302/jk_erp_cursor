@@ -3,7 +3,9 @@ URL configuration for config project.
 """
 
 from django.contrib import admin
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LogoutView
+
+from config.views.auth import TrialRestrictedLoginView
 from django.views.generic import RedirectView
 from django.urls import include, path
 
@@ -26,6 +28,11 @@ urlpatterns = [
     path('engagements/', include('engagements.urls')),
     path('invoices/', include('sales.invoices.urls')),
     path('setup/', views.setup, name='setup'),
+    path(
+        'setup/server/',
+        views.setup_server_environment,
+        name='setup_server_environment',
+    ),
     path('gl/', views.gl_hub, name='gl_hub'),
     path('gl/trial-balance/', views.gl_trial_balance, name='gl_trial_balance'),
     path('setup/chart-of-accounts/', include('gl.chart_of_accounts.urls')),
@@ -76,6 +83,11 @@ urlpatterns = [
         'data-utilities/excel-import/sheets/',
         views.excel_import_sheets_json,
         name='excel_import_sheets_json',
+    ),
+    path(
+        'data-utilities/excel-import/tables/',
+        views.excel_import_tables_json,
+        name='excel_import_tables_json',
     ),
     path(
         'data-utilities/excel-import/headers/',
@@ -234,11 +246,19 @@ urlpatterns = [
         views.select_rename_text_folder,
         name='select_rename_text_folder',
     ),
+
     path(
         'utilities/select-rename-content-date-folder/',
         views.select_rename_content_date_folder,
         name='select_rename_content_date_folder',
     ),
+
+    path(
+        'utilities/select-cleanup-fy-folder/',
+        views.select_cleanup_fy_folder,
+        name='select_cleanup_fy_folder',
+    ),
+
     path(
         'utilities/select-move-to-fy-folder/',
         views.select_move_to_fy_folder,
@@ -255,10 +275,23 @@ urlpatterns = [
         name='select_move_name_target_folder',
     ),
     path(
+        'utilities/select-move-first-chars-folder/',
+        views.select_move_first_chars_folder,
+        name='select_move_first_chars_folder',
+    ),
+
+        path(
+        'utilities/select-prefix-fy-xml-folder/',
+        views.select_prefix_fy_xml_folder,
+        name='select_prefix_fy_xml_folder',
+    ),
+
+    path(
         'utilities/select-similar-files-folder/',
         views.select_similar_files_folder,
         name='select_similar_files_folder',
     ),
+
     path(
         'utilities/similar-files/select-reference/',
         views.select_similar_reference_file,
@@ -279,11 +312,19 @@ urlpatterns = [
         views.rename_date_prefix_files,
         name='rename_date_prefix_files',
     ),
+
     path(
         'utilities/rename-files-based-on-text/',
         views.rename_files_based_on_text,
         name='rename_files_based_on_text',
     ),
+
+        path(
+        'utilities/cleanup-fy-file-names/',
+        views.cleanup_fy_file_names,
+        name='cleanup_fy_file_names',
+    ),
+    
     path(
         'utilities/rename-files-by-content-date/',
         views.rename_files_by_content_date,
@@ -299,6 +340,20 @@ urlpatterns = [
         views.move_files_name_contains,
         name='move_files_name_contains',
     ),
+
+    path(
+        'utilities/move-files-by-first-chars/',
+        views.move_files_by_first_chars,
+        name='move_files_by_first_chars',
+    ),
+
+        path(
+        'utilities/process-it-xml-files/',
+        views.process_it_xml_files,
+        name='process_it_xml_files',
+    ),
+    
+
     path(
         'utilities/delete-duplicate-files/',
         views.delete_duplicate_files,
@@ -360,6 +415,7 @@ urlpatterns = [
         name='sales_ledger_settings',
     ),
     path('setup/gl/fiscal-years/', include('gl.fiscal_years.urls')),
+    path('gl/bank-transactions-source-ob/', include('gl.bank_transactions.urls')),
     path('setup/hr/teams/', include('hr.teams.urls')),
     path(
         'setup/hr/team-qualification-maps/',
@@ -485,8 +541,9 @@ urlpatterns = [
     ),
     path(
         'accounts/login/',
-        LoginView.as_view(redirect_authenticated_user=True),
+        TrialRestrictedLoginView.as_view(),
         name='login',
     ),
     path('accounts/logout/', LogoutView.as_view(), name='logout'),
 ]
+

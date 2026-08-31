@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}JK ERP{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=23">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=25">
 </head>
 <body>
   {% if user.is_authenticated %}
@@ -26,6 +26,11 @@
       <a href="{% url 'setup' %}" class="global-mini-nav__item" title="Setup" aria-label="Setup">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h0a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.5h0a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v0a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.5 1z"/></svg>
       </a>
+      {% if can_manage_server_environment %}
+      <a href="{% url 'setup_server_environment' %}" class="global-mini-nav__item" title="Server environment" aria-label="Server environment">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 11v6c0 1.7 4 3 9 3s9-1.3 9-3v-6"/></svg>
+      </a>
+      {% endif %}
       <a href="{% url 'manage_engagements' %}" class="global-mini-nav__item" title="Manage Engagements" aria-label="Manage Engagements">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
       </a>
@@ -60,6 +65,15 @@
   {% endif %}
   {% if user.is_authenticated %}
     {% include "engagements/_session_engagement_bar.html" %}
+  {% endif %}
+  {% if jk_erp_is_trial %}
+    <div class="trial-server-banner" role="status">
+      <strong>Trial server</strong>
+      <span class="muted">Separate database for sample data — production is unaffected.</span>
+      {% if can_manage_server_environment %}
+        <a href="{% url 'setup_server_environment' %}" class="trial-server-banner__link">Server &amp; migrations</a>
+      {% endif %}
+    </div>
   {% endif %}
   {% block global_messages %}
     {% if messages %}

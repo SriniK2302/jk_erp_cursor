@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Server environment · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Server environment</h1>
+      <p class="muted">Switch between the live server and the trial server. Set up the trial database once, then copy your live login.</p>
+    </header>
+
+    <section class="server-switch-panel" aria-label="Server selection">
+      <h2 class="section-heading">Select server</h2>
+      <div class="server-switch-grid">
+        <a
+          class="server-switch-card{% if not jk_erp_is_trial %} is-current{% endif %}"
+          href="{{ live_server_url }}{% url 'setup_server_environment' %}"
+        >
+          <span class="server-switch-card__label">Live server</span>
+          <span class="server-switch-card__meta">Production data · {{ live_database_name }}</span>
+          {% if not jk_erp_is_trial %}
+            <span class="server-switch-card__badge">Current</span>
+          {% else %}
+            <span class="server-switch-card__action">Open live server →</span>
+          {% endif %}
+        </a>
+        <a
+          class="server-switch-card{% if jk_erp_is_trial %} is-current{% endif %}"
+          href="{{ trial_server_url }}{% url 'setup_server_environment' %}"
+        >
+          <span class="server-switch-card__label">Trial server</span>
+          <span class="server-switch-card__meta">Sample data · {{ trial_database_name }} · user {{ trial_allowed_username }} only</span>
+          {% if jk_erp_is_trial %}
+            <span class="server-switch-card__badge">Current</span>
+          {% else %}
+            <span class="server-switch-card__action">Open trial server →</span>
+          {% endif %}
+        </a>
+      </div>
+      <p class="muted server-switch-note">
+        Current database: <strong>{{ database_name }}</strong>
+        · environment: <strong>{{ jk_erp_env }}</strong>
+      </p>
+    </section>
+
+    {% if jk_erp_is_trial %}
+      <section class="server-migration-panel" aria-label="Trial database setup">
+        <h2 class="section-heading">Trial database (one-time setup)</h2>
+        {% if trial_db_ready %}
+          <p class="form-banner form-banner-success" role="status">
+            Trial database <strong>{{ database_name }}</strong> exists and is connected.
+          </p>
+        {% else %}
+          <p class="form-banner form-banner-error" role="status">
+            {{ trial_db_error }}
+          </p>
+          <form method="post" action="{% url 'setup_server_environment' %}" class="stack-form server-migration-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_db">
+            <button type="submit" class="button button-primary">Create trial database</button>
+          </form>
+          <p class="muted">Creates <strong>{{ trial_database_name }}</strong> on Postgres and runs all table migrations once.</p>
+        {% endif %}
+      </section>
+
+      {% if trial_db_ready %}
+        <section class="server-migration-panel" aria-label="Trial login from live">
+          <h2 class="section-heading">Trial login</h2>
+          <p class="muted">
+            Copy user <strong>{{ trial_allowed_username }}</strong> from live database
+            <strong>{{ live_database_name }}</strong> (same password and admin flags).
+          </p>
+          {% if trial_user_exists %}
+            <p class="form-banner form-banner-success" role="status">
+              User <strong>{{ trial_allowed_username }}</strong> exists on the trial database.
+            </p>
+          {% else %}
+            <p class="form-banner form-banner-error" role="status">
+              User <strong>{{ trial_allowed_username }}</strong> is not on the trial database yet.
+            </p>
+          {% endif %}
+          <form method="post" action="{% url 'setup_server_environment' %}" class="stack-form server-migration-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="copy_user">
+            <button type="submit" class="button button-secondary">Copy {{ trial_allowed_username }} from live server</button>
+          </form>
+        </section>
+
+        <section class="server-migration-panel" aria-label="Trial database migrations">
+          <h2 class="section-heading">Database migrations</h2>
+          <p class="muted">
+            Apply pending Django migrations to <strong>{{ database_name }}</strong>.
+          </p>
+          {% if pending_count %}
+            <p class="form-banner form-banner-error" role="status">
+              {{ pending_count }} pending migration{{ pending_count|pluralize }}.
+            </p>
+            <ul class="migration-pending-list">
+              {% for name in pending_migrations %}
+                <li><code>{{ name }}</code></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="form-banner form-banner-success" role="status">
+              All migrations are applied.
+            </p>
+          {% endif %}
+
+          <form method="post" action="{% url 'setup_server_environment' %}" class="stack-form server-migration-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="migrate">
+            <button type="submit" class="button button-primary">Run all table migrations</button>
+          </form>
+        </section>
+      {% endif %}
+
+      {% if operation_output %}
+        <details class="migration-output" open>
+          <summary>Operation log</summary>
+          <pre>{{ operation_output }}</pre>
+        </details>
+      {% endif %}
+    {% else %}
+      <section class="server-migration-panel" aria-label="Trial setup on live server">
+        <h2 class="section-heading">Trial database and migrations</h2>
+        <p class="muted">
+          Create the trial database, copy your login, and run migrations on the trial server.
+          <a href="{{ trial_server_url }}{% url 'setup_server_environment' %}">Open trial server</a>
+        </p>
+      </section>
+    {% endif %}
+
+    <p class="muted"><a href="{% url 'setup' %}">← Back to Setup</a></p>
+  </section>
+</div>
+{% endblock %}

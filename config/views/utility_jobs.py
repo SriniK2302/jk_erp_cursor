@@ -466,23 +466,11 @@ def _is_truthy_form_value(value: str) -> bool:
 
 def _excel_import_mapping_warning(check: dict) -> str:
     missing = check.get("missing_in_table") or []
-    table_only = check.get("table_only_columns") or []
-    parts: list[str] = []
-    if missing:
-        parts.append(
-            "Selected Excel columns missing in destination table: "
-            + ", ".join(missing[:12])
-            + ("ΓÇª" if len(missing) > 12 else "")
-            + "."
-        )
-    if table_only:
-        parts.append(
-            "Destination table columns not present in selected Excel columns: "
-            + ", ".join(table_only[:12])
-            + ("ΓÇª" if len(table_only) > 12 else "")
-            + "."
-        )
-    if not parts:
+    if not missing:
         return ""
-    return "Column mismatch detected. " + " ".join(parts)
-
+    return (
+        "Selected Excel columns missing in destination table: "
+        + ", ".join(missing[:12])
+        + ("ΓÇª" if len(missing) > 12 else "")
+        + "."
+    )

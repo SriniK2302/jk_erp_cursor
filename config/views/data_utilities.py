@@ -7,6 +7,15 @@ from .access import (
 from .constants import MODULE_ENGAGEMENTS, MODULE_SETUP, MODULE_TOOLS
 
 from .utility_jobs import *  # noqa: F403
+from .utility_jobs import (
+    _EXCEL_IMPORT_JOBS,
+    _EXCEL_IMPORT_JOBS_LOCK,
+    _start_excel_import_job,
+    _save_excel_import_preferences,
+    _is_truthy_form_value,
+    _excel_import_mapping_warning,
+)
+
 
 def data_utilities(request):
     if not _has_module_access(request.user, MODULE_TOOLS):
@@ -234,7 +243,29 @@ def excel_import_sheets_json(request):
 
 @login_required
 @require_GET
+def excel_import_tables_json(request):
+    """List public tables in the selected PostgreSQL database (Django default connection)."""
+    postgres_db = (request.GET.get("postgres_db") or "").strip()
+    if not postgres_db:
+        return JsonResponse({"ok": False, "message": "Select a database first."}, status=400)
+    d = settings.DATABASES["default"]
+    try:
+        names = list_public_tables(
+            host=d.get("HOST") or "127.0.0.1",
+            port=int(d.get("PORT") or 5432),
+            user=d.get("USER") or "postgres",
+            password=d.get("PASSWORD") or "",
+            dbname=postgres_db,
+        )
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    return JsonResponse({"ok": True, "tables": names})
+
+
+@login_required
+@require_GET
 def excel_import_headers_json(request):
+
     raw = request.session.get("data_excel_import_path", "")
     sheet = (request.GET.get("sheet") or "").strip()
     if not raw:
@@ -249,6 +280,24 @@ def excel_import_headers_json(request):
     except Exception as exc:
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
     return JsonResponse({"ok": True, "headers": headers})
+
+
+def _validate_table_exists(*, postgres_db: str, table_name: str) -> str | None:
+    """Return an error message if table_name is not a real table in postgres_db, else None."""
+    d = settings.DATABASES["default"]
+    try:
+        names = list_public_tables(
+            host=d.get("HOST") or "127.0.0.1",
+            port=int(d.get("PORT") or 5432),
+            user=d.get("USER") or "postgres",
+            password=d.get("PASSWORD") or "",
+            dbname=postgres_db,
+        )
+    except Exception as exc:
+        return f"Could not verify table: {exc}"
+    if table_name not in names:
+        return f"Table {table_name!r} was not found in database {postgres_db!r}. Pick a table from the list."
+    return None
 
 
 @login_required
@@ -281,6 +330,10 @@ def excel_import_match_report(request):
             {"ok": False, "message": "Enter the destination table name."},
             status=400,
         )
+
+    table_error = _validate_table_exists(postgres_db=postgres_db, table_name=table_name)
+    if table_error:
+        return JsonResponse({"ok": False, "message": table_error}, status=400)
 
     path = Path(raw).expanduser()
     if not path.is_file():
@@ -325,6 +378,11 @@ def excel_import_run(request):
         return redirect("data_excel_import")
     if not table_name:
         messages.error(request, "Enter the destination table name.")
+        return redirect("data_excel_import")
+
+    table_error = _validate_table_exists(postgres_db=postgres_db, table_name=table_name)
+    if table_error:
+        messages.error(request, table_error)
         return redirect("data_excel_import")
 
     path = Path(raw).expanduser()
@@ -432,6 +490,10 @@ def excel_import_start(request):
             {"ok": False, "message": "Enter the destination table name."},
             status=400,
         )
+
+    table_error = _validate_table_exists(postgres_db=postgres_db, table_name=table_name)
+    if table_error:
+        return JsonResponse({"ok": False, "message": table_error}, status=400)
 
     path = Path(raw).expanduser()
     if not path.is_file():
@@ -713,4 +775,5 @@ def pg_row_delete_execute(request):
             ),
         }
     )
+
 

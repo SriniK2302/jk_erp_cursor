@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions Source · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions Source</h1>
+      <p class="muted">Bank and cash transaction data, opening balances, and related maintenance.</p>
+    </header>
+
+    <nav class="tile-grid" aria-label="Bank Transactions Source modules">
+      <a class="tile-link" href="{% url 'bank_transactions_source_ob' %}">
+        <span class="tile-title">Opening Balances</span>
+        <span class="tile-subtitle">One opening balance record per account</span>
+      </a>
+      <a class="tile-link" href="{% url 'bank_transactions_build_ym' %}">
+        <span class="tile-title">Build YM</span>
+        <span class="tile-subtitle">Update the YM column on transactions</span>
+      </a>
+      <a class="tile-link" href="{% url 'bank_transactions_build_month_summary' %}">
+        <span class="tile-title">Build Month Summary</span>
+        <span class="tile-subtitle">Generate monthly OB/CB rows from transaction data</span>
+      </a>
+    </nav>    
+    <p class="muted"><a href="{% url 'gl_hub' %}">← Back to GL</a></p>
+  </section>
+</div>
+{% endblock %}
+

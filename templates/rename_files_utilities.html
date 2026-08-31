@@ -165,11 +165,15 @@
           autocomplete="off"
         >
 
-        <label for="rename-criteria" class="muted utility-label">Rename criteria</label>
-        <select id="rename-criteria" name="rename_criteria" class="utility-input">
-          <option value="remove_left">Remove text to Left</option>
-          <option value="remove_right">Remove text to Right</option>
-        </select>
+        <label for="file-name-prefix" class="muted utility-label">File Prefix</label>
+        <input
+          id="file-name-prefix"
+          name="file_name_prefix"
+          type="text"
+          class="utility-input"
+          autocomplete="off"
+          placeholder="Optional text to add before the file name"
+        >
 
         <button type="submit" id="execute-rename-by-text-btn" class="button button-compact">Execute</button>
       </form>
@@ -181,11 +185,63 @@
         <p class="muted utility-progress-text" id="rename-by-text-progress-text">Renaming files...</p>
       </div>
 
-      <p id="rename-by-text-result" class="muted utility-result" aria-live="polite"></p>
+            <p id="rename-by-text-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Clean up File Names</span>
+      <span class="tile-subtitle">Removes duplicate FYNN / 20NN references from file names starting with FYNN</span>
+
+      <form id="select-cleanup-fy-folder-form" method="post" action="{% url 'select_cleanup_fy_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'cleanup_fy_file_names' %}"
+        id="cleanup-fy-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="cleanup-fy-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="cleanup-fy-folder"
+              name="cleanup_fy_folder"
+              type="text"
+              class="utility-input"
+              value="{{ cleanup_fy_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-cleanup-fy-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="execute-cleanup-fy-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="cleanup-fy-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="cleanup-fy-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="cleanup-fy-progress-text">Cleaning up file names...</p>
+      </div>
+
+      <p id="cleanup-fy-result" class="muted utility-result" aria-live="polite"></p>
     </article>
 
     <article class="tile-link utility-tile">
       <span class="tile-title">Rename by Date in File Content</span>
+
       <span class="tile-subtitle">Reads each file and prefixes name as <code>YYYY MM DD</code> from first date match</span>
 
       <form id="select-rename-content-date-folder-form" method="post" action="{% url 'select_rename_content_date_folder' %}" hidden>
@@ -378,6 +434,67 @@
       } catch (error) {
         progressText.textContent = "Failed.";
         resultBox.textContent = error.message || "Unexpected error while renaming files.";
+            } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
+
+  (function () {
+    const form = document.getElementById("cleanup-fy-form");
+    const progressWrap = document.getElementById("cleanup-fy-progress-wrap");
+    const progressBar = document.getElementById("cleanup-fy-progress-bar");
+    const progressText = document.getElementById("cleanup-fy-progress-text");
+    const resultBox = document.getElementById("cleanup-fy-result");
+    const executeBtn = document.getElementById("execute-cleanup-fy-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("cleanup-fy-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Cleaning up file names...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to clean up file names.");
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while cleaning up file names.";
       } finally {
         window.clearInterval(interval);
         executeBtn.disabled = false;
@@ -454,3 +571,4 @@
   })();
 </script>
 {% endblock %}
+

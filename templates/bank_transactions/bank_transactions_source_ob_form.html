@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}{% if ob %}Edit Opening Balance{% else %}Add Opening Balance{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if ob %}Edit Opening Balance{% else %}Add Opening Balance{% endif %}</h1>
+      <p class="muted">YM format is MYYMM, e.g. M2601 for January 2026.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.source_ac.id_for_label }}">Source Ac</label>
+        <div class="sap-control">
+          {{ form.source_ac }}
+          {% if form.source_ac.errors %}
+            <span class="field-error">{{ form.source_ac.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.ym.id_for_label }}">YM</label>
+        <div class="sap-control">
+          {{ form.ym }}
+          {% if form.ym.errors %}
+            <span class="field-error">{{ form.ym.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.ob.id_for_label }}">OB</label>
+        <div class="sap-control">
+          {{ form.ob }}
+          {% if form.ob.errors %}
+            <span class="field-error">{{ form.ob.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'bank_transactions_source_ob' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if ob %}Update Opening Balance{% else %}Save Opening Balance{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'bank_transactions_source_ob' %}">← Back to Opening Balances</a></p>
+  </section>
+</div>
+{% endblock %}

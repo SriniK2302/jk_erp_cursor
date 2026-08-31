@@ -1,0 +1,68 @@
+bank_transactions_source_ob.html
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions – Opening Balances · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions – Opening Balances</h1>
+      <p class="muted">One opening balance record per account. Update when an earlier statement is available.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search..."
+          aria-label="Search opening balances"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Source Ac</th>
+              <th>YM</th>
+              <th>OB</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ob in obs %}
+              <tr data-grid-row>
+                <td>{{ ob.source_ac_id }}</td>
+                <td>{{ ob.ym }}</td>
+                <td>{{ ob.ob }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="bank_transactions_source_ob" edit_url_name="bank_transactions_source_ob_edit" edit_pk=ob.id pk=ob.id delete_action="delete" confirm_message="Delete this opening balance record?" %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="4" class="muted">No opening balances added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching records found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'bank_transactions_source_ob_create' %}" class="button">Add Opening Balance</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'gl_hub' %}">← Back to GL</a></p>    <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a></p>
+  </section>
+</div>
+{% endblock %}
+

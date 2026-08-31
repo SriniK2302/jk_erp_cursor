@@ -22,14 +22,19 @@ from utilities.file_content_search import scan_folder_for_phrase
 from utilities.move_all_files import move_all_files_flat
 from utilities.move_files_to_fy_folder import move_direct_files_to_fy_folders
 from utilities.move_files_by_name_contains import move_direct_files_name_contains
+from utilities.move_files_by_first_chars import move_direct_files_by_first_chars
+from utilities.prefix_fy_from_tax_files import prefix_fy_from_tax_files
 from utilities.rename_files_by_content_date import rename_direct_files_by_content_date
 from utilities.rename_date_prefix_files import rename_direct_files_date_prefix
 from utilities.rename_files_based_on_text import rename_direct_files_by_text
+from utilities.cleanup_fy_duplicate_refs import cleanup_fy_duplicate_refs
 from utilities.similar_files import (
     choose_spreadsheet_file,
     find_similar_spreadsheet_files,
     find_similar_to_reference_file,
 )
+
+
 from utilities.excel_to_postgres import (
     choose_excel_file,
     create_public_table_from_schema_sheet,

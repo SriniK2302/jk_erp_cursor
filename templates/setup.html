@@ -48,6 +48,12 @@
         <span class="tile-title">Sales Ledger Settings</span>
         <span class="tile-subtitle">Sales ledger options and defaults (expand as needed)</span>
       </a>
+      {% if can_manage_server_environment %}
+      <a class="tile-link" href="{% url 'setup_server_environment' %}">
+        <span class="tile-title">Server environment</span>
+        <span class="tile-subtitle">Switch live/trial server; run trial database migrations</span>
+      </a>
+      {% endif %}
       <a class="tile-link" href="{% url 'services' %}">
         <span class="tile-title">Services</span>
         <span class="tile-subtitle">Manage service master data</span>

@@ -6,7 +6,13 @@
 <div class="auth-layout">
   <div class="auth-card">
     <h1>Log in</h1>
-    <p class="muted">Use your account credentials.</p>
+    {% if jk_erp_is_trial %}
+      <p class="form-banner form-banner-error" role="status">
+        Trial server — only user <strong>{{ trial_allowed_username }}</strong> may sign in here.
+      </p>
+    {% else %}
+      <p class="muted">Use your account credentials.</p>
+    {% endif %}
 
     {% if form.errors %}
       <p class="form-error" role="alert">Please correct the errors below.</p>

@@ -48,6 +48,12 @@
             <span class="tile-subtitle">To-do list, file tools, and data utilities</span>
           </a>
         {% endif %}
+        {% if can_manage_server_environment %}
+          <a class="tile-link" href="{% url 'setup_server_environment' %}">
+            <span class="tile-title">Server environment</span>
+            <span class="tile-subtitle">Switch live/trial server; run trial database migrations</span>
+          </a>
+        {% endif %}
       </nav>
 
       {% if can_use_engagements %}

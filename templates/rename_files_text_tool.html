@@ -44,30 +44,34 @@
           </div>
         </div>
 
-        <label for="file-name-text-identifier" class="muted utility-label">File name text Identifier</label>
+        <label for="file-name-text-identifier" class="muted utility-label">File name text Identifier (single or range)</label>
         <input
           id="file-name-text-identifier"
           name="file_name_text_identifier"
           type="text"
           class="utility-input"
           autocomplete="off"
+          placeholder="e.g. INV_2024  or  2020 04:2020 10  or  202004:202010;2"
         >
 
-        <label for="rename-criteria" class="muted utility-label">Rename criteria</label>
-        <select id="rename-criteria" name="rename_criteria" class="utility-input">
-          <option value="remove_left">Remove text to Left</option>
-          <option value="remove_right">Remove text to Right</option>
-        </select>
+        <label for="file-name-prefix" class="muted utility-label">File Prefix</label>
+        <input
+          id="file-name-prefix"
+          name="file_name_prefix"
+          type="text"
+          class="utility-input"
+          autocomplete="off"
+          placeholder="Optional text to add before the file name"
+        >
 
         <button type="submit" id="execute-rename-by-text-btn" class="button button-compact">Execute</button>
-      </form>
-
-      <div id="rename-by-text-progress-wrap" class="utility-progress-wrap" hidden>
-        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div id="rename-by-text-progress-bar" class="utility-progress-bar"></div>
+        <div id="rename-by-text-progress-wrap" class="utility-progress-wrap" hidden>
+          <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="rename-by-text-progress-bar" class="utility-progress-bar"></div>
+          </div>
+          <p class="muted utility-progress-text" id="rename-by-text-progress-text">Renaming files...</p>
         </div>
-        <p class="muted utility-progress-text" id="rename-by-text-progress-text">Renaming files...</p>
-      </div>
+      </form>
 
       <p id="rename-by-text-result" class="muted utility-result" aria-live="polite"></p>
     </article>

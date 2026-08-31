@@ -49,6 +49,124 @@ body {
   backdrop-filter: blur(4px);
 }
 
+.trial-server-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  border-bottom: 1px solid rgba(234, 179, 8, 0.45);
+  background: rgba(234, 179, 8, 0.14);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.trial-server-banner__link {
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+@media (prefers-color-scheme: light) {
+  .trial-server-banner {
+    border-bottom-color: rgba(202, 138, 4, 0.45);
+    background: rgba(250, 204, 21, 0.18);
+  }
+}
+
+.server-switch-panel,
+.server-migration-panel {
+  margin: 1.25rem 0 1.5rem;
+}
+
+.section-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.server-switch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.server-switch-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.server-switch-card:hover {
+  border-color: var(--accent);
+}
+
+.server-switch-card.is-current {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.server-switch-card__label {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.server-switch-card__meta,
+.server-switch-card__action {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.server-switch-card__badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.server-switch-note {
+  margin: 0.75rem 0 0;
+}
+
+.server-migration-form {
+  margin-top: 0.85rem;
+}
+
+.migration-pending-list {
+  margin: 0.65rem 0 0;
+  padding-left: 1.2rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.migration-output {
+  margin-top: 1rem;
+}
+
+.migration-output pre {
+  margin: 0.65rem 0 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  overflow: auto;
+  max-height: 24rem;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+
 .active-timer-banner {
   display: flex;
   flex-wrap: wrap;

@@ -7,6 +7,26 @@ from .access import (
 from .constants import MODULE_ENGAGEMENTS, MODULE_SETUP, MODULE_TOOLS
 
 from .utility_jobs import *  # noqa: F403
+from .utility_jobs import (
+    _DUPLICATE_JOBS,
+    _DUPLICATE_JOBS_LOCK,
+    _SIMILAR_JOBS,
+    _SIMILAR_JOBS_LOCK,
+    _SIMILAR_REF_JOBS,
+    _SIMILAR_REF_JOBS_LOCK,
+    _EXCEL_IMPORT_JOBS,
+    _EXCEL_IMPORT_JOBS_LOCK,
+    _MOVE_ALL_JOBS,
+    _MOVE_ALL_JOBS_LOCK,
+    _start_duplicate_job,
+    _start_similar_files_job,
+    _start_similar_to_reference_job,
+    _start_excel_import_job,
+    _start_move_all_files_job,
+    _save_excel_import_preferences,
+    _is_truthy_form_value,
+    _excel_import_mapping_warning,
+)
 
 @login_required
 def utilities(request):
@@ -18,6 +38,7 @@ def utilities(request):
     content_search_folder = request.session.get("utilities_content_search_folder", "")
     move_all_source_folder = request.session.get("utilities_move_all_source_folder", "")
     move_all_target_folder = request.session.get("utilities_move_all_target_folder", "")
+    prefix_fy_xml_folder = request.session.get("utilities_prefix_fy_xml_folder", "")
     return render(
         request,
         "utilities.html",
@@ -28,6 +49,7 @@ def utilities(request):
             "content_search_folder": content_search_folder,
             "move_all_source_folder": move_all_source_folder,
             "move_all_target_folder": move_all_target_folder,
+            "prefix_fy_xml_folder": prefix_fy_xml_folder,
         },
     )
 
@@ -68,6 +90,7 @@ def rename_files_utilities(request):
             "replacement_pattern": replacement_pattern,
             "rename_date_pattern_position": rename_date_pattern_position,
             "rename_text_folder": request.session.get("utilities_rename_text_folder", ""),
+            "cleanup_fy_folder": request.session.get("utilities_cleanup_fy_folder", ""),
             "rename_content_date_folder": rename_content_date_folder,
             "rename_content_date_pattern": rename_content_date_pattern,
             "rename_content_date_file_type": rename_content_date_file_type,
@@ -125,6 +148,7 @@ def organize_files_utilities(request):
     move_to_fy_folder = request.session.get("utilities_move_to_fy_folder", "")
     move_name_search_folder = request.session.get("utilities_move_name_search_folder", "")
     move_name_target_folder = request.session.get("utilities_move_name_target_folder", "")
+    move_first_chars_folder = request.session.get("utilities_move_first_chars_folder", "")
     return render(
         request,
         "organize_files_utilities.html",
@@ -132,6 +156,7 @@ def organize_files_utilities(request):
             "move_to_fy_folder": move_to_fy_folder,
             "move_name_search_folder": move_name_search_folder,
             "move_name_target_folder": move_name_target_folder,
+            "move_first_chars_folder": move_first_chars_folder,
         },
     )
 
@@ -405,6 +430,69 @@ def select_folder_for_delete_empty(request):
 
 @login_required
 @require_POST
+def select_prefix_fy_xml_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("utilities")
+
+    if root_path is None:
+        messages.info(request, "Folder selection cancelled.")
+        return redirect("utilities")
+
+    request.session["utilities_prefix_fy_xml_folder"] = str(root_path)
+    messages.success(request, f"Selected folder: {root_path}")
+    return redirect("utilities")
+
+
+@login_required
+@require_POST
+def process_it_xml_files(request):
+    folder = (
+        (request.POST.get("prefix_fy_xml_folder") or "").strip()
+        or request.session.get("utilities_prefix_fy_xml_folder", "")
+    )
+
+    if not folder:
+        return JsonResponse({"ok": False, "message": "Folder is required."}, status=400)
+
+    root_path = Path(folder).expanduser()
+    if not root_path.exists() or not root_path.is_dir():
+        return JsonResponse({"ok": False, "message": f"Folder not found: {root_path}"}, status=400)
+
+    request.session["utilities_prefix_fy_xml_folder"] = str(root_path)
+    try:
+        report = prefix_fy_from_tax_files(root_path)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    except OSError as exc:
+        return JsonResponse({"ok": False, "message": f"Rename failed: {exc}"}, status=500)
+
+    payload = {
+        "ok": True,
+        "renamed_count": report.renamed_count,
+        "scanned_files": report.scanned_count,
+        "skipped_count": report.skipped_count,
+        "message": (
+            f"Processed {report.renamed_count} file(s) in '{report.root}'. "
+            f"Scanned {report.scanned_count} direct .xml/.json file(s) only (no subfolders)."
+        ),
+    }
+
+    if report.skipped_count:
+        payload["warning"] = (
+            f"Skipped {report.skipped_count} file(s) where AssessmentYear was not found "
+            "or the file was already compliant."
+        )
+    return JsonResponse(payload)
+
+
+@login_required
+@require_POST
 def select_duplicate_source_folder(request):
     try:
         root_path = choose_root_folder()
@@ -550,6 +638,28 @@ def select_rename_text_folder(request):
     return redirect("rename_files_utilities")
 
 
+
+@login_required
+@require_POST
+def select_cleanup_fy_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("rename_files_utilities")
+
+    if root_path is None:
+        messages.info(request, "Clean up file names folder selection cancelled.")
+        return redirect("rename_files_utilities")
+
+    request.session["utilities_cleanup_fy_folder"] = str(root_path)
+    messages.success(request, f"Selected folder for clean up file names: {root_path}")
+    return redirect("rename_files_utilities")
+
+
 @login_required
 @require_POST
 def select_rename_content_date_folder(request):
@@ -612,6 +722,27 @@ def select_move_name_search_folder(request):
     messages.success(request, f"Selected search folder: {root_path}")
     return redirect("organize_files_utilities")
 
+
+
+@login_required
+@require_POST
+def select_move_first_chars_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("organize_files_utilities")
+
+    if root_path is None:
+        messages.info(request, "Folder selection cancelled.")
+        return redirect("organize_files_utilities")
+
+    request.session["utilities_move_first_chars_folder"] = str(root_path)
+    messages.success(request, f"Selected folder: {root_path}")
+    return redirect("organize_files_utilities")
 
 @login_required
 @require_POST
@@ -856,7 +987,7 @@ def rename_files_based_on_text(request):
         or request.session.get("utilities_rename_text_folder", "")
     )
     identifier = (request.POST.get("file_name_text_identifier") or "").strip()
-    criteria = (request.POST.get("rename_criteria") or "").strip()
+    prefix = (request.POST.get("file_name_prefix") or "").strip()
 
     if not folder:
         return JsonResponse(
@@ -876,7 +1007,7 @@ def rename_files_based_on_text(request):
         report = rename_direct_files_by_text(
             root_path,
             identifier=identifier,
-            criteria=criteria,
+            prefix=prefix,
         )
     except ValueError as exc:
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
@@ -897,6 +1028,54 @@ def rename_files_based_on_text(request):
         payload["warning"] = (
             f"Skipped {report.skipped_count} file(s) where identifier not found "
             "or due to naming errors."
+        )
+    return JsonResponse(payload)
+
+
+
+@login_required
+@require_POST
+def cleanup_fy_file_names(request):
+    folder = (
+        (request.POST.get("cleanup_fy_folder") or "").strip()
+        or request.session.get("utilities_cleanup_fy_folder", "")
+    )
+
+    if not folder:
+        return JsonResponse(
+            {"ok": False, "message": "Select a folder first."},
+            status=400,
+        )
+
+    root_path = Path(folder).expanduser()
+    if not root_path.exists() or not root_path.is_dir():
+        return JsonResponse(
+            {"ok": False, "message": f"Folder not found: {root_path}"},
+            status=400,
+        )
+
+    request.session["utilities_cleanup_fy_folder"] = str(root_path)
+    try:
+        report = cleanup_fy_duplicate_refs(root_path)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    except OSError as exc:
+        return JsonResponse({"ok": False, "message": f"Rename failed: {exc}"}, status=500)
+
+    payload = {
+        "ok": True,
+        "renamed_count": report.renamed_count,
+        "scanned_files": report.scanned_count,
+        "skipped_count": report.skipped_count,
+        "message": (
+            f"Cleaned up {report.renamed_count} file(s) in '{report.root}'. "
+            f"Scanned {report.scanned_count} direct file(s) only (no subfolders)."
+        ),
+    }
+    if report.skipped_count:
+        payload["warning"] = (
+            f"Skipped {report.skipped_count} file(s) that don't start with FYNN "
+            "or were already clean."
         )
     return JsonResponse(payload)
 
@@ -1056,6 +1235,49 @@ def move_files_name_contains(request):
         "message": (
             f"Moved {report.moved_count} file(s) from '{report.source_root}' to '{report.target_root}'. "
             f"Scanned {report.scanned_count} direct file(s)."
+        ),
+    }
+
+
+@login_required
+@require_POST
+def move_files_by_first_chars(request):
+    folder = (
+        (request.POST.get("move_first_chars_folder") or "").strip()
+        or request.session.get("utilities_move_first_chars_folder", "")
+    )
+    char_count_raw = (request.POST.get("move_first_chars_count") or "").strip()
+
+    if not folder:
+        return JsonResponse({"ok": False, "message": "Folder is required."}, status=400)
+    if not char_count_raw:
+        return JsonResponse({"ok": False, "message": "Number of characters is required."}, status=400)
+
+    try:
+        char_count = int(char_count_raw)
+    except ValueError:
+        return JsonResponse({"ok": False, "message": "Number of characters must be a whole number."}, status=400)
+
+    root_path = Path(folder).expanduser()
+    if not root_path.exists() or not root_path.is_dir():
+        return JsonResponse({"ok": False, "message": f"Folder not found: {root_path}"}, status=400)
+
+    request.session["utilities_move_first_chars_folder"] = str(root_path)
+    try:
+        report = move_direct_files_by_first_chars(root_path, char_count=char_count)
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    except OSError as exc:
+        return JsonResponse({"ok": False, "message": f"Move failed: {exc}"}, status=500)
+
+    payload = {
+        "ok": True,
+        "moved_count": report.moved_count,
+        "scanned_files": report.scanned_count,
+        "skipped_count": report.skipped_count,
+        "message": (
+            f"Moved {report.moved_count} file(s) into folders in '{report.root}'. "
+            f"Scanned {report.scanned_count} direct file(s) only (no subfolders)."
         ),
     }
     if report.skipped_count:

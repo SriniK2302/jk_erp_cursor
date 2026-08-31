@@ -27,7 +27,7 @@
         <label for="excel-path" class="muted utility-label">Workbook path</label>
         <div class="utility-field-row__grow">
           <input id="excel-path" type="text" class="utility-input" value="{{ excel_path }}" readonly>
-          <button type="submit" class="button button-compact button-secondary" form="excel-select-file-form">Select Excel File</button>
+          <button type="submit" class="button button-compact button-secondary" form="excel-select-file-form">Select Excel / CSV File</button>
         </div>
       </div>
 
@@ -62,12 +62,14 @@
       </div>
 
       <div class="utility-field-row">
-        <label for="table-name" class="muted utility-label">Table (from sheet name)</label>
+        <label for="table-name" class="muted utility-label">Table</label>
         <div class="utility-field-row__grow">
-          <input id="table-name" name="table_name" type="text" class="utility-input utility-input-readonly" value="{{ initial_table_name|default:'' }}" placeholder="Select a sheet first" form="excel-import-run-form" readonly autocomplete="off" title="Sanitized from the sheet name (letters, digits, underscore). Matches the sheet you select.">
+          <input id="table-name" name="table_name" type="text" class="utility-input" value="{{ initial_table_name|default:'' }}" placeholder="Select a database, then choose a table" list="table-name-options" autocomplete="off" form="excel-import-run-form" title="Type to search. Must be an existing table in the selected database.">
+          <datalist id="table-name-options"></datalist>
           <button type="button" id="load-headers-btn" class="button button-compact button-secondary">Load columns</button>
           <button type="button" id="match-report-btn" class="button button-compact button-secondary" title="Compares checked columns to PostgreSQL (if none checked, uses every column from the sheet header row).">Column–field match report</button>
         </div>
+        <p class="muted utility-footnote" id="table-name-load-msg" aria-live="polite"></p>
       </div>
 
       <p class="muted utility-label" id="import-columns-label">Columns to import (must match table column names)</p>
@@ -149,27 +151,44 @@
       retainedColsFromServer = [];
     }
 
-    function sheetNameToTableName(sheetLabel) {
-      if (!sheetLabel) {
-        return "";
-      }
-      var safe = sheetLabel
-        .replace(/[^a-zA-Z0-9_]+/g, "_")
-        .replace(/^([0-9])/, "_$1")
-        .toLowerCase();
-      return safe ? safe.slice(0, 63) : "";
-    }
+    const tableNameOptions = document.getElementById("table-name-options");
+    const tableNameLoadMsg = document.getElementById("table-name-load-msg");
 
-    function syncTableFromSheet() {
-      if (!tableName || !sheetSelect) {
+    async function loadTablesForDatabase() {
+      if (!tableNameOptions || !postgresDbSelect) {
         return;
       }
-      if (!sheetSelect.value) {
-        tableName.value = "";
+      const dbName = postgresDbSelect.value || "";
+      tableNameOptions.innerHTML = "";
+      if (tableNameLoadMsg) {
+        tableNameLoadMsg.textContent = "";
+      }
+      if (!dbName) {
         return;
       }
-      var t = sheetNameToTableName(sheetSelect.value);
-      tableName.value = t || "";
+      try {
+        const res = await fetch(
+          "{% url 'excel_import_tables_json' %}?postgres_db=" + encodeURIComponent(dbName),
+          { headers: { "X-Requested-With": "XMLHttpRequest" } }
+        );
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not list tables.");
+        }
+        const names = data.tables || [];
+        names.forEach(function (name) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          tableNameOptions.appendChild(opt);
+        });
+        if (tableNameLoadMsg) {
+          tableNameLoadMsg.textContent = "Loaded " + names.length + " table(s).";
+        }
+      } catch (e) {
+        if (tableNameLoadMsg) {
+          tableNameLoadMsg.textContent = e.message || "Failed to list tables.";
+        }
+      }
     }
 
     function getCsrfToken() {
@@ -224,7 +243,6 @@
     if (sheetSelect && sheetHidden) {
       sheetSelect.addEventListener("change", function () {
         sheetHidden.value = sheetSelect.value;
-        syncTableFromSheet();
         syncRetainedState();
         if (importColumnList) {
           importColumnList.innerHTML = "";
@@ -283,6 +301,7 @@
           pgDbLoadMsg.textContent = "Loaded " + names.length + " database(s).";
         }
         syncRetainedState();
+        loadTablesForDatabase();
       } catch (e) {
         if (pgDbLoadMsg) {
           pgDbLoadMsg.textContent = e.message || "Failed to list databases.";
@@ -297,6 +316,12 @@
     if (loadDatabasesBtn) {
       loadDatabasesBtn.addEventListener("click", function () {
         loadPostgresDatabases();
+      });
+    }
+    if (postgresDbSelect) {
+      postgresDbSelect.addEventListener("change", function () {
+        syncRetainedState();
+        loadTablesForDatabase();
       });
     }
     loadPostgresDatabases();
@@ -383,16 +408,10 @@
         lines.push("Column mismatch detected between Excel and destination table.");
       }
       var missing = check.missing_in_table || [];
-      var tableOnly = check.table_only_columns || [];
       if (missing.length) {
         lines.push("");
         lines.push("Selected Excel columns missing in table:");
         lines.push(missing.join(", "));
-      }
-      if (tableOnly.length) {
-        lines.push("");
-        lines.push("Table columns not in selected Excel columns:");
-        lines.push(tableOnly.join(", "));
       }
       lines.push("");
       lines.push("Proceed with import anyway?");
@@ -505,20 +524,13 @@
         "</tbody></table></div>";
 
       var extra = "";
-      const details = report.table_only_details || [];
-      if (details.length) {
+      const tableOnly = report.table_only_columns || [];
+      if (tableOnly.length) {
         const h =
           "<h3 class=\"excel-import-report-subheading\">Table columns not in this import selection</h3>";
-        const th =
-          "<thead><tr><th>PostgreSQL column</th><th>PostgreSQL type</th></tr></thead>";
-        const rows = details.map(function (d) {
-          return (
-            "<tr><td>" +
-            escapeHtmlCell(d.postgres_column) +
-            "</td><td>" +
-            escapeHtmlCell(d.postgres_type || "—") +
-            "</td></tr>"
-          );
+        const th = "<thead><tr><th>PostgreSQL column</th></tr></thead>";
+        const rows = tableOnly.map(function (name) {
+          return "<tr><td>" + escapeHtmlCell(name) + "</td></tr>";
         });
         extra =
           h +
@@ -741,3 +753,4 @@
   })();
 </script>
 {% endblock %}
+

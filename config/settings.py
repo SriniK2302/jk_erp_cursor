@@ -13,12 +13,32 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(BASE_DIR / '.env')
+
+# production (default) or trial — set JK_ERP_ENV before Django loads, or in .env / .env.trial
+JK_ERP_ENV = os.environ.get('JK_ERP_ENV', 'production').strip().lower()
+if JK_ERP_ENV not in ('production', 'trial'):
+    raise ImproperlyConfigured(
+        f'JK_ERP_ENV must be "production" or "trial", got {JK_ERP_ENV!r}.'
+    )
+
+_env_overlay = BASE_DIR / f'.env.{JK_ERP_ENV}'
+if _env_overlay.exists():
+    load_dotenv(_env_overlay, override=True)
+
+JK_ERP_IS_TRIAL = JK_ERP_ENV == 'trial'
+TRIAL_ALLOWED_USERNAME = os.environ.get('TRIAL_ALLOWED_USERNAME', 'srini').strip().lower()
+
+LIVE_SERVER_URL = os.environ.get('JK_ERP_LIVE_URL', 'http://127.0.0.1:8010').rstrip('/')
+TRIAL_SERVER_URL = os.environ.get('JK_ERP_TRIAL_URL', 'http://127.0.0.1:8011').rstrip('/')
+LIVE_POSTGRES_DB = os.environ.get('LIVE_POSTGRES_DB', 'jk_erp')
+TRIAL_POSTGRES_DB = os.environ.get('TRIAL_POSTGRES_DB', 'jk_erp_trial')
 
 
 # Quick-start development settings - unsuitable for production
@@ -60,6 +80,7 @@ INSTALLED_APPS = [
     'gl.fiscal_years.apps.FiscalYearsConfig',
     'gl.chart_of_accounts.apps.ChartOfAccountsConfig',
     'gl.journal.apps.JournalConfig',
+    'gl.bank_transactions.apps.BankTransactionsConfig',
     'hr.teams.apps.TeamsConfig',
     'hr.grades.apps.GradesConfig',
     'hr.qualifications.apps.QualificationsConfig',
@@ -76,6 +97,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'config.middleware.TrialServerAccessMiddleware',
     'audit.middleware.AuditUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -94,6 +116,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'engagements.context_processors.active_time_session',
+                'config.context_processors.server_environment',
             ],
         },
     },
@@ -105,10 +128,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+_default_postgres_db = 'jk_erp_trial' if JK_ERP_IS_TRIAL else 'jk_erp'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'jk_erp'),
+        'NAME': os.environ.get('POSTGRES_DB', _default_postgres_db),
         'USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
         # Use 127.0.0.1 by default: "localhost" on Windows can stall on IPv6 (::1)
@@ -173,7 +198,8 @@ STORAGES = {
 
 # User uploads (engagement documentation attachments, etc.)
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / 'media'
+_default_media_root = 'media_trial' if JK_ERP_IS_TRIAL else 'media'
+MEDIA_ROOT = BASE_DIR / os.environ.get('MEDIA_ROOT_DIR', _default_media_root)
 
 # Auth
 LOGIN_URL = 'login'

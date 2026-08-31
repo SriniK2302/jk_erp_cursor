@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Build YM · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Build YM</h1>
+      <p class="muted">Update the YM column on bank_transactions_source.</p>
+    </header>
+
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="button">Run Build</button>
+    </form>
+
+    <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a></p>
+  </section>
+</div>
+{% endblock %}

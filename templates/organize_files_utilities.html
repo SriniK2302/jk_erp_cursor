@@ -156,9 +156,71 @@
         <p class="muted utility-progress-text" id="move-name-contains-progress-text">Moving files...</p>
       </div>
 
-      <p id="move-name-contains-result" class="muted utility-result" aria-live="polite"></p>
+            <p id="move-name-contains-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Move Files Based on First set of chars</span>
+      <span class="tile-subtitle">Creates a folder per unique prefix and moves matching files into it</span>
+
+      <form id="select-move-first-chars-folder-form" method="post" action="{% url 'select_move_first_chars_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'move_files_by_first_chars' %}"
+        id="move-first-chars-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="move-first-chars-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="move-first-chars-folder"
+              name="move_first_chars_folder"
+              type="text"
+              class="utility-input"
+              value="{{ move_first_chars_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-move-first-chars-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label for="move-first-chars-count" class="muted utility-label">Number of characters from left</label>
+        <input
+          id="move-first-chars-count"
+          name="move_first_chars_count"
+          type="number"
+          min="1"
+          class="utility-input"
+          autocomplete="off"
+        >
+
+        <button type="submit" id="execute-move-first-chars-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="move-first-chars-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="move-first-chars-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="move-first-chars-progress-text">Moving files...</p>
+      </div>
+
+      <p id="move-first-chars-result" class="muted utility-result" aria-live="polite"></p>
     </article>
     </div>
+
 
     <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
   </section>
@@ -324,5 +386,74 @@
       }
     });
   })();
+
+  (function () {
+    const form = document.getElementById("move-first-chars-form");
+    const progressWrap = document.getElementById("move-first-chars-progress-wrap");
+    const progressBar = document.getElementById("move-first-chars-progress-bar");
+    const progressText = document.getElementById("move-first-chars-progress-text");
+    const resultBox = document.getElementById("move-first-chars-result");
+    const executeBtn = document.getElementById("execute-move-first-chars-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("move-first-chars-folder");
+      const countInput = document.getElementById("move-first-chars-count");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      const countValue = countInput ? countInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Folder is required.";
+        return;
+      }
+      if (!countValue || parseInt(countValue, 10) < 1) {
+        resultBox.textContent = "Enter a valid number of characters (1 or more).";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Moving direct files...";
+
+      let current = 10;
+      progressBar.style.width = current + "%";
+      const interval = window.setInterval(function () {
+        current = Math.min(current + 10, 90);
+        progressBar.style.width = current + "%";
+      }, 200);
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to move files.");
+        }
+
+        progressBar.style.width = "100%";
+        progressText.textContent = "Completed.";
+        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while moving files.";
+      } finally {
+        window.clearInterval(interval);
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
 </script>
 {% endblock %}
+
