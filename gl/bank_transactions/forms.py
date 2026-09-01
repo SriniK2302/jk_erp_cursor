@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import BankTransactionSourceOb
+from .models import BankTransactionSourceOb, SourceBankCashAc
 
 
 class BankTransactionSourceObForm(forms.ModelForm):
@@ -18,4 +18,16 @@ class BankTransactionSourceObForm(forms.ModelForm):
         if len(ym) != 5 or ym[0] != "M" or not ym[1:].isdigit():
             raise forms.ValidationError("YM must be in format MYYMM, e.g. M2601.")
         return ym
-    
+
+
+class SourceBankCashAcForm(forms.ModelForm):
+    class Meta:
+        model = SourceBankCashAc
+        fields = ["source_ac", "bank_name", "account_type", "fb_code"]
+        widgets = {
+            "source_ac": forms.TextInput(attrs={"class": "input-compact", "maxlength": 15}),
+            "bank_name": forms.TextInput(attrs={"class": "input-compact", "maxlength": 50}),
+            "account_type": forms.Select(attrs={"class": "input-compact"}),
+            "fb_code": forms.TextInput(attrs={"class": "input-compact", "maxlength": 5}),
+        }
+        

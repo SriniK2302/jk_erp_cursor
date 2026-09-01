@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions – Source Accounts · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions – Source Accounts</h1>
+      <p class="muted">Bank and cash accounts used across opening balances, transactions, and the summary report.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search..."
+          aria-label="Search accounts"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>Source Ac</th>
+              <th>Bank Name</th>
+              <th>Account Type</th>
+              <th>FB Code</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for account in accounts %}
+              <tr data-grid-row>
+                <td>{{ account.source_ac }}</td>
+                <td>{{ account.bank_name|default:"—" }}</td>
+                <td>{{ account.account_type|default:"—" }}</td>
+                <td>{{ account.fb_code }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="bank_transactions_source_accounts" edit_url_name="bank_transactions_source_account_edit" edit_pk=account.id pk=account.id delete_action="delete" confirm_message="Delete this account? This is blocked if it has opening balances, transactions, or summary rows." %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="5" class="muted">No accounts added yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching records found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'bank_transactions_source_account_create' %}" class="button">Add Account</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a></p>
+  </section>
+</div>
+{% endblock %}

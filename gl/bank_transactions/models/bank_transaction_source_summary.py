@@ -25,6 +25,13 @@ class BankTransactionSourceSummary(models.Model):
         db_persist=True,
     )
     cb_from_statement = models.FloatField(blank=True, null=True)
+    statement_upload = models.ForeignKey(
+        "bank_transactions.BankStatementUpload",
+        on_delete=models.SET_NULL,
+        related_name="summary_rows",
+        null=True,
+        blank=True,
+    )
     check_diff = models.GeneratedField(
         expression=(
             Coalesce(F("ob"), Value(0.0))
@@ -43,4 +50,5 @@ class BankTransactionSourceSummary(models.Model):
 
     def __str__(self):
         return f"{self.source_ac_id} {self.ym}"
+
     

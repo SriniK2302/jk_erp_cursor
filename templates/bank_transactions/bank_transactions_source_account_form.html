@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{% if account %}Edit Account{% else %}Add Account{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if account %}Edit Account{% else %}Add Account{% endif %}</h1>
+      <p class="muted">Source Ac is the code used everywhere else (opening balances, transactions, summary report).</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.source_ac.id_for_label }}">Source Ac</label>
+        <div class="sap-control">
+          {{ form.source_ac }}
+          {% if form.source_ac.errors %}
+            <span class="field-error">{{ form.source_ac.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.bank_name.id_for_label }}">Bank Name</label>
+        <div class="sap-control">
+          {{ form.bank_name }}
+          {% if form.bank_name.errors %}
+            <span class="field-error">{{ form.bank_name.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.account_type.id_for_label }}">Account Type</label>
+        <div class="sap-control">
+          {{ form.account_type }}
+          {% if form.account_type.errors %}
+            <span class="field-error">{{ form.account_type.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fb_code.id_for_label }}">FB Code</label>
+        <div class="sap-control">
+          {{ form.fb_code }}
+          {% if form.fb_code.errors %}
+            <span class="field-error">{{ form.fb_code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'bank_transactions_source_accounts' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if account %}Update Account{% else %}Save Account{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'bank_transactions_source_accounts' %}">← Back to Source Accounts</a></p>
+  </section>
+</div>
+{% endblock %}

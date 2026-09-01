@@ -11,6 +11,10 @@
     </header>
 
     <nav class="tile-grid" aria-label="Bank Transactions Source modules">
+      <a class="tile-link" href="{% url 'bank_transactions_source_accounts' %}">
+        <span class="tile-title">Source Accounts</span>
+        <span class="tile-subtitle">Add and edit bank/cash accounts (bank name, account type)</span>
+      </a>
       <a class="tile-link" href="{% url 'bank_transactions_source_ob' %}">
         <span class="tile-title">Opening Balances</span>
         <span class="tile-subtitle">One opening balance record per account</span>
@@ -23,9 +27,14 @@
         <span class="tile-title">Build Month Summary</span>
         <span class="tile-subtitle">Generate monthly OB/CB rows from transaction data</span>
       </a>
-    </nav>    
-    <p class="muted"><a href="{% url 'gl_hub' %}">← Back to GL</a></p>
+      <a class="tile-link" href="{% url 'bank_transactions_summary_report' %}">
+        <span class="tile-title">Summary Report</span>
+        <span class="tile-subtitle">Choose a fiscal year; all accounts and their monthly summary</span>
+      </a>
+    </nav>
+      <p class="muted"><a href="{% url 'gl_hub' %}">← Back to GL</a></p>
   </section>
 </div>
 {% endblock %}
+
 

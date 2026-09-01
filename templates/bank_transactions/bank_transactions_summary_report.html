@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions – Summary Report · JK ERP{% endblock %}
+
+{% block content %}
+<style>
+  .table-wrap input[type="number"]::-webkit-outer-spin-button,
+  .table-wrap input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+</style>
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions – Summary Report</h1>
+      <p class="muted">Choose a <strong>fiscal year</strong>. All accounts are shown, with one row per calendar month in that year. Run <strong>Build Month Summary</strong> first for the numbers to appear.</p>
+    </header>
+
+    {% if fiscal_years %}
+      <form method="get" class="sap-form" action="{% url 'bank_transactions_summary_report' %}" style="display: flex; align-items: flex-end; gap: 0.75rem; margin: 0;">
+        <div class="sap-row" style="margin: 0;">
+          <label for="id_bt_summary_fy">Fiscal year</label>
+          <div class="sap-control">
+            <select name="fy" id="id_bt_summary_fy" class="input-medium" required>
+              {% for fy in fiscal_years %}
+                <option value="{{ fy.pk }}"{% if selected_fy and fy.pk == selected_fy.pk %} selected{% endif %}>
+                  {{ fy.fy_no }} — {{ fy.start_date|date:"Y-m-d" }} to {{ fy.end_date|date:"Y-m-d" }}
+                  {% if current_fy and fy.pk == current_fy.pk %} (current){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="button">Show report</button>
+      </form>
+
+      {% if selected_fy %}
+        {% if report_rows %}
+          {% for account in report_rows %}
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+              <h2 style="font-size: 1.05rem; font-weight: 600; margin: 0;">
+                {{ account.source_ac }}
+              </h2>
+              <form method="post" class="inline-form" action="{% url 'bank_transactions_summary_upload_annual_statement' %}" enctype="multipart/form-data" style="display: inline-flex; align-items: center;">
+                {% csrf_token %}
+                <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                <input type="hidden" name="source_ac" value="{{ account.source_ac }}">
+                <input
+                  type="file"
+                  name="statement_pdf"
+                  accept="application/pdf"
+                  id="bt-annual-upload-{{ forloop.counter }}"
+                  style="display: none;"
+                  onchange="this.form.submit()"
+                >
+                <label for="bt-annual-upload-{{ forloop.counter }}" class="icon-btn" title="Upload annual statement for {{ account.source_ac }}" aria-label="Upload annual statement" style="cursor: pointer;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </label>
+              </form>
+              <form method="post" class="inline-form" action="{% url 'bank_transactions_summary_update_cb_annual' %}" style="display: inline-flex; align-items: center;">
+                {% csrf_token %}
+                <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                <input type="hidden" name="source_ac" value="{{ account.source_ac }}">
+                <button type="submit" class="icon-btn" title="Copy CB into Statement CB for every month of {{ account.source_ac }}" aria-label="Update CB">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                  </svg>
+                </button>
+              </form>
+              {% if account.statement_file_url %}
+                <a href="{{ account.statement_file_url }}" target="_blank" rel="noopener" class="icon-btn" title="View saved statement: {{ account.statement_file_name }}" aria-label="View saved statement">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                </a>
+              {% endif %}
+            </div>
+            <div class="table-wrap" style="margin-top: 0.5rem;">
+              <table class="data-grid data-grid-wrap" aria-label="Summary for {{ account.source_ac }}">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th class="num">OB</th>
+                    <th class="num">Debit</th>
+                    <th class="num">Credit</th>
+                    <th class="num">CB</th>
+                    <th class="num">Statement CB</th>
+                    <th class="num">Check</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for m in account.months %}
+                    <tr>
+                      <td>{{ m.label }}</td>
+                      <td class="num">{% if m.has_data %}{{ m.ob|floatformat:"2g" }}{% else %}—{% endif %}</td>
+                      <td class="num">{% if m.has_data %}{{ m.debit|floatformat:"2g" }}{% else %}—{% endif %}</td>
+                      <td class="num">{% if m.has_data %}{{ m.credit|floatformat:"2g" }}{% else %}—{% endif %}</td>
+                      <td class="num">{% if m.has_data %}{{ m.cb|floatformat:"2g" }}{% else %}—{% endif %}</td>
+                      {% if m.has_data %}
+                        <td class="num" style="white-space: nowrap;">
+                          <form method="post" class="inline-form" action="{% url 'bank_transactions_summary_report' %}" style="display: inline-flex; align-items: center; gap: 0.4rem; vertical-align: middle;">
+                            {% csrf_token %}
+                            <input type="hidden" name="pk" value="{{ m.pk }}">
+                            <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input
+                              type="number"
+                              step="0.01"
+                              name="cb_from_statement"
+                              value="{% if m.cb_from_statement is not None %}{{ m.cb_from_statement|floatformat:"2g" }}{% endif %}"
+                              class="input-compact"
+                              style="width: 6rem; -moz-appearance: textfield;"
+                              onwheel="this.blur()"
+                            >
+                            <button type="submit" class="icon-btn icon-btn-edit" title="Save" aria-label="Save">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                              </svg>
+                            </button>
+                          </form>
+                          <form method="post" class="inline-form" action="{% url 'bank_transactions_summary_update_cb' %}" style="display: inline-flex; align-items: center; vertical-align: middle;">
+                            {% csrf_token %}
+                            <input type="hidden" name="pk" value="{{ m.pk }}">
+                            <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <button type="submit" class="icon-btn" title="Copy CB into Statement CB" aria-label="Update CB">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="1 4 1 10 7 10"/>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                              </svg>
+                            </button>
+                          </form>
+                          <form method="post" class="inline-form" action="{% url 'bank_transactions_summary_upload_statement' %}" enctype="multipart/form-data" style="display: inline-flex; align-items: center; gap: 0.3rem; vertical-align: middle;">
+                            {% csrf_token %}
+                            <input type="hidden" name="pk" value="{{ m.pk }}">
+                            <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input
+                              type="file"
+                              name="statement_pdf"
+                              accept="application/pdf"
+                              id="bt-upload-{{ m.pk }}"
+                              style="display: none;"
+                              onchange="this.form.submit()"
+                            >
+                            <label for="bt-upload-{{ m.pk }}" class="icon-btn" title="Upload statement PDF (auto-fills CB)" aria-label="Upload statement PDF" style="cursor: pointer;">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                              </svg>
+                            </label>
+                          </form>
+                          {% if m.statement_file_url %}
+                            <a href="{{ m.statement_file_url }}" target="_blank" rel="noopener" class="icon-btn" title="View saved statement: {{ m.statement_file_name }}" aria-label="View saved statement" style="margin-left: 0.2rem; vertical-align: middle;">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </td>
+                        <td class="num">
+                          {% if m.cb_from_statement is not None %}
+                            {% if m.check_diff == 0 %}
+                              <span style="color: var(--ok-color, #1a7f37);">✓ 0.00</span>
+                            {% else %}
+                              <span class="field-error">{{ m.check_diff|floatformat:"2g" }}</span>
+                            {% endif %}
+                          {% else %}
+                            —
+                          {% endif %}
+                        </td>
+                        <td></td>
+                      {% else %}
+                        <td class="num">—</td>
+                        <td class="num">—</td>
+                        <td></td>
+                      {% endif %}
+                    </tr>
+                  {% endfor %}
+                  <tr>
+                    <td><strong>Total</strong></td>
+                    <td class="num"></td>
+                    <td class="num"><strong>{{ account.total_debit|floatformat:"2g" }}</strong></td>
+                    <td class="num"><strong>{{ account.total_credit|floatformat:"2g" }}</strong></td>
+                    <td class="num"></td>
+                    <td class="num"></td>
+                    <td class="num"></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted" style="margin-top: 1rem;">No bank/cash accounts found. Add one under Setup.</p>
+        {% endif %}
+      {% endif %}
+    {% else %}
+      <p class="muted">No fiscal years are defined. Add them under <a href="{% url 'fiscal_years' %}">Setup → GL → Fiscal years</a>.</p>
+    {% endif %}
+
+    <p class="muted" style="margin-top: 1.25rem;">
+      <a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a>
+      ·
+      <a href="{% url 'gl_hub' %}">← Back to GL</a>
+    </p>
+  </section>
+</div>
+{% endblock %}
