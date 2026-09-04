@@ -3,14 +3,16 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import BankTransactionSourceObForm, SourceBankCashAcForm
+from .forms import BankTransactionSourceObForm, FbForm, SourceBankCashAcForm
 from .models import (
     BankStatementUpload,
     BankTransactionSource,
     BankTransactionSourceOb,
     BankTransactionSourceSummary,
+    Fb,
     SourceBankCashAc,
 )
+
 from .services.build_month_summary import build_month_summary
 from .services.build_ym import build_ym
 from .services.extract_closing_balance import (
@@ -37,6 +39,8 @@ def bank_transactions_summary_report(request):
     if request.method == "POST":
         row = get_object_or_404(BankTransactionSourceSummary, pk=request.POST.get("pk"))
         raw = (request.POST.get("cb_from_statement") or "").strip()
+        anchor = request.POST.get("anchor", "")
+        redirect_url = f"{request.path}?fy={request.POST.get('fy', '')}" + (f"#{anchor}" if anchor else "")
         if raw == "":
             row.cb_from_statement = None
         else:
@@ -44,10 +48,10 @@ def bank_transactions_summary_report(request):
                 row.cb_from_statement = float(raw)
             except ValueError:
                 messages.error(request, "Statement CB must be a number.")
-                return redirect(f"{request.path}?fy={request.POST.get('fy', '')}")
+                return redirect(redirect_url)
         row.save(update_fields=["cb_from_statement"])
         messages.success(request, f"Saved statement CB for {row.source_ac_id} {row.ym}.")
-        return redirect(f"{request.path}?fy={request.POST.get('fy', '')}")
+        return redirect(redirect_url)
 
     fy_param = request.GET.get("fy")
     selected_fy = None
@@ -73,7 +77,7 @@ def bank_transactions_summary_report(request):
             upload = latest_uploads.get(account.source_ac)
             account.statement_file_url = upload.statement_file.url if upload else None
             account.statement_file_name = upload.statement_file.name.rsplit("/", 1)[-1] if upload else None
-            
+
     return render(
         request,
         "bank_transactions/bank_transactions_summary_report.html",
@@ -95,7 +99,8 @@ def bank_transactions_summary_upload_statement(request):
 
     row = get_object_or_404(BankTransactionSourceSummary, pk=request.POST.get("pk"))
     fy_pk = request.POST.get("fy", "")
-    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}"
+    anchor = request.POST.get("anchor", "")
+    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}" + (f"#{anchor}" if anchor else "")
     uploaded = request.FILES.get("statement_pdf")
 
     if uploaded is None:
@@ -155,7 +160,8 @@ def bank_transactions_summary_upload_annual_statement(request):
         return redirect("bank_transactions_summary_report")
 
     fy_pk = request.POST.get("fy", "")
-    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}"
+    anchor = request.POST.get("anchor", "")
+    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}" + (f"#{anchor}" if anchor else "")
 
     fiscal_year = get_object_or_404_fiscal_year(fy_pk)
     if fiscal_year is None:
@@ -258,14 +264,15 @@ def bank_transactions_summary_update_cb(request):
         return redirect("bank_transactions_summary_report")
 
     fy_pk = request.POST.get("fy", "")
-    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}"
+    anchor = request.POST.get("anchor", "")
+    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}" + (f"#{anchor}" if anchor else "")
 
     row = get_object_or_404(BankTransactionSourceSummary, pk=request.POST.get("pk"))
-    row.cb_from_statement = row.cb
+    row.cb_from_statement = round(row.cb, 2)
     row.save(update_fields=["cb_from_statement"])
     messages.success(
         request,
-        f"Statement CB set to {row.cb:,.2f} for {row.source_ac_id} {row.ym}.",
+        f"Statement CB set to {row.cb_from_statement:,.2f} for {row.source_ac_id} {row.ym}.",
     )
     return redirect(back_url)
 
@@ -278,7 +285,8 @@ def bank_transactions_summary_update_cb_annual(request):
         return redirect("bank_transactions_summary_report")
 
     fy_pk = request.POST.get("fy", "")
-    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}"
+    anchor = request.POST.get("anchor", "")
+    back_url = f"{reverse('bank_transactions_summary_report')}?{urlencode({'fy': fy_pk})}" + (f"#{anchor}" if anchor else "")
 
     fiscal_year = get_object_or_404_fiscal_year(fy_pk)
     if fiscal_year is None:
@@ -296,7 +304,7 @@ def bank_transactions_summary_update_cb_annual(request):
     rows = BankTransactionSourceSummary.objects.filter(source_ac=account, ym__in=yms)
     updated = 0
     for row in rows:
-        row.cb_from_statement = row.cb
+        row.cb_from_statement = round(row.cb, 2)
         row.save(update_fields=["cb_from_statement"])
         updated += 1
 
@@ -353,15 +361,80 @@ def bank_transactions_build_month_summary(request):
 @login_required
 def bank_transactions_build_ym(request):
     if request.method == "POST":
-        report = build_ym(BankTransactionSource=BankTransactionSource)
-        messages.success(
-            request,
-            f"Build complete. {report.updated_count} transaction(s) had their YM filled in "
-            f"(rows with an existing YM were left untouched).",
-        )
-        return redirect("bank_transactions_build_ym")
+        force = request.POST.get("force") == "1"
+        report = build_ym(BankTransactionSource=BankTransactionSource, force=force)
+        if force:
+            if report.updated_count == 0:
+                messages.success(
+                    request,
+                    f"All {report.scanned_count} transaction(s) already had the correct "
+                    f"YM for their Value Date. Nothing to update.",
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Recalculate complete. {report.updated_count} of {report.scanned_count} "
+                    f"transaction(s) had their YM changed to match Value Date.",
+                )
+        else:
+            if report.updated_count == 0:
+                messages.success(
+                    request,
+                    "All transactions already had a YM. Nothing to fill in.",
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Build complete. {report.updated_count} transaction(s) had their YM filled in "
+                    f"(rows with an existing YM were left untouched).",
+                )
+                return redirect("bank_transactions_build_ym")
 
     return render(request, "bank_transactions/bank_transactions_build_ym.html", {})
+
+@login_required
+def bank_transactions_fbs(request):
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "delete":
+            fb = get_object_or_404(Fb, pk=request.POST.get("pk"))
+            fb.delete()
+            return redirect("bank_transactions_fbs")
+        return redirect("bank_transactions_fbs")
+
+    return render(
+        request,
+        "bank_transactions/bank_transactions_fbs.html",
+        {"fbs": Fb.objects.all()},
+    )
+
+
+def _bank_transactions_fb_form_view(request, instance=None):
+    if request.method == "POST":
+        form = FbForm(request.POST, instance=instance)
+        if form.is_valid():
+            form.save()
+            return redirect("bank_transactions_fbs")
+    else:
+        form = FbForm(instance=instance)
+
+    return render(
+        request,
+        "bank_transactions/bank_transactions_fb_form.html",
+        {"form": form, "fb": instance},
+    )
+
+
+@login_required
+def bank_transactions_fb_create(request):
+    return _bank_transactions_fb_form_view(request)
+
+
+@login_required
+def bank_transactions_fb_edit(request, pk):
+    fb = get_object_or_404(Fb, pk=pk)
+    return _bank_transactions_fb_form_view(request, instance=fb)
+
 
 @login_required
 def bank_transactions_source_accounts(request):

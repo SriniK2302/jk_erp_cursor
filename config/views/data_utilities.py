@@ -402,25 +402,6 @@ def excel_import_run(request):
     )
 
     try:
-        mapping_check = inspect_import_column_mapping(
-            file_path=path,
-            sheet_name=sheet_name,
-            postgres_db=postgres_db,
-            table_name=table_name,
-            selected_headers=selected_headers,
-        )
-    except Exception as exc:
-        messages.error(request, f"Import failed: {exc}")
-        return redirect("data_excel_import")
-
-    if not mapping_check.get("exact_match") and not confirm_mismatch:
-        warn = _excel_import_mapping_warning(mapping_check)
-        if not warn:
-            warn = "Column mismatch detected between Excel and destination table."
-        messages.error(request, f"{warn} Review columns and run import again.")
-        return redirect("data_excel_import")
-
-    try:
         result = import_sheet_to_postgres(
             file_path=path,
             sheet_name=sheet_name,
@@ -429,15 +410,31 @@ def excel_import_run(request):
             filter_triples=None,
             selected_headers=selected_headers,
         )
+        
     except Exception as exc:
         messages.error(request, f"Import failed: {exc}")
         return redirect("data_excel_import")
 
     extra = ""
     if result.get("columns_not_in_table"):
-        extra = (
+        extra += (
             f" Skipped columns not in the table: "
             f"{', '.join(result['columns_not_in_table'])}."
+        )
+    if result.get("columns_calculated_skipped"):
+        extra += (
+            f" Skipped database-calculated columns (filled automatically): "
+            f"{', '.join(result['columns_calculated_skipped'])}."
+        )
+    if result.get("auto_created_accounts"):
+        extra += (
+            f" Auto-created new accounts in Source Accounts: "
+            f"{', '.join(result['auto_created_accounts'])}."
+        )
+    if result.get("opening_balance_rows_skipped"):
+        extra += (
+            f" Skipped {result['opening_balance_rows_skipped']} opening balance "
+            f"row(s) (enter these via Opening Balances instead)."
         )
     messages.success(
         request,
@@ -500,31 +497,6 @@ def excel_import_start(request):
         return JsonResponse({"ok": False, "message": "File not found."}, status=400)
 
     request.session["data_excel_import_path"] = str(path)
-
-    try:
-        mapping_check = inspect_import_column_mapping(
-            file_path=path,
-            sheet_name=sheet_name,
-            postgres_db=postgres_db,
-            table_name=table_name,
-            selected_headers=selected_headers,
-        )
-    except Exception as exc:
-        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
-
-    if not mapping_check.get("exact_match") and not confirm_mismatch:
-        warning = _excel_import_mapping_warning(mapping_check)
-        if not warning:
-            warning = "Column mismatch detected between Excel and destination table."
-        return JsonResponse(
-            {
-                "ok": False,
-                "needs_confirmation": True,
-                "message": warning,
-                "mapping_check": mapping_check,
-            },
-            status=409,
-        )
 
     job_id = str(uuid.uuid4())
     with _EXCEL_IMPORT_JOBS_LOCK:

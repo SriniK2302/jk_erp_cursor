@@ -34,15 +34,25 @@
       </div>
 
       <div class="sap-row">
-        <label for="{{ form.ob.id_for_label }}">OB</label>
+        <label for="{{ form.ob_debit.id_for_label }}">Debit</label>
         <div class="sap-control">
-          {{ form.ob }}
-          {% if form.ob.errors %}
-            <span class="field-error">{{ form.ob.errors.0 }}</span>
+          {{ form.ob_debit }}
+          {% if form.ob_debit.errors %}
+            <span class="field-error">{{ form.ob_debit.errors.0 }}</span>
           {% endif %}
         </div>
       </div>
 
+      <div class="sap-row">
+        <label for="{{ form.ob_credit.id_for_label }}">Credit</label>
+        <div class="sap-control">
+          {{ form.ob_credit }}
+          {% if form.ob_credit.errors %}
+            <span class="field-error">{{ form.ob_credit.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      
       <div class="sap-actions">
         <a href="{% url 'bank_transactions_source_ob' %}" class="button button-secondary">Cancel</a>
         <button type="submit" class="button">{% if ob %}Update Opening Balance{% else %}Save Opening Balance{% endif %}</button>

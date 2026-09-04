@@ -118,17 +118,69 @@ def list_sheet_names(path: Path) -> list[str]:
         wb.close()
 
 
+def _locate_header_row(path: Path, sheet_name: str) -> tuple[int, int | None, int | None]:
+    """
+    Best-effort detection of where a sheet's real header row starts.
+
+    1. If the sheet has a formal Excel Table (Insert > Table) defined,
+       use its header row and column bounds.
+    2. Otherwise, skip any leading fully-blank rows and use the first row
+       that has at least one non-empty cell as the header.
+
+    Returns (header_row, min_col, max_col), all 1-based/inclusive.
+    min_col/max_col are ``None`` when there's no table to bound columns
+    (the caller then uses each row's natural width).
+    """
+    if path.suffix.lower() == ".csv":
+        return 1, None, None
+
+    wb = load_workbook(path, read_only=False, data_only=True)
+    try:
+        ws = wb[sheet_name]
+        tables = getattr(ws, "tables", None)
+        if tables:
+            for name in tables:
+                try:
+                    from openpyxl.utils.cell import range_boundaries
+
+                    min_col, min_row, max_col, _max_row = range_boundaries(tables[name].ref)
+                    return min_row, min_col, max_col
+                except Exception:
+                    continue
+    finally:
+        wb.close()
+
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb[sheet_name]
+        for i, row in enumerate(ws.iter_rows(values_only=True), start=1):
+            if any(c is not None and str(c).strip() != "" for c in row):
+                return i, None, None
+            if i >= 50:
+                break
+    finally:
+        wb.close()
+    return 1, None, None
+
+
 def read_sheet_headers_only(path: Path, sheet_name: str) -> list[str]:
     path = path.resolve()
     if path.suffix.lower() == ".csv":
         headers, _ = _read_csv_rows(path)
         return headers
+    header_row, min_col, max_col = _locate_header_row(path, sheet_name)
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         if sheet_name not in wb.sheetnames:
             raise ValueError(f"Sheet not found: {sheet_name}")
         ws = wb[sheet_name]
-        first = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        first = next(
+            ws.iter_rows(
+                min_row=header_row, max_row=header_row,
+                min_col=min_col, max_col=max_col, values_only=True,
+            ),
+            None,
+        )
         if not first:
             return []
         return [_header_cell_str(c) for c in first]
@@ -171,12 +223,15 @@ def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[li
     path = path.resolve()
     if path.suffix.lower() == ".csv":
         return _read_csv_rows(path)
+    header_row, min_col, max_col = _locate_header_row(path, sheet_name)
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         if sheet_name not in wb.sheetnames:
             raise ValueError(f"Sheet not found: {sheet_name}")
         ws = wb[sheet_name]
-        rows_iter = ws.iter_rows(values_only=True)
+        rows_iter = ws.iter_rows(
+            min_row=header_row, min_col=min_col, max_col=max_col, values_only=True
+        )
         first = next(rows_iter, None)
         if first is None:
             return [], []
@@ -193,7 +248,7 @@ def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[li
         return headers, data
     finally:
         wb.close()
-
+        
 
 
 def read_sheet_rows(path: Path, sheet_name: str) -> tuple[list[str], list[list[Any]]]:
@@ -603,6 +658,7 @@ def _format_import_psycopg_error(
     sheet_row_1based: int,
     sel_headers: list[str],
     insert_plan: list[tuple[int, str]],
+    payload: tuple[Any, ...] | None = None,
 ) -> str:
     """
     Add sheet row and column context. insert_plan maps subset index -> DB column name
@@ -636,6 +692,24 @@ def _format_import_psycopg_error(
         f'Sheet {sheet_name!r}, data row {sheet_row_1based} (row 1 is the header).',
         "Only columns you selected for import are written.",
     ]
+
+    # PostgreSQL doesn't report a column name for plain "value too long"
+    # errors, so find the actual offending value ourselves by comparing
+    # each value in this row against the column's VARCHAR/CHAR limit.
+    if pg_col is None and payload is not None:
+        m = re.search(r"character varying\((\d+)\)|character\((\d+)\)", exc_msg, re.I)
+        if m:
+            limit = int(m.group(1) or m.group(2))
+            for (j, dbn), value in zip(insert_plan, payload):
+                if isinstance(value, str) and len(value) > limit:
+                    lines.append(
+                        f"Failing value: Excel column {sel_headers[j]!r} → PostgreSQL "
+                        f"{dbn!r} (limit {limit} chars). Value ({len(value)} chars): "
+                        f"{value!r}."
+                    )
+                    lines.append(str(exc).strip())
+                    return "\n".join(lines)
+
     if sheet_header is not None and pg_col is not None:
         hint = (
             f'Failing column: Excel/header {sheet_header!r} → PostgreSQL {pg_col!r}.'
@@ -756,6 +830,97 @@ def _coerce_for_pg(
     return s
 
 
+def _shorten_bank_account_name(raw: str) -> str:
+    """
+    'HDFC SB 00581000000873' -> 'HDFC SB 000873'.
+
+    Bank name + account type + last 6 digits of the account number. This is
+    the naming convention already used for accounts in source_bank_cash_acs
+    (max 15 chars). "CC-04" style type suffixes are dropped (only "CC" is
+    kept); the account-index digit isn't part of the actual account number.
+    """
+    tokens = (raw or "").strip().split()
+    if len(tokens) < 2:
+        return (raw or "").strip()[:15]
+    bank = tokens[0]
+    acc_type = tokens[1].split("-")[0]
+    digits = "".join(re.findall(r"\d", " ".join(tokens[2:])))
+    last6 = digits[-6:] if len(digits) >= 6 else digits
+    return f"{bank} {acc_type} {last6}".strip()[:15]
+
+
+def _ensure_source_bank_cash_accounts(
+    cur,
+    *,
+    insert_plan: list[tuple[int, str]],
+    sel_idx: list[int],
+    headers: list[str],
+    data_rows: list[list[Any]],
+) -> list[str]:
+    """
+    For an import into ``bank_transactions_source``: scan the sheet's
+    ``source_ac`` values, and insert any that don't yet exist in
+    ``source_bank_cash_acs`` (bank_name/account_type filled in from the
+    sheet where available, fb_code left blank). Returns the list of newly
+    created account codes.
+    """
+    source_ac_j = next((j for j, dbn in insert_plan if dbn.lower() == "source_ac"), None)
+    if source_ac_j is None:
+        return []
+    account_type_j = next((j for j, dbn in insert_plan if dbn.lower() == "account_type"), None)
+
+    seen: dict[str, str] = {}
+    for full_row in data_rows:
+        row = full_row
+        if len(row) < len(headers):
+            row = list(row) + [None] * (len(headers) - len(row))
+        val = row[sel_idx[source_ac_j]]
+        if val is None:
+            continue
+        sac = str(val).strip()
+        if not sac:
+            continue
+        sac = _shorten_bank_account_name(sac)
+        if sac in seen:
+            continue
+        atype = ""
+        if account_type_j is not None:
+            atv = row[sel_idx[account_type_j]]
+            atype = str(atv).strip()[:2] if atv else ""
+        seen[sac] = atype
+
+    if not seen:
+        return []
+
+    too_long = [sac for sac in seen if len(sac) > 15]
+    if too_long:
+        raise ValueError(
+            "These Source Ac values are longer than 15 characters (the limit "
+            "for the accounts master table) and can't be auto-created: "
+            + ", ".join(f"{sac!r} ({len(sac)} chars)" for sac in too_long)
+            + ". Shorten them in the sheet before importing."
+        )
+
+    cur.execute(
+        "SELECT source_ac FROM source_bank_cash_acs WHERE source_ac = ANY(%s)",
+        (list(seen.keys()),),
+    )
+
+    existing = {row[0] for row in cur.fetchall()}
+    to_create = [sac for sac in seen if sac not in existing]
+
+    for sac in to_create:
+        bank_name = sac.split(" ", 1)[0][:50]
+        cur.execute(
+            "INSERT INTO source_bank_cash_acs "
+            "(source_ac, bank_name, account_type, fb_code) "
+            "VALUES (%s, %s, %s, %s)",
+            (sac, bank_name, seen[sac], ""),
+        )
+
+    return to_create
+
+
 def import_sheet_to_postgres(
     file_path: Path,
     sheet_name: str,
@@ -815,6 +980,7 @@ def import_sheet_to_postgres(
     )
     unmatched_db: list[str] = []
     insert_db_names: list[str] = []
+    auto_created_accounts: list[str] = []
 
     try:
         conn.autocommit = False
@@ -835,9 +1001,27 @@ def import_sheet_to_postgres(
                     "(case-insensitive). Check the table definition and your selection."
                 )
 
-            insert_plan = matched
-            insert_db_names = [db for _, db in matched]
             column_meta = _fetch_public_column_metadata(cur, table_name)
+
+            # Database-calculated (generated) columns can't be written to directly;
+            # skip them automatically rather than failing the whole import.
+            skipped_calculated: list[str] = []
+            insert_plan: list[tuple[int, str]] = []
+            for j, dbn in matched:
+                meta = column_meta.get(dbn.lower()) if column_meta else None
+                if meta and meta.get("is_calculated"):
+                    skipped_calculated.append(dbn)
+                    continue
+                insert_plan.append((j, dbn))
+
+            if not insert_plan:
+                raise ValueError(
+                    "All matched columns are database-calculated (generated) columns "
+                    "and can't be imported directly: " + ", ".join(skipped_calculated)
+                    + ". Remove them from your selection."
+                )
+
+            insert_db_names = [db for _, db in insert_plan]
             col_by_lower = {c.lower(): c for c in existing_cols}
             pg_types: list[str] = []
             for j in range(n_import):
@@ -848,6 +1032,19 @@ def import_sheet_to_postgres(
                 else:
                     pg_types.append("TEXT")
 
+            # bank_transactions_source.source_ac always references the
+            # source_bank_cash_acs master; auto-create any account the sheet
+            # references but that doesn't exist yet, so historical imports
+            # don't need manual account setup first.
+            if table_name.lower() == "bank_transactions_source":
+                auto_created_accounts = _ensure_source_bank_cash_accounts(
+                    cur,
+                    insert_plan=insert_plan,
+                    sel_idx=sel_idx,
+                    headers=headers,
+                    data_rows=data_rows,
+                )
+
             idents = [sql.Identifier(db) for _, db in insert_plan]
             placeholders = sql.SQL(", ").join(sql.Placeholder() for _ in insert_plan)
             insert_stmt = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
@@ -855,6 +1052,14 @@ def import_sheet_to_postgres(
                 sql.SQL(", ").join(idents),
                 placeholders,
             )
+
+            shorten_accounts = table_name.lower() == "bank_transactions_source"
+            narration_j = None
+            opening_balance_skipped = 0
+            if shorten_accounts:
+                narration_j = next(
+                    (j for j, dbn in insert_plan if dbn.lower() == "narration"), None
+                )
 
             notify_every = max(1, nrows // 500) if nrows > 500 else 1
             for i, full_row in enumerate(data_rows, start=1):
@@ -875,6 +1080,15 @@ def import_sheet_to_postgres(
                 if not row_passes_filters(row, headers, filters):
                     continue
                 sub_row = [row[j] for j in sel_idx]
+                if narration_j is not None:
+                    narration_val = sub_row[narration_j]
+                    if narration_val and str(narration_val).strip().lower().startswith("opening balance"):
+                        opening_balance_skipped += 1
+                        continue
+                if shorten_accounts:
+                    for j, dbn in insert_plan:
+                        if dbn.lower() == "source_ac" and sub_row[j] not in (None, ""):
+                            sub_row[j] = _shorten_bank_account_name(str(sub_row[j]))
                 payload = tuple(
                     _coerce_for_pg(
                         sub_row[j],
@@ -896,8 +1110,10 @@ def import_sheet_to_postgres(
                             sheet_row_1based=i,
                             sel_headers=sel_headers,
                             insert_plan=insert_plan,
+                            payload=payload,
                         )
                     ) from e
+                
                 inserted += 1
         conn.commit()
     except Exception:
@@ -923,8 +1139,13 @@ def import_sheet_to_postgres(
     }
     if unmatched_db:
         out["columns_not_in_table"] = unmatched_db
+    if skipped_calculated:
+        out["columns_calculated_skipped"] = skipped_calculated
+    if auto_created_accounts:
+        out["auto_created_accounts"] = auto_created_accounts
+    if opening_balance_skipped:
+        out["opening_balance_rows_skipped"] = opening_balance_skipped
     return out
-
 
 def inspect_import_column_mapping(
     file_path: Path,
@@ -1017,9 +1238,11 @@ def inspect_import_column_mapping(
         if meta:
             pair["postgres_column"] = meta["column_name"]
             pair["postgres_type"] = _coercion_pg_type_from_db_meta(meta)
+            pair["is_calculated"] = bool(meta.get("is_calculated"))
         else:
             pair["postgres_column"] = None
             pair["postgres_type"] = None
+            pair["is_calculated"] = False
 
     exact_match = not missing_in_table
     return {
@@ -1345,3 +1568,4 @@ def create_public_table_from_schema_sheet(
         "database": dbname,
         "columns": [[c, t] for c, t in columns],
     }
+

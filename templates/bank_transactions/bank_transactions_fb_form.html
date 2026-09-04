@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{% if fb %}Edit FB Code{% else %}Add FB Code{% endif %} · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>{% if fb %}Edit FB Code{% else %}Add FB Code{% endif %}</h1>
+      <p class="muted">FB Code is referenced by Source Accounts and must be unique.</p>
+    </header>
+
+    <form method="post" class="sap-form" novalidate>
+      {% csrf_token %}
+
+      <div class="sap-row">
+        <label for="{{ form.fb_code.id_for_label }}">FB Code</label>
+        <div class="sap-control">
+          {{ form.fb_code }}
+          {% if form.fb_code.errors %}
+            <span class="field-error">{{ form.fb_code.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.fb_desc.id_for_label }}">Description</label>
+        <div class="sap-control">
+          {{ form.fb_desc }}
+          {% if form.fb_desc.errors %}
+            <span class="field-error">{{ form.fb_desc.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-row">
+        <label for="{{ form.entity.id_for_label }}">Entity</label>
+        <div class="sap-control">
+          {{ form.entity }}
+          {% if form.entity.errors %}
+            <span class="field-error">{{ form.entity.errors.0 }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sap-actions">
+        <a href="{% url 'bank_transactions_fbs' %}" class="button button-secondary">Cancel</a>
+        <button type="submit" class="button">{% if fb %}Update FB Code{% else %}Save FB Code{% endif %}</button>
+      </div>
+    </form>
+
+    <p class="muted"><a href="{% url 'bank_transactions_fbs' %}">← Back to FB Codes</a></p>
+  </section>
+</div>
+{% endblock %}
+

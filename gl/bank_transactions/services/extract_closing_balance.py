@@ -200,15 +200,29 @@ def extract_closing_balances_for_months(file_obj, yms: list[str]) -> dict[str, f
     For a statement covering many months, return {ym: closing_balance} for
     every ``ym`` it could confidently match (transaction-scan only; the
     single 'closing balance' label isn't meaningful across several months).
-    Months it couldn't find are simply absent from the result.
+
+    Months with no dated transactions at all (dormant months) don't get a
+    line to scan, so their balance is carried forward unchanged from the
+    nearest earlier month that did have one. ``yms`` must be in
+    chronological order for this to work. Months before the first month with
+    any match are left absent (nothing to carry forward from).
     """
     text = _extract_text(file_obj)
     if not text:
         return {}
 
-    results: dict[str, float] = {}
+    found: dict[str, float] = {}
     for ym in yms:
         amount = _closing_balance_for_month(text, ym)
         if amount is not None:
-            results[ym] = amount
+            found[ym] = amount
+
+    results: dict[str, float] = {}
+    last_known: float | None = None
+    for ym in yms:
+        if ym in found:
+            last_known = found[ym]
+            results[ym] = found[ym]
+        elif last_known is not None:
+            results[ym] = last_known
     return results

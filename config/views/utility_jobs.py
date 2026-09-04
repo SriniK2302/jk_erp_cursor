@@ -468,9 +468,4 @@ def _excel_import_mapping_warning(check: dict) -> str:
     missing = check.get("missing_in_table") or []
     if not missing:
         return ""
-    return (
-        "Selected Excel columns missing in destination table: "
-        + ", ".join(missing[:12])
-        + ("ΓÇª" if len(missing) > 12 else "")
-        + "."
-    )
+    return "Column mismatch detected between the selected Excel columns and the destination table."

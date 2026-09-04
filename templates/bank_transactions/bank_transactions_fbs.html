@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions – FB Codes · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions – FB Codes</h1>
+      <p class="muted">Referenced by Source Accounts (FB Code). This table already existed in the database; managed here for convenience.</p>
+    </header>
+
+    <div class="grid-panel" data-grid-root>
+      <div class="grid-toolbar">
+        <input
+          type="search"
+          class="grid-search"
+          placeholder="Search..."
+          aria-label="Search FB codes"
+          data-grid-search
+        >
+        <span class="muted grid-count" data-grid-count></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-grid">
+          <thead>
+            <tr>
+              <th>FB Code</th>
+              <th>Description</th>
+              <th>Entity</th>
+              <th class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fb in fbs %}
+              <tr data-grid-row>
+                <td>{{ fb.fb_code }}</td>
+                <td>{{ fb.fb_desc|default:"—" }}</td>
+                <td>{{ fb.entity }}</td>
+                <td class="col-actions">
+                  {% include "includes/grid_row_actions.html" with list_url_name="bank_transactions_fbs" edit_url_name="bank_transactions_fb_edit" edit_pk=fb.id pk=fb.id delete_action="delete" confirm_message="Delete this FB code? This is blocked if any account still references it." %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr data-grid-empty>
+                <td colspan="4" class="muted">No FB codes yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="muted grid-no-results" data-grid-no-results hidden>
+        No matching records found.
+      </p>
+    </div>
+
+    <div class="page-actions">
+      <a href="{% url 'bank_transactions_fb_create' %}" class="button">Add FB Code</a>
+    </div>
+
+    <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a></p>
+  </section>
+</div>
+{% endblock %}

@@ -29,7 +29,9 @@ bank_transactions_source_ob.html
             <tr>
               <th>Source Ac</th>
               <th>YM</th>
-              <th>OB</th>
+              <th class="num">Debit</th>
+              <th class="num">Credit</th>
+              <th class="num">OB</th>
               <th class="col-actions">Actions</th>
             </tr>
           </thead>
@@ -38,14 +40,16 @@ bank_transactions_source_ob.html
               <tr data-grid-row>
                 <td>{{ ob.source_ac_id }}</td>
                 <td>{{ ob.ym }}</td>
-                <td>{{ ob.ob }}</td>
+                <td class="num">{{ ob.ob_debit|default:"—" }}</td>
+                <td class="num">{{ ob.ob_credit|default:"—" }}</td>
+                <td class="num">{{ ob.ob }}</td>
                 <td class="col-actions">
                   {% include "includes/grid_row_actions.html" with list_url_name="bank_transactions_source_ob" edit_url_name="bank_transactions_source_ob_edit" edit_pk=ob.id pk=ob.id delete_action="delete" confirm_message="Delete this opening balance record?" %}
                 </td>
               </tr>
             {% empty %}
               <tr data-grid-empty>
-                <td colspan="4" class="muted">No opening balances added yet.</td>
+                <td colspan="6" class="muted">No opening balances added yet.</td>
               </tr>
             {% endfor %}
           </tbody>

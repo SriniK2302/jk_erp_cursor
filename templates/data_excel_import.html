@@ -365,6 +365,12 @@
       }
     });
 
+    function syncTableFromSheet() {
+      // Table name isn't auto-derived from the sheet; this is a safe no-op
+      // so selecting a sheet never crashes or silently overwrites whatever
+      // table name has already been typed in.
+    }
+
     function fillImportColumns(headers) {
       if (!importColumnList || !importColumnToolbar) {
         return;
@@ -733,6 +739,24 @@
                 " Sheet columns not in the table (skipped): " +
                 res.columns_not_in_table.join(", ") +
                 ".";
+            }
+            if (res.columns_calculated_skipped && res.columns_calculated_skipped.length) {
+              msg +=
+                " Database-calculated columns skipped (filled automatically): " +
+                res.columns_calculated_skipped.join(", ") +
+                ".";
+            }
+            if (res.auto_created_accounts && res.auto_created_accounts.length) {
+              msg +=
+                " Auto-created new accounts in Source Accounts: " +
+                res.auto_created_accounts.join(", ") +
+                ".";
+            }
+            if (res.opening_balance_rows_skipped) {
+              msg +=
+                " Skipped " +
+                res.opening_balance_rows_skipped +
+                " opening balance row(s) (enter these via Opening Balances instead).";
             }
             resultBox.textContent = msg;
             return;

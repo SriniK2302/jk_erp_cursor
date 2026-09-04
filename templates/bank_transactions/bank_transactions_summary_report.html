@@ -38,7 +38,7 @@
       {% if selected_fy %}
         {% if report_rows %}
           {% for account in report_rows %}
-            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+            <div id="account-{{ forloop.counter }}" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
               <h2 style="font-size: 1.05rem; font-weight: 600; margin: 0;">
                 {{ account.source_ac }}
               </h2>
@@ -46,6 +46,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
                 <input type="hidden" name="source_ac" value="{{ account.source_ac }}">
+                <input type="hidden" name="anchor" value="account-{{ forloop.counter }}">
                 <input
                   type="file"
                   name="statement_pdf"
@@ -66,6 +67,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
                 <input type="hidden" name="source_ac" value="{{ account.source_ac }}">
+                <input type="hidden" name="anchor" value="account-{{ forloop.counter }}">
                 <button type="submit" class="icon-btn" title="Copy CB into Statement CB for every month of {{ account.source_ac }}" aria-label="Update CB">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <polyline points="1 4 1 10 7 10"/>
@@ -98,7 +100,7 @@
                 </thead>
                 <tbody>
                   {% for m in account.months %}
-                    <tr>
+                    <tr id="row-{{ m.pk }}">
                       <td>{{ m.label }}</td>
                       <td class="num">{% if m.has_data %}{{ m.ob|floatformat:"2g" }}{% else %}—{% endif %}</td>
                       <td class="num">{% if m.has_data %}{{ m.debit|floatformat:"2g" }}{% else %}—{% endif %}</td>
@@ -110,11 +112,12 @@
                             {% csrf_token %}
                             <input type="hidden" name="pk" value="{{ m.pk }}">
                             <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input type="hidden" name="anchor" value="row-{{ m.pk }}">
                             <input
                               type="number"
                               step="0.01"
                               name="cb_from_statement"
-                              value="{% if m.cb_from_statement is not None %}{{ m.cb_from_statement|floatformat:"2g" }}{% endif %}"
+                              value="{% if m.cb_from_statement is not None %}{{ m.cb_from_statement|stringformat:".2f" }}{% endif %}"
                               class="input-compact"
                               style="width: 6rem; -moz-appearance: textfield;"
                               onwheel="this.blur()"
@@ -131,6 +134,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="pk" value="{{ m.pk }}">
                             <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input type="hidden" name="anchor" value="row-{{ m.pk }}">
                             <button type="submit" class="icon-btn" title="Copy CB into Statement CB" aria-label="Update CB">
                               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <polyline points="1 4 1 10 7 10"/>
@@ -142,6 +146,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="pk" value="{{ m.pk }}">
                             <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input type="hidden" name="anchor" value="row-{{ m.pk }}">
                             <input
                               type="file"
                               name="statement_pdf"

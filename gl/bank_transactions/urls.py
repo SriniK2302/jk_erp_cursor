@@ -29,4 +29,7 @@ urlpatterns = [
          name="bank_transactions_source_account_create"),
     path("accounts/<int:pk>/edit/", views.bank_transactions_source_account_edit, 
          name="bank_transactions_source_account_edit"),
+    path("fbs/", views.bank_transactions_fbs, name="bank_transactions_fbs"),
+    path("fbs/new/", views.bank_transactions_fb_create, name="bank_transactions_fb_create"),
+    path("fbs/<int:pk>/edit/", views.bank_transactions_fb_edit, name="bank_transactions_fb_edit"),
 ]
