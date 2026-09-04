@@ -344,8 +344,15 @@ def bank_transactions_build_month_summary(request):
         if report.accounts_needing_ob:
             messages.warning(
                 request,
-                "Accounts missing an opening balance (skipped): "
+                "Accounts with no opening balance and no transactions (skipped): "
                 + ", ".join(report.accounts_needing_ob),
+            )
+        if report.accounts_built_without_ob:
+            messages.warning(
+                request,
+                "Built with OB treated as 0 (no opening balance entered yet): "
+                + ", ".join(report.accounts_built_without_ob)
+                + ". Add the opening balance and run Build Month Summary again to correct it.",
             )
         if report.accounts_with_invalid_ym_transactions:
             messages.warning(

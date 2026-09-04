@@ -35,6 +35,7 @@ class BuildMonthSummaryReport:
     months_created: int = 0
     months_updated: int = 0
     accounts_needing_ob: list[str] = field(default_factory=list)
+    accounts_built_without_ob: list[str] = field(default_factory=list)
     accounts_with_invalid_ym_transactions: list[str] = field(default_factory=list)
 
 
@@ -56,9 +57,6 @@ def build_month_summary(
     for account in all_accounts:
         ac = account.source_ac
         ob_row = ob_by_account.get(ac)
-        if ob_row is None:
-            report.accounts_needing_ob.append(ac)
-            continue
 
         txns = BankTransactionSource.objects.filter(source_ac=account)
 
@@ -78,14 +76,25 @@ def build_month_summary(
         if has_invalid_ym:
             report.accounts_with_invalid_ym_transactions.append(ac)
 
-        report.accounts_processed += 1
+        txn_yms = list(monthly.keys())
 
-        anchor_ym = ob_row.ym
-        if not _is_valid_ym(anchor_ym):
+        if ob_row is not None and _is_valid_ym(ob_row.ym):
+            anchor_ym = ob_row.ym
+            running_ob = ob_row.ob or 0.0
+        elif txn_yms:
+            # No opening balance yet: build anyway from the earliest
+            # transaction month with OB treated as 0. Add the OB later and
+            # run Build Month Summary again to pick it up.
+            anchor_ym = min(txn_yms, key=_parse_ym)
+            running_ob = 0.0
+            report.accounts_built_without_ob.append(ac)
+        else:
+            # No OB and no transactions at all: nothing to build.
             report.accounts_needing_ob.append(ac)
             continue
 
-        txn_yms = list(monthly.keys())
+        report.accounts_processed += 1
+
         last_ym = max([anchor_ym] + txn_yms, key=_parse_ym)
 
         existing_rows = {
@@ -94,7 +103,17 @@ def build_month_summary(
         }
         most_recent_existing_ym = max(existing_rows.keys(), key=_parse_ym) if existing_rows else None
 
-        running_ob = ob_row.ob or 0.0
+        # If the anchor month's opening balance has changed since it was
+        # last built (e.g. OB was just added/corrected), the whole chain of
+        # months needs recomputing — a stale OB cascades into every later
+        # month's CB. Otherwise, only refresh the most recent month, so
+        # earlier months you've already reconciled are left untouched.
+        existing_anchor_row = existing_rows.get(anchor_ym)
+        force_full_rebuild = (
+            existing_anchor_row is not None
+            and (existing_anchor_row.ob or 0.0) != running_ob
+        )
+
         ym = anchor_ym
         while True:
             month_totals = monthly.get(ym, {"debit": 0.0, "credit": 0.0})
@@ -102,7 +121,11 @@ def build_month_summary(
             credit = month_totals["credit"]
 
             existing = existing_rows.get(ym)
-            should_write = existing is None or ym == most_recent_existing_ym
+            should_write = (
+                existing is None
+                or ym == most_recent_existing_ym
+                or force_full_rebuild
+            )
 
             if should_write:
                 if existing is not None:
@@ -133,4 +156,3 @@ def build_month_summary(
             ym = _next_ym(ym)
 
     return report
-
