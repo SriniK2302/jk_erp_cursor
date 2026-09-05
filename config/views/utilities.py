@@ -18,11 +18,14 @@ from .utility_jobs import (
     _EXCEL_IMPORT_JOBS_LOCK,
     _MOVE_ALL_JOBS,
     _MOVE_ALL_JOBS_LOCK,
+    _RENAME_SOA_JOBS,
+    _RENAME_SOA_JOBS_LOCK,
     _start_duplicate_job,
     _start_similar_files_job,
     _start_similar_to_reference_job,
     _start_excel_import_job,
     _start_move_all_files_job,
+    _start_rename_soa_job,
     _save_excel_import_preferences,
     _is_truthy_form_value,
     _excel_import_mapping_warning,
@@ -90,6 +93,7 @@ def rename_files_utilities(request):
             "replacement_pattern": replacement_pattern,
             "rename_date_pattern_position": rename_date_pattern_position,
             "rename_text_folder": request.session.get("utilities_rename_text_folder", ""),
+            "rename_soa_folder": request.session.get("utilities_rename_soa_folder", ""),
             "cleanup_fy_folder": request.session.get("utilities_cleanup_fy_folder", ""),
             "rename_content_date_folder": rename_content_date_folder,
             "rename_content_date_pattern": rename_content_date_pattern,
@@ -641,6 +645,27 @@ def select_rename_text_folder(request):
 
 @login_required
 @require_POST
+def select_rename_soa_folder(request):
+    try:
+        root_path = choose_root_folder()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open folder selector. Run this on a machine with desktop access.",
+        )
+        return redirect("rename_files_utilities")
+
+    if root_path is None:
+        messages.info(request, "Rename-SOA folder selection cancelled.")
+        return redirect("rename_files_utilities")
+
+    request.session["utilities_rename_soa_folder"] = str(root_path)
+    messages.success(request, f"Selected folder for SOA rename: {root_path}")
+    return redirect("rename_files_utilities")
+
+
+@login_required
+@require_POST
 def select_cleanup_fy_folder(request):
     try:
         root_path = choose_root_folder()
@@ -1031,6 +1056,81 @@ def rename_files_based_on_text(request):
         )
     return JsonResponse(payload)
 
+
+
+@login_required
+@require_POST
+def rename_soa_files_execute(request):
+    folder = (
+        (request.POST.get("rename_soa_folder") or "").strip()
+        or request.session.get("utilities_rename_soa_folder", "")
+    )
+
+    if not folder:
+        return JsonResponse(
+            {"ok": False, "message": "Select a folder first."},
+            status=400,
+        )
+
+    root_path = Path(folder).expanduser()
+    if not root_path.exists() or not root_path.is_dir():
+        return JsonResponse(
+            {"ok": False, "message": f"Folder not found: {root_path}"},
+            status=400,
+        )
+
+    request.session["utilities_rename_soa_folder"] = str(root_path)
+
+    job_id = str(uuid.uuid4())
+    with _RENAME_SOA_JOBS_LOCK:
+        _RENAME_SOA_JOBS[job_id] = {
+            "done": False,
+            "phase": "queued",
+            "current": 0,
+            "total": None,
+            "progress_percent": 5,
+            "message": "Job queued...",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+            "updated_at": time.time(),
+        }
+
+    _start_rename_soa_job(job_id=job_id, root_folder=root_path)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "message": "SOA rename started.",
+        }
+    )
+
+
+@login_required
+@require_GET
+def rename_soa_files_status(request, job_id):
+    with _RENAME_SOA_JOBS_LOCK:
+        job = _RENAME_SOA_JOBS.get(job_id)
+
+    if not job:
+        return JsonResponse({"ok": False, "message": "Job not found."}, status=404)
+
+    response_payload = {
+        "ok": True,
+        "job_id": job_id,
+        "done": job["done"],
+        "phase": job["phase"],
+        "current": job["current"],
+        "total": job["total"],
+        "progress_percent": job["progress_percent"],
+        "message": job["message"],
+    }
+    if job.get("error"):
+        response_payload["error"] = job["error"]
+    if job.get("result"):
+        response_payload["result"] = job["result"]
+    return JsonResponse(response_payload)
 
 
 @login_required
@@ -1658,5 +1758,3 @@ def similar_files_status(request, job_id):
     if job.get("result"):
         payload["result"] = job["result"]
     return JsonResponse(payload)
-
-

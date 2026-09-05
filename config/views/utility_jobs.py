@@ -10,6 +10,8 @@ _EXCEL_IMPORT_JOBS_LOCK = threading.Lock()
 _EXCEL_IMPORT_JOBS: dict[str, dict] = {}
 _MOVE_ALL_JOBS_LOCK = threading.Lock()
 _MOVE_ALL_JOBS: dict[str, dict] = {}
+_RENAME_SOA_JOBS_LOCK = threading.Lock()
+_RENAME_SOA_JOBS: dict[str, dict] = {}
 def _save_excel_import_preferences(
     request,
     *,
@@ -457,6 +459,69 @@ def _start_move_all_files_job(job_id: str, source_root: Path, target_root: Path)
                     job["updated_at"] = time.time()
 
     thread = threading.Thread(target=run, name=f"move-all-job-{job_id}", daemon=True)
+    thread.start()
+
+
+def _rename_soa_progress_percent(current: int, total: int | None) -> int:
+    if total and total > 0:
+        return 5 + int((current / total) * 90)
+    return 10
+
+
+def _start_rename_soa_job(job_id: str, root_folder: Path) -> None:
+    def run() -> None:
+        try:
+            def progress_callback(phase: str, current: int, total: int | None, message: str) -> None:
+                with _RENAME_SOA_JOBS_LOCK:
+                    job = _RENAME_SOA_JOBS.get(job_id)
+                    if not job:
+                        return
+                    job["phase"] = phase
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = message
+                    job["progress_percent"] = _rename_soa_progress_percent(current, total)
+
+            report = rename_soa_files(root_folder, progress_callback=progress_callback)
+
+            payload = {
+                "ok": True,
+                "renamed_count": report.renamed_count,
+                "scanned_files": report.scanned_count,
+                "skipped_count": report.skipped_count,
+                "message": (
+                    f"Moved {report.renamed_count} renamed file(s) from '{report.root}' "
+                    f"into '{report.target}'. Scanned {report.scanned_count} direct file(s) only (no subfolders)."
+                ),
+            }
+            if report.unresolved or report.skipped_paths:
+                details = report.unresolved + report.skipped_paths
+                payload["warning"] = (
+                    f"{len(details)} file(s) not renamed, left in place in '{report.root}': "
+                    + " | ".join(details)
+                )
+
+            with _RENAME_SOA_JOBS_LOCK:
+                job = _RENAME_SOA_JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["phase"] = "done"
+                    job["progress_percent"] = 100
+                    job["message"] = "SOA rename completed."
+                    job["result"] = payload
+                    job["updated_at"] = time.time()
+        except Exception as exc:  # broad catch to keep job state visible to UI
+            with _RENAME_SOA_JOBS_LOCK:
+                job = _RENAME_SOA_JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["phase"] = "error"
+                    job["progress_percent"] = 100
+                    job["message"] = str(exc)
+                    job["error"] = str(exc)
+                    job["updated_at"] = time.time()
+
+    thread = threading.Thread(target=run, name=f"rename-soa-job-{job_id}", daemon=True)
     thread.start()
 
 

@@ -32,7 +32,12 @@ def _service_form_view(request, instance=None):
             if instance is None:
                 service.created_by = request.user
             service.save()
+            next_url = request.GET.get("next")
+            if next_url:
+                sep = "&" if "?" in next_url else "?"
+                return redirect(f"{next_url}{sep}new_service={service.pk}")
             return redirect("services")
+
     else:
         form = ServiceForm(instance=instance)
 

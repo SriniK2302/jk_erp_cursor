@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import F, Func, Prefetch, Value
+from django.db.models import F, Func, Prefetch, Q, Value
 from django.db.models.functions import NullIf
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -27,6 +27,7 @@ from sales.udins.service_remarks_build import (
     service_remarks_is_blank,
 )
 from sales.udins.service_fy_build import derive_service_fy
+from sales.udins.row_prepare import prepare_udin_row
 
 from .forms import (
     CertificationFeeRateForm,
@@ -42,6 +43,7 @@ from sales.invoices.invoice_from_udin import (
 )
 from sales.invoices.models import InvUdinMap, Invoice
 from sales.invoices.bulk_pdf_zip import save_bulk_invoice_zip
+from sales.invoices.bulk_pdf_zip import save_single_invoice_pdf
 from sales.invoices.pdf_export import PdfExportError, invoice_html_list_to_pdf_bytes
 from sales.invoices.permissions import require_setup_module
 from sales.invoices.preview_context import build_invoice_preview_context
@@ -84,9 +86,9 @@ def udins(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         invoice_status = (request.POST.get("invoice_status") or "").strip().lower()
-        if invoice_status not in {"all", "invoiced", "pending"}:
+        if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
             invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-            if invoice_status not in {"all", "invoiced", "pending"}:
+            if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
                 invoice_status = "pending"
         request.session[_UDINS_INVOICE_STATUS_SESSION_KEY] = invoice_status
 
@@ -94,6 +96,15 @@ def udins(request):
             row = get_object_or_404(Udin, pk=request.POST.get("pk"))
             row.delete()
             messages.success(request, "UDIN deleted.")
+            return redirect(f"{request.path}?invoice_status={invoice_status}")
+        if action == "prepare_row":
+            row = get_object_or_404(Udin, pk=request.POST.get("pk"))
+            with transaction.atomic():
+                changes = prepare_udin_row(row)
+            if changes:
+                messages.success(request, f"{row.udin}: " + " ".join(changes))
+            else:
+                messages.info(request, f"{row.udin}: nothing to fill.")
             return redirect(f"{request.path}?invoice_status={invoice_status}")
         if action == "import_from_source":
             imported = 0
@@ -356,16 +367,16 @@ def udins(request):
     raw_get = request.GET.get("invoice_status")
     if raw_get is not None and str(raw_get).strip() != "":
         parsed = str(raw_get).strip().lower()
-        if parsed in {"all", "invoiced", "pending"}:
+        if parsed in {"all", "invoiced", "pending", "data_pending"}:
             invoice_status = parsed
             request.session[_UDINS_INVOICE_STATUS_SESSION_KEY] = invoice_status
         else:
             invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-            if invoice_status not in {"all", "invoiced", "pending"}:
+            if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
                 invoice_status = "pending"
     else:
         invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-        if invoice_status not in {"all", "invoiced", "pending"}:
+        if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
             invoice_status = "pending"
 
     rows_qs = Udin.objects.select_related("created_by", "source_row", "client", "service")
@@ -373,6 +384,18 @@ def udins(request):
         rows_qs = rows_qs.filter(is_invoiced=True)
     elif invoice_status == "pending":
         rows_qs = rows_qs.filter(is_invoiced=False)
+    elif invoice_status == "data_pending":
+        rows_qs = rows_qs.filter(
+            Q(client__isnull=True)
+            | Q(service__isnull=True)
+            | Q(inv_date__isnull=True)
+            | Q(inv_tv_amount__isnull=True)
+            | Q(service_remarks="")
+            | Q(service_remarks__isnull=True)
+            | Q(client__billing_gstn="")
+            | Q(client__billing_gstn__isnull=True)
+        )
+
     rows = (
         rows_qs.annotate(
             signed_doc_date_sort=Func(
@@ -689,6 +712,12 @@ def _udin_form_view(request, instance=None):
             return redirect("udins")
     else:
         form = UdinForm(instance=instance)
+        new_client_id = request.GET.get("new_client")
+        if new_client_id:
+            form.initial["client"] = new_client_id
+        new_service_id = request.GET.get("new_service")
+        if new_service_id:
+            form.initial["service"] = new_service_id
     return _render_udin_form(request, form=form, instance=instance)
 
 
@@ -761,3 +790,4 @@ def certification_fee_rate_create(request):
 def certification_fee_rate_edit(request, pk):
     row = get_object_or_404(CertificationFeeRate, pk=pk)
     return _certification_fee_rate_form_view(request, instance=row)
+

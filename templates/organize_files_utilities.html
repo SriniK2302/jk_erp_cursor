@@ -257,13 +257,6 @@
       executeBtn.textContent = "Executing...";
       progressText.textContent = "Moving direct files into FY folders...";
 
-      let current = 10;
-      progressBar.style.width = current + "%";
-      const interval = window.setInterval(function () {
-        current = Math.min(current + 10, 90);
-        progressBar.style.width = current + "%";
-      }, 200);
-
       try {
         const response = await fetch(form.action, {
           method: "POST",
@@ -274,22 +267,61 @@
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) {
-          throw new Error(payload.message || "Failed to move files into FY folders.");
+          throw new Error(payload.message || "Failed to start SOA rename.");
         }
 
-        progressBar.style.width = "100%";
-        progressText.textContent = "Completed.";
-        resultBox.textContent = payload.message + (payload.warning ? " " + payload.warning : "");
+        const jobId = payload.job_id;
+        if (!jobId) {
+          throw new Error("SOA rename job id missing.");
+        }
+
+        const statusUrl = "{% url 'rename_soa_files_status' 'JOB_ID_PLACEHOLDER' %}".replace("JOB_ID_PLACEHOLDER", jobId);
+        let attempts = 0;
+        const maxAttempts = 3600; // 1 hour at 1s polling
+
+        while (attempts < maxAttempts) {
+          attempts += 1;
+          const statusResponse = await fetch(statusUrl, {
+            headers: {
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok || !statusPayload.ok) {
+            throw new Error(statusPayload.message || "Failed to read job status.");
+          }
+
+          const percent = Number(statusPayload.progress_percent || 5);
+          progressBar.style.width = Math.min(Math.max(percent, 5), 100) + "%";
+          const total = statusPayload.total;
+          const current = statusPayload.current;
+          progressText.textContent = total
+            ? `${statusPayload.message || "Processing..."} (${current}/${total})`
+            : (statusPayload.message || "Processing...");
+
+          if (statusPayload.done) {
+            if (statusPayload.error) {
+              throw new Error(statusPayload.error);
+            }
+            const result = statusPayload.result || {};
+            progressBar.style.width = "100%";
+            progressText.textContent = "Completed.";
+            resultBox.textContent = (result.message || "") + (result.warning ? " " + result.warning : "");
+            break;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
       } catch (error) {
         progressText.textContent = "Failed.";
-        resultBox.textContent = error.message || "Unexpected error while moving files.";
+        resultBox.textContent = error.message || "Unexpected error while processing files.";
       } finally {
-        window.clearInterval(interval);
         executeBtn.disabled = false;
         executeBtn.textContent = "Execute";
       }
     });
   })();
+
 
   (function () {
     const form = document.getElementById("move-name-contains-form");

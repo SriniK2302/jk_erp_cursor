@@ -311,6 +311,56 @@
 
       <p id="rename-by-content-date-result" class="muted utility-result" aria-live="polite"></p>
     </article>
+
+    <article class="tile-link utility-tile">
+      <span class="tile-title">Rename SOA files</span>
+      <span class="tile-subtitle">Moves renamed files into a parallel '&lt;folder&gt; renamed' folder. Unresolved files are left in place. Direct files only.</span>
+      <form id="select-rename-soa-folder-form" method="post" action="{% url 'select_rename_soa_folder' %}" hidden>
+        {% csrf_token %}
+      </form>
+
+      <form
+        method="post"
+        action="{% url 'rename_soa_files_execute' %}"
+        id="rename-soa-form"
+        class="utility-form-stack"
+      >
+        {% csrf_token %}
+        <div class="utility-folder-path-row">
+          <label for="rename-soa-folder" class="muted utility-label">Folder</label>
+          <div class="utility-folder-path-row__input-wrap">
+            <input
+              id="rename-soa-folder"
+              name="rename_soa_folder"
+              type="text"
+              class="utility-input"
+              value="{{ rename_soa_folder }}"
+              placeholder="No folder selected yet"
+            >
+            <button
+              type="submit"
+              form="select-rename-soa-folder-form"
+              class="icon-btn icon-btn-muted"
+              title="Select folder"
+              aria-label="Select folder"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="execute-rename-soa-btn" class="button button-compact">Execute</button>
+      </form>
+
+      <div id="rename-soa-progress-wrap" class="utility-progress-wrap" hidden>
+        <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="rename-soa-progress-bar" class="utility-progress-bar"></div>
+        </div>
+        <p class="muted utility-progress-text" id="rename-soa-progress-text">Processing files...</p>
+      </div>
+
+      <p id="rename-soa-result" class="muted utility-result" aria-live="polite"></p>
+    </article>
     </div>
 
     <p class="muted"><a href="{% url 'utilities' %}">← Back to File and Folder Utilities</a></p>
@@ -569,6 +619,101 @@
       }
     });
   })();
+
+  (function () {
+    const form = document.getElementById("rename-soa-form");
+    const progressWrap = document.getElementById("rename-soa-progress-wrap");
+    const progressBar = document.getElementById("rename-soa-progress-bar");
+    const progressText = document.getElementById("rename-soa-progress-text");
+    const resultBox = document.getElementById("rename-soa-result");
+    const executeBtn = document.getElementById("execute-rename-soa-btn");
+
+    if (!form || !progressWrap || !progressBar || !progressText || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const folderInput = document.getElementById("rename-soa-folder");
+      const folderValue = folderInput ? folderInput.value.trim() : "";
+      if (!folderValue) {
+        resultBox.textContent = "Select a folder first.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      progressWrap.hidden = false;
+      progressBar.style.width = "5%";
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Executing...";
+      progressText.textContent = "Starting SOA rename...";
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to start SOA rename.");
+        }
+
+        const jobId = payload.job_id;
+        if (!jobId) {
+          throw new Error("SOA rename job id missing.");
+        }
+
+        const statusUrl = "{% url 'rename_soa_files_status' 'JOB_ID_PLACEHOLDER' %}".replace("JOB_ID_PLACEHOLDER", jobId);
+        let attempts = 0;
+        const maxAttempts = 3600; // 1 hour at 1s polling
+
+        while (attempts < maxAttempts) {
+          attempts += 1;
+          const statusResponse = await fetch(statusUrl, {
+            headers: {
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok || !statusPayload.ok) {
+            throw new Error(statusPayload.message || "Failed to read job status.");
+          }
+
+          const percent = Number(statusPayload.progress_percent || 5);
+          progressBar.style.width = Math.min(Math.max(percent, 5), 100) + "%";
+          const total = statusPayload.total;
+          const current = statusPayload.current;
+          progressText.textContent = total
+            ? `${statusPayload.message || "Processing..."} (${current}/${total})`
+            : (statusPayload.message || "Processing...");
+
+          if (statusPayload.done) {
+            if (statusPayload.error) {
+              throw new Error(statusPayload.error);
+            }
+            const result = statusPayload.result || {};
+            progressBar.style.width = "100%";
+            progressText.textContent = "Completed.";
+            resultBox.textContent = (result.message || "") + (result.warning ? " " + result.warning : "");
+            break;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        progressText.textContent = "Failed.";
+        resultBox.textContent = error.message || "Unexpected error while processing files.";
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Execute";
+      }
+    });
+  })();
 </script>
 {% endblock %}
+
 

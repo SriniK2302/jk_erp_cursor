@@ -28,6 +28,7 @@ from utilities.rename_files_by_content_date import rename_direct_files_by_conten
 from utilities.rename_date_prefix_files import rename_direct_files_date_prefix
 from utilities.rename_files_based_on_text import rename_direct_files_by_text
 from utilities.cleanup_fy_duplicate_refs import cleanup_fy_duplicate_refs
+from utilities.rename_soa_files import rename_soa_files
 from utilities.similar_files import (
     choose_spreadsheet_file,
     find_similar_spreadsheet_files,
@@ -56,3 +57,5 @@ from engagements.models import Engagement, STATUS_IN_PROGRESS, STATUS_SCHEDULED
 from hr.teams.models import TeamMember
 
 from config.forms import SalesLedgerSettingsForm, SmtpMailSettingsForm, UserTodoForm
+
+

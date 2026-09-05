@@ -68,6 +68,7 @@
             style="margin-bottom:0.35rem;"
           >
           {{ form.client }}
+          <a href="{% url 'client_create' %}?next={{ request.path|urlencode }}" class="button button-secondary" title="Add new client">+</a>
           {% if form.client.errors %}
             <span class="field-error">{{ form.client.errors.0 }}</span>
           {% endif %}
@@ -78,11 +79,13 @@
         <label for="{{ form.service.id_for_label }}">Service</label>
         <div class="sap-control">
           {{ form.service }}
+          <a href="{% url 'service_create' %}?next={{ request.path|urlencode }}" class="button button-secondary" title="Add new service">+</a>
           {% if form.service.errors %}
             <span class="field-error">{{ form.service.errors.0 }}</span>
           {% endif %}
         </div>
       </div>
+
 
       <div class="sap-row">
         <label for="{{ form.ay_fy.id_for_label }}">Service FY</label>

@@ -255,6 +255,12 @@ urlpatterns = [
     ),
 
     path(
+        'utilities/select-rename-soa-folder/',
+        views.select_rename_soa_folder,
+        name='select_rename_soa_folder',
+    ),
+
+    path(
         'utilities/select-cleanup-fy-folder/',
         views.select_cleanup_fy_folder,
         name='select_cleanup_fy_folder',
@@ -320,12 +326,24 @@ urlpatterns = [
         name='rename_files_based_on_text',
     ),
 
+    path(
+        'utilities/rename-soa-files/',
+        views.rename_soa_files_execute,
+        name='rename_soa_files_execute',
+    ),
+
+    path(
+        'utilities/rename-soa-files/status/<str:job_id>/',
+        views.rename_soa_files_status,
+        name='rename_soa_files_status',
+    ),
+
         path(
         'utilities/cleanup-fy-file-names/',
         views.cleanup_fy_file_names,
         name='cleanup_fy_file_names',
     ),
-    
+
     path(
         'utilities/rename-files-by-content-date/',
         views.rename_files_by_content_date,
@@ -353,7 +371,7 @@ urlpatterns = [
         views.process_it_xml_files,
         name='process_it_xml_files',
     ),
-    
+
 
     path(
         'utilities/delete-duplicate-files/',
@@ -550,4 +568,3 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    

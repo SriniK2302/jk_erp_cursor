@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Prefetch, Q
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -306,6 +307,11 @@ def reports_gstr1_invoice_list(request):
 def receipts_home(request):
     _require_setup_module(request)
     return render(request, "invoices/receipts.html")
+def _latest_invoice_fy() -> FiscalYear | None:
+    latest_inv = Invoice.objects.order_by("-invoice_date", "-id").first()
+    if latest_inv is None:
+        return None
+    return _fiscal_year_containing_date(latest_inv.invoice_date)
 
 
 @login_required
@@ -347,6 +353,18 @@ def invoice_list(request):
     if status_filter not in ("all", "fresh", "authorised"):
         status_filter = "fresh"
 
+    fiscal_years = list(FiscalYear.objects.all())
+    fy_param = request.GET.get("fy")
+    if fy_param == "all":
+        selected_fy = None
+    elif fy_param and str(fy_param).isdigit():
+        selected_fy = FiscalYear.objects.filter(pk=int(fy_param)).first()
+        if selected_fy is None:
+            selected_fy = _latest_invoice_fy() or (fiscal_years[0] if fiscal_years else None)
+    else:
+        selected_fy = _latest_invoice_fy() or (fiscal_years[0] if fiscal_years else None)
+
+
     inv_qs = Invoice.objects.select_related(
         "client", "service", "fiscal_year", "created_by", "posted_gl_header"
     ).prefetch_related(
@@ -359,7 +377,18 @@ def invoice_list(request):
         inv_qs = inv_qs.filter(status=InvoiceStatus.FRESH)
     elif status_filter == "authorised":
         inv_qs = inv_qs.filter(status=InvoiceStatus.AUTHORISED)
+    if selected_fy is not None:
+        inv_qs = inv_qs.filter(
+            invoice_date__gte=selected_fy.start_date,
+            invoice_date__lte=selected_fy.end_date,
+        )
     invoices = inv_qs.order_by("-invoice_date", "-id")
+
+    totals = invoices.aggregate(
+        total_tv=Sum("inv_taxable_value"),
+        total_taxes=Sum("taxes"),
+        total_gross=Sum("inv_gross"),
+    )
 
     return render(
         request,
@@ -367,8 +396,12 @@ def invoice_list(request):
         {
             "invoices": invoices,
             "status_filter": status_filter,
+            "fiscal_years": fiscal_years,
+            "selected_fy": selected_fy,
+            "totals": totals,
         },
     )
+
 
 
 @login_required

@@ -175,6 +175,7 @@ from .utilities import (
     select_move_to_fy_folder,
     select_rename_content_date_folder,
     select_rename_date_prefix_folder,
+    select_rename_soa_folder,
     select_rename_text_folder,
     select_similar_files_folder,
     select_similar_reference_file,

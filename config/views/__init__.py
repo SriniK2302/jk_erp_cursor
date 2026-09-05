@@ -68,6 +68,8 @@ from .utilities import (
     rename_files_date_prefix_tool,
     rename_files_text_tool,
     rename_files_utilities,
+    rename_soa_files_execute,
+    rename_soa_files_status,
     select_audit_triage_dest,
     select_audit_triage_source,
     select_cleanup_fy_folder,
@@ -84,6 +86,7 @@ from .utilities import (
     select_move_to_fy_folder,
     select_rename_content_date_folder,
     select_rename_date_prefix_folder,
+    select_rename_soa_folder,
     select_rename_text_folder,
     select_similar_files_folder,
     select_similar_reference_file,
@@ -95,4 +98,3 @@ from .utilities import (
 )
 
 __all__ = [name for name in dir() if not name.startswith("_") or name.startswith("__")]
-

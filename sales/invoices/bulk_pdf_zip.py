@@ -15,6 +15,18 @@ def bulk_invoice_export_dir() -> Path:
     root.mkdir(parents=True, exist_ok=True)
     return root
 
+def save_single_invoice_pdf(*, pdf_bytes: bytes, safe_name: str) -> tuple[str, Path]:
+    """
+    Write one invoice PDF under media/invoice_pdfs/. Returns (relative path
+    under MEDIA_ROOT, absolute path).
+    """
+    root = Path(settings.MEDIA_ROOT) / "invoice_pdfs"
+    root.mkdir(parents=True, exist_ok=True)
+    pdf_path = root / f"{safe_name}.pdf"
+    pdf_path.write_bytes(pdf_bytes)
+    rel = pdf_path.relative_to(Path(settings.MEDIA_ROOT)).as_posix()
+    return rel, pdf_path
+
 
 def save_bulk_invoice_zip(*, pdf_parts: list[bytes], safe_names: list[str]) -> tuple[str, Path]:
     """

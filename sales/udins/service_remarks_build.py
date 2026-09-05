@@ -63,17 +63,22 @@ def find_client_by_code_in_remarks(remarks: str) -> Client | None:
             ):
                 score = 300 + len(code)
 
-        if score < 0:
-            continue
-        if score > best_score or (
-            score == best_score
-            and best is not None
-            and len(code) > len((best.client_code or "").strip())
-        ):
-            best_score = score
-            best = row
+            if score < 0:
+                continue
+            if score > best_score or (
+                    score == best_score
+                    and best is not None
+                    and len(code) > len((best.client_code or "").strip())
+            ):
+                best_score = score
+                best = row
 
-    return best
+        if best is None:
+            prefix = text_upper[:4].strip()
+            if prefix:
+                best = Client.objects.filter(client_code__iexact=prefix).first()
+
+        return best
 
 
 def resolve_client_for_remarks(*, remarks: str, client) -> Client | None:
@@ -103,6 +108,9 @@ def bulk_fill_client_from_remarks() -> tuple[int, int]:
 def strip_remarks_client_code(*, remarks: str, client) -> str | None:
     """
     Step 2: drop leading client code from ICAI Remarks (must match Client.client_code).
+    Falls back to the first len(code) characters when there's no clean word
+    match — offline data entry, so Remarks don't always have a space after
+    the code.
     """
     text = (remarks or "").strip()
     if not text or client is None:
@@ -111,10 +119,11 @@ def strip_remarks_client_code(*, remarks: str, client) -> str | None:
     if not code:
         return None
     parts = text.split(None, 1)
-    if len(parts) < 2 or parts[0].upper() != code.upper():
-        return None
-    return parts[1].strip()
-
+    if len(parts) >= 2 and parts[0].upper() == code.upper():
+        return parts[1].strip()
+    if len(text) > len(code) and text[: len(code)].upper() == code.upper():
+        return text[len(code) :].strip()
+    return None
 
 def build_certification_service_remarks(*, stripped_remarks: str) -> str:
     """Step 3: full invoice line for the Service remarks field."""
@@ -130,8 +139,10 @@ def derive_service_remarks(*, remarks: str, client, service) -> str | None:
     Certification billing prep (updates **Service remarks**, reads **Remarks**):
 
     1. Read Remarks (ICAI text, e.g. ``SVSM Form 146 FILOPA 20260502``)
-    2. Strip client code (``SVSM``) using Client master
-    3. ``Fee for issuing certificate for `` + stripped text (trimmed)
+    2. Try to match the first 4 chars against a Client Code and strip that
+       match. If no Client Code matches, strip the first 4 chars anyway —
+       offline data entry always puts a 4-char code up front.
+    3. ``Fee for issuing certificate for `` + remaining text (trimmed)
     """
     if service is not None and is_audit_service(service):
         return None
@@ -139,15 +150,16 @@ def derive_service_remarks(*, remarks: str, client, service) -> str | None:
         return None
 
     text = (remarks or "").strip()
-    if not text:
+    if len(text) <= 4:
         return None
 
     client = resolve_client_for_remarks(remarks=text, client=client)
     stripped = strip_remarks_client_code(remarks=text, client=client)
     if not stripped:
+        stripped = text[4:].strip()
+    if not stripped:
         return None
     return build_certification_service_remarks(stripped_remarks=stripped)
-
 
 def explain_service_remarks_failure(*, remarks: str, client, service) -> str:
     if service is not None and is_audit_service(service):

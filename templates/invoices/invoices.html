@@ -18,14 +18,29 @@
     </div>
 
     <form method="get" action="{% url 'invoices' %}" class="sap-form" style="margin-bottom: 0.75rem;">
-      <div class="sap-row" style="align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div class="sap-row">
         <label for="id_inv_list_status">Show status</label>
-        <select name="status" id="id_inv_list_status" class="input-medium">
-          <option value="all"{% if status_filter == "all" %} selected{% endif %}>All</option>
-          <option value="fresh"{% if status_filter == "fresh" %} selected{% endif %}>Fresh</option>
-          <option value="authorised"{% if status_filter == "authorised" %} selected{% endif %}>Authorised</option>
-        </select>
-        <button type="submit" class="button button-secondary">Apply filter</button>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <select name="status" id="id_inv_list_status" class="input-medium" style="width: auto; max-width: 10rem;">
+            <option value="all"{% if status_filter == "all" %} selected{% endif %}>All</option>
+            <option value="fresh"{% if status_filter == "fresh" %} selected{% endif %}>Fresh</option>
+            <option value="authorised"{% if status_filter == "authorised" %} selected{% endif %}>Authorised</option>
+          </select>
+          <select name="fy" id="id_inv_list_fy" class="input-medium" style="width: auto; max-width: 10rem;">
+            <option value="all"{% if not selected_fy %} selected{% endif %}>All years</option>
+            {% for fy in fiscal_years %}
+              <option value="{{ fy.pk }}"{% if selected_fy and selected_fy.pk == fy.pk %} selected{% endif %}>{{ fy.fy_no }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="icon-btn" title="Apply filter" aria-label="Apply filter">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="muted" style="margin-left: 1rem;">
+            TV: {{ totals.total_tv|default:0|floatformat:"0g" }}
+            &nbsp;|&nbsp; Taxes: {{ totals.total_taxes|default:0|floatformat:"0g" }}
+            &nbsp;|&nbsp; Gross: {{ totals.total_gross|default:0|floatformat:"0g" }}
+          </span>
+        </div>
       </div>
     </form>
 
