@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Transactions – Ledger Report · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Bank Transactions – Ledger Report</h1>
+      <p class="muted">Choose a <strong>fiscal year</strong> and <strong>source account</strong> to see every transaction for that account in that year.</p>
+      <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Bank Transactions Source</a></p>
+    </header>
+
+    {% if fiscal_years and all_accounts %}
+      <form method="get" class="sap-form" action="{% url 'bank_transactions_ledger_report' %}" style="display: flex; align-items: flex-end; gap: 0.75rem; margin: 0; flex-wrap: wrap;">
+        <div class="sap-row" style="margin: 0;">
+          <label for="id_bt_ledger_fy">Fiscal year</label>
+          <div class="sap-control">
+            <select name="fy" id="id_bt_ledger_fy" class="input-medium" required>
+              {% for fy in fiscal_years %}
+                <option value="{{ fy.pk }}"{% if selected_fy and fy.pk == selected_fy.pk %} selected{% endif %}>
+                  {{ fy.fy_no }} — {{ fy.start_date|date:"Y-m-d" }} to {{ fy.end_date|date:"Y-m-d" }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="sap-row" style="margin: 0;">
+          <label for="id_bt_ledger_account">Source account</label>
+          <div class="sap-control">
+            <select name="source_ac" id="id_bt_ledger_account" class="input-medium" required>
+              {% for account in all_accounts %}
+                <option value="{{ account.source_ac }}"{% if selected_account and account.source_ac == selected_account.source_ac %} selected{% endif %}>
+                  {{ account.source_ac }}{% if account.bank_name %} — {{ account.bank_name }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="button">Show ledger</button>
+      </form>
+
+      {% if selected_fy and selected_account %}
+        <div class="table-wrap" style="margin-top: 1.5rem;">
+          <table class="sap-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Value Date</th>
+                <th>Narration</th>
+                <th>Reference</th>
+                <th style="text-align: right;">Debit</th>
+                <th style="text-align: right;">Credit</th>
+                <th style="text-align: right;">Closing Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if opening_balance_row %}
+                <tr>
+                  <td colspan="4"><strong>Opening Balance</strong></td>
+                  <td style="text-align: right;">{% if opening_balance_row.ob_debit %}{{ opening_balance_row.ob_debit|floatformat:2 }}{% endif %}</td>
+                  <td style="text-align: right;">{% if opening_balance_row.ob_credit %}{{ opening_balance_row.ob_credit|floatformat:2 }}{% endif %}</td>
+                  <td style="text-align: right;"><strong>{{ opening_balance_row.ob|floatformat:2 }}</strong></td>
+                </tr>
+              {% endif %}
+              {% for txn in transactions %}
+                <tr>
+                  <td>{{ txn.tran_date|date:"d-m-Y" }}</td>
+                  <td>{{ txn.value_date|date:"d-m-Y" }}</td>
+                  <td>{{ txn.narration }}</td>
+                  <td>{{ txn.reference }}</td>
+                  <td style="text-align: right;">{% if txn.debit %}{{ txn.debit|floatformat:2 }}{% endif %}</td>
+                  <td style="text-align: right;">{% if txn.credit %}{{ txn.credit|floatformat:2 }}{% endif %}</td>
+                  <td style="text-align: right;">{% if txn.closing_balance is not None %}{{ txn.closing_balance|floatformat:2 }}{% endif %}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" class="muted">No transactions found for this account in this fiscal year.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            {% if transactions %}
+              <tfoot>
+                <tr>
+                  <td colspan="4"><strong>Total</strong></td>
+                  <td style="text-align: right;"><strong>{{ total_debit|floatformat:2 }}</strong></td>
+                  <td style="text-align: right;"><strong>{{ total_credit|floatformat:2 }}</strong></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            {% endif %}
+          </table>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="muted">Set up at least one fiscal year and one source account first.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+

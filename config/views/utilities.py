@@ -1,5 +1,7 @@
 from config.views._std_imports import *  # noqa: F403
 
+import pikepdf
+
 from .access import (
     _engagement_queryset_for_user,
     _has_module_access,
@@ -53,7 +55,60 @@ def utilities(request):
             "move_all_source_folder": move_all_source_folder,
             "move_all_target_folder": move_all_target_folder,
             "prefix_fy_xml_folder": prefix_fy_xml_folder,
+            "decrypt_pdf_path": request.session.get("utilities_decrypt_pdf_path", ""),
         },
+    )
+
+
+@login_required
+def select_decrypt_pdf_file(request):
+    if not _has_module_access(request.user, MODULE_TOOLS):
+        raise PermissionDenied("Admin only.")
+    try:
+        path = choose_pdf_file()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open file picker. Run on a machine with desktop access.",
+        )
+        return redirect("utilities")
+
+    if path is None:
+        messages.info(request, "File selection cancelled.")
+        return redirect("utilities")
+
+    request.session["utilities_decrypt_pdf_path"] = str(path.resolve())
+    messages.success(request, f"Selected: {path.name}")
+    return redirect("utilities")
+
+
+@login_required
+@require_POST
+def decrypt_pdf_execute(request):
+    if not _has_module_access(request.user, MODULE_TOOLS):
+        raise PermissionDenied("Admin only.")
+
+    file_path = (request.POST.get("decrypt_pdf_file") or "").strip()
+    password = request.POST.get("decrypt_pdf_password") or ""
+
+    if not file_path:
+        return JsonResponse({"ok": False, "message": "Select a PDF file first."})
+    if not password:
+        return JsonResponse({"ok": False, "message": "Enter the PDF's password."})
+
+    path = Path(file_path)
+    if not path.is_file():
+        return JsonResponse({"ok": False, "message": f"File not found: {file_path}"})
+
+    try:
+        output_path = decrypt_pdf(path, password)
+    except pikepdf.PasswordError:
+        return JsonResponse({"ok": False, "message": "Incorrect password."})
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": f"Failed to decrypt: {exc}"})
+
+    return JsonResponse(
+        {"ok": True, "message": f"Decrypted copy written to: {output_path}"}
     )
 
 

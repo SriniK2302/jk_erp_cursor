@@ -29,6 +29,7 @@ from utilities.rename_date_prefix_files import rename_direct_files_date_prefix
 from utilities.rename_files_based_on_text import rename_direct_files_by_text
 from utilities.cleanup_fy_duplicate_refs import cleanup_fy_duplicate_refs
 from utilities.rename_soa_files import rename_soa_files
+from utilities.decrypt_pdf_tool import choose_pdf_file, decrypt_pdf
 from utilities.similar_files import (
     choose_spreadsheet_file,
     find_similar_spreadsheet_files,

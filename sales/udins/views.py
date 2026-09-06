@@ -7,7 +7,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import F, Func, Prefetch, Q, Value
+from django.db.models import F, Func, Prefetch, Q, Value,Exists, OuterRef
+
+from sales.invoices.models import InvoiceStatus
 from django.db.models.functions import NullIf
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -47,7 +49,8 @@ from sales.invoices.bulk_pdf_zip import save_single_invoice_pdf
 from sales.invoices.pdf_export import PdfExportError, invoice_html_list_to_pdf_bytes
 from sales.invoices.permissions import require_setup_module
 from sales.invoices.preview_context import build_invoice_preview_context
-
+from sales.invoices.invoice_lines import build_invoice_lines_from_map_entries, gross_from_lines, money2, taxes_total_from_lines
+from sales.invoices.forms import persist_maps_and_lines
 from .models import CertificationFeeRate, CertificationPeriodFee, Udin
 from .certification_period_fee import (
     bulk_apply_certification_period_fees_to_udins,
@@ -86,9 +89,9 @@ def udins(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         invoice_status = (request.POST.get("invoice_status") or "").strip().lower()
-        if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
+        if invoice_status not in {"all", "invoiced", "pending", "data_pending", "invoiced_fresh"}:
             invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-            if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
+            if invoice_status not in {"all", "invoiced", "pending", "data_pending", "invoiced_fresh"}:
                 invoice_status = "pending"
         request.session[_UDINS_INVOICE_STATUS_SESSION_KEY] = invoice_status
 
@@ -97,6 +100,78 @@ def udins(request):
             row.delete()
             messages.success(request, "UDIN deleted.")
             return redirect(f"{request.path}?invoice_status={invoice_status}")
+        if action == "raise_invoice_row":
+            try:
+                require_setup_module(request)
+            except PermissionDenied as exc:
+                messages.error(request, str(exc))
+                return redirect(f"{request.path}?invoice_status={invoice_status}")
+            row = get_object_or_404(Udin, pk=request.POST.get("pk"))
+            inv, err = create_invoice_from_udin(user=request.user, udin=row)
+            if err:
+                messages.error(request, f"{row.udin}: {err}")
+                return redirect(f"{request.path}?invoice_status={invoice_status}")
+            inv_full = (
+                Invoice.objects.filter(pk=inv.pk)
+                .select_related("client", "service", "fiscal_year", "created_by")
+                .prefetch_related(
+                    Prefetch(
+                        "inv_udin_maps",
+                        queryset=InvUdinMap.objects.select_related("udin").order_by("line_no"),
+                    )
+                )
+                .first()
+            )
+            ctx = build_invoice_preview_context(request, inv_full)
+            html_doc = render_to_string("invoices/invoice_preview.html", ctx, request=request)
+            safe_name = re.sub(r"[^\w.\-]+", "_", inv_full.invoice_no) or f"inv_{inv_full.pk}"
+            try:
+                pdf_parts = invoice_html_list_to_pdf_bytes(html_documents=[html_doc])
+                save_single_invoice_pdf(pdf_bytes=pdf_parts[0], safe_name=safe_name)
+                messages.success(request, f"Invoice {inv_full.invoice_no} created and saved as PDF.")
+            except PdfExportError as exc:
+                messages.warning(request, f"Invoice {inv_full.invoice_no} created, but PDF export failed: {exc}")
+            return redirect("invoice_preview", pk=inv_full.pk)
+        if action == "refresh_invoice_row":
+            row = get_object_or_404(Udin, pk=request.POST.get("pk"))
+            entry = InvUdinMap.objects.filter(udin=row).select_related("invoice").order_by("-id").first()
+            if entry is None:
+                messages.error(request, f"{row.udin}: not linked to any invoice.")
+                return redirect(f"{request.path}?invoice_status={invoice_status}")
+            inv = entry.invoice
+            if inv.status != InvoiceStatus.FRESH or inv.posted_gl_header_id:
+                messages.error(request, f"{row.udin}: invoice {inv.invoice_no} is Authorised — cannot refresh.")
+                return redirect(f"{request.path}?invoice_status={invoice_status}")
+            maps = list(
+                inv.inv_udin_maps.select_related("udin", "udin__client", "udin__service").order_by("line_no")
+            )
+            if not maps:
+                messages.error(request, f"{row.udin}: invoice has no linked UDINs to refresh from.")
+                return redirect(f"{request.path}?invoice_status={invoice_status}")
+            map_rows = []
+            for m in maps:
+                udin = m.udin
+                service_desc = (udin.service_remarks or udin.remarks or m.service_desc or "").strip()
+                line_amount = udin.inv_tv_amount if udin.inv_tv_amount is not None else m.line_amount
+                map_rows.append((udin, service_desc, money2(line_amount)))
+            first_udin = maps[0].udin
+            tax_type = first_udin.client.invoice_tax_type
+            entries = [{"line_amount": r[2], "service_desc": r[1]} for r in map_rows]
+            lines = build_invoice_lines_from_map_entries(map_entries=entries, invoice_tax_type=tax_type)
+            tv = money2(sum(r[2] for r in map_rows))
+            tax_tot = taxes_total_from_lines(lines)
+            gross = gross_from_lines(lines, tv)
+            with transaction.atomic():
+                inv.client = first_udin.client
+                inv.service = first_udin.service
+                inv.inv_taxable_value = tv
+                inv.taxes = tax_tot
+                inv.inv_gross = gross
+                inv.save()
+                persist_maps_and_lines(invoice=inv, map_rows=map_rows, invoice_tax_type=tax_type)
+            messages.success(request, f"Invoice {inv.invoice_no} refreshed from UDIN data (Inv No unchanged).")
+            return redirect(f"{request.path}?invoice_status={invoice_status}")
+
         if action == "prepare_row":
             row = get_object_or_404(Udin, pk=request.POST.get("pk"))
             with transaction.atomic():
@@ -367,19 +442,29 @@ def udins(request):
     raw_get = request.GET.get("invoice_status")
     if raw_get is not None and str(raw_get).strip() != "":
         parsed = str(raw_get).strip().lower()
-        if parsed in {"all", "invoiced", "pending", "data_pending"}:
+        if parsed in {"all", "invoiced", "pending", "data_pending", "invoiced_fresh"}:
             invoice_status = parsed
             request.session[_UDINS_INVOICE_STATUS_SESSION_KEY] = invoice_status
         else:
             invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-            if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
+            if invoice_status not in {"all", "invoiced", "pending", "data_pending", "invoiced_fresh"}:
                 invoice_status = "pending"
     else:
         invoice_status = request.session.get(_UDINS_INVOICE_STATUS_SESSION_KEY, "pending")
-        if invoice_status not in {"all", "invoiced", "pending", "data_pending"}:
+        if invoice_status not in {"all", "invoiced", "pending", "data_pending", "invoiced_fresh"}:
             invoice_status = "pending"
 
-    rows_qs = Udin.objects.select_related("created_by", "source_row", "client", "service")
+    rows_qs = Udin.objects.select_related("created_by", "source_row", "client", "service").annotate(
+        locked_for_edit=Exists(
+            InvUdinMap.objects.filter(udin=OuterRef("pk")).exclude(invoice__status=InvoiceStatus.FRESH)
+        )
+    ).prefetch_related(
+        Prefetch(
+            "inv_udin_map_entries",
+            queryset=InvUdinMap.objects.select_related("invoice").order_by("id"),
+        )
+    )
+
     if invoice_status == "invoiced":
         rows_qs = rows_qs.filter(is_invoiced=True)
     elif invoice_status == "pending":
@@ -394,6 +479,13 @@ def udins(request):
             | Q(service_remarks__isnull=True)
             | Q(client__billing_gstn="")
             | Q(client__billing_gstn__isnull=True)
+        )
+
+    elif invoice_status == "invoiced_fresh":
+        rows_qs = rows_qs.filter(is_invoiced=True).filter(
+            Exists(
+                InvUdinMap.objects.filter(udin=OuterRef("pk"), invoice__status=InvoiceStatus.FRESH)
+            )
         )
 
     rows = (
@@ -729,6 +821,13 @@ def udin_create(request):
 @login_required
 def udin_edit(request, pk):
     row = get_object_or_404(Udin, pk=pk)
+    locked = InvUdinMap.objects.filter(udin=row).exclude(invoice__status=InvoiceStatus.FRESH).exists()
+    if locked:
+        messages.error(
+            request,
+            f"{row.udin}: cannot edit — this UDIN is invoiced on an Authorised invoice.",
+        )
+        return redirect("udins")
     return _udin_form_view(request, instance=row)
 
 

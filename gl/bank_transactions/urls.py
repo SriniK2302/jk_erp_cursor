@@ -9,6 +9,8 @@ urlpatterns = [
     path("build-ym/", views.bank_transactions_build_ym, name="bank_transactions_build_ym"),
     path("summary-report/", views.bank_transactions_summary_report, 
          name="bank_transactions_summary_report"),
+    path("ledger-report/", views.bank_transactions_ledger_report,
+         name="bank_transactions_ledger_report"),
     path("summary-report/upload-statement/", views.bank_transactions_summary_upload_statement, 
          name="bank_transactions_summary_upload_statement"),
     path("summary-report/upload-annual-statement/", views.bank_transactions_summary_upload_annual_statement, 

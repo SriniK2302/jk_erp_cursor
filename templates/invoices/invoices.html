@@ -52,7 +52,7 @@
     </form>
     <p class="muted invoice-udin-hint" style="margin-top: 0.35rem;">Select Fresh invoices, then post. Each invoice becomes an <strong>Authorised</strong> GL entry (Dr receivables · Cr fees · Cr GST per Sales ledger settings).</p>
 
-    <div class="grid-panel" data-grid-root data-grid-id="invoices" data-grid-no-resize="1" data-default-sort-col="3" data-default-sort-dir="asc">
+    <div class="grid-panel" data-grid-root data-grid-id="invoices" data-grid-no-resize="1" data-default-sort-col="3" data-default-sort-dir="asc" data-grid-search-mode="all-words">
       <div class="grid-toolbar">
         <input
           type="search"
@@ -86,7 +86,7 @@
           </thead>
           <tbody>
             {% for row in invoices %}
-              <tr data-grid-row>
+              <tr data-grid-row data-search-extra="{{ row.narration }} {% for m in row.inv_udin_maps.all %}{{ m.udin.remarks }} {% endfor %}">
                 <td class="col-check num">
                   {% if row.status == "fresh" and not row.posted_gl_header_id %}
                     <input type="checkbox" name="invoice_id" value="{{ row.pk }}" form="bulkAuthorizeForm" class="invoice-bulk-check" aria-label="Select invoice {{ row.invoice_no }}">
@@ -121,6 +121,17 @@
                     <a href="{% url 'invoice_edit' row.pk %}" class="icon-btn icon-btn-edit" title="Edit" aria-label="Edit">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
                     </a>
+                    {% if not row.posted_gl_header_id %}
+                    <form method="post" class="inline-form" onsubmit="return confirm('Refresh this invoice from its UDIN(s)? Inv No stays the same.');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="refresh_from_udin">
+                      <input type="hidden" name="pk" value="{{ row.pk }}">
+                      <button type="submit" class="icon-btn" title="Refresh from UDIN (Inv No unchanged)" aria-label="Refresh from UDIN">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                      </button>
+                    </form>
+                    {% endif %}
+
                     {% if row.posted_gl_header_id %}
                     <span class="icon-btn icon-btn-muted" title="Posted to GL — delete disabled" aria-hidden="true">—</span>
                     {% else %}
@@ -202,3 +213,5 @@
   </section>
 </div>
 {% endblock %}
+
+

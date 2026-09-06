@@ -1,13 +1,20 @@
 {# Requires: list_url_name (e.g. grades), pk, delete_action, confirm_message #}
 {# Optional: delete_disabled, delete_disabled_title #}
 <div class="row-actions">
-  {% if edit_url_name %}
+{% if edit_disabled %}
+    <span class="icon-btn icon-btn-muted is-disabled" title="{{ edit_disabled_title|default:'Edit is not allowed for this row.' }}" aria-label="{{ edit_disabled_title|default:'Edit disabled' }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    </span>
+  {% elif edit_url_name %}
     <a href="{% url edit_url_name edit_pk %}" class="icon-btn icon-btn-edit" title="Edit" aria-label="Edit">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    </a>
   {% else %}
     <a href="{% url list_url_name %}?edit={{ pk }}" class="icon-btn icon-btn-edit" title="Edit" aria-label="Edit">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    </a>
   {% endif %}
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-  </a>
+
   {% if delete_disabled %}
     <span
       class="icon-btn icon-btn-danger is-disabled"

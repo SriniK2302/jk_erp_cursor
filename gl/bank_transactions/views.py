@@ -68,7 +68,9 @@ def bank_transactions_summary_report(request):
             selected_fy,
             SourceBankCashAc=SourceBankCashAc,
             BankTransactionSourceSummary=BankTransactionSourceSummary,
+            BankTransactionSourceOb=BankTransactionSourceOb,
         )
+
         latest_uploads = {}
         for upload in BankStatementUpload.objects.filter(fiscal_year=selected_fy).order_by("source_ac_id", "-uploaded_on"):
             if upload.source_ac_id not in latest_uploads:
@@ -78,17 +80,78 @@ def bank_transactions_summary_report(request):
             account.statement_file_url = upload.statement_file.url if upload else None
             account.statement_file_name = upload.statement_file.name.rsplit("/", 1)[-1] if upload else None
 
+        return render(
+            request,
+            "bank_transactions/bank_transactions_summary_report.html",
+            {
+                "fiscal_years": fiscal_years,
+                "current_fy": current_fy,
+                "selected_fy": selected_fy,
+                "report_rows": report_rows,
+                "all_accounts": SourceBankCashAc.objects.all(),
+            },
+        )
+
+@login_required
+def bank_transactions_ledger_report(request):
+    from gl.fiscal_years.models import FiscalYear
+
+    fiscal_years = list(FiscalYear.objects.all().order_by("fy_no"))
+    all_accounts = list(SourceBankCashAc.objects.all())
+
+    fy_param = request.GET.get("fy")
+    selected_fy = None
+    if fy_param and str(fy_param).isdigit():
+        selected_fy = FiscalYear.objects.filter(pk=int(fy_param)).first()
+    if selected_fy is None and fiscal_years:
+        selected_fy = fiscal_years[0]
+
+    source_ac_param = (request.GET.get("source_ac") or "").strip()
+    selected_account = None
+    if source_ac_param:
+        selected_account = next(
+            (a for a in all_accounts if a.source_ac == source_ac_param), None
+        )
+    if selected_account is None and all_accounts:
+        selected_account = all_accounts[0]
+
+    transactions = []
+    opening_balance_row = None
+    total_debit = 0.0
+    total_credit = 0.0
+
+    if selected_fy is not None and selected_account is not None:
+        transactions = list(
+            BankTransactionSource.objects.filter(
+                source_ac=selected_account,
+                tran_date__gte=selected_fy.start_date,
+                tran_date__lte=selected_fy.end_date,
+            ).order_by("tran_date", "tran_id", "pk")
+        )
+        for txn in transactions:
+            total_debit += txn.debit or 0.0
+            total_credit += txn.credit or 0.0
+
+        ob_months = {m["ym"] for m in calendar_months_in_fiscal_year(selected_fy)}
+        ob_row = BankTransactionSourceOb.objects.filter(source_ac=selected_account).first()
+        if ob_row is not None and ob_row.ym in ob_months:
+            opening_balance_row = ob_row
+
     return render(
         request,
-        "bank_transactions/bank_transactions_summary_report.html",
+        "bank_transactions/bank_transactions_ledger_report.html",
         {
             "fiscal_years": fiscal_years,
-            "current_fy": current_fy,
             "selected_fy": selected_fy,
-            "report_rows": report_rows,
-            "all_accounts": SourceBankCashAc.objects.all(),
+            "all_accounts": all_accounts,
+            "selected_account": selected_account,
+            "transactions": transactions,
+            "opening_balance_row": opening_balance_row,
+            "total_debit": total_debit,
+            "total_credit": total_credit,
         },
     )
+
 
 @login_required
 def bank_transactions_summary_upload_statement(request):
@@ -360,7 +423,15 @@ def bank_transactions_build_month_summary(request):
                 "Accounts with transactions missing a valid YM (those transactions were skipped): "
                 + ", ".join(report.accounts_with_invalid_ym_transactions),
             )
+        if report.accounts_summary_cleaned:
+            messages.warning(
+                request,
+                "Data integrity: removed stale summary rows for account(s) with no "
+                "opening balance and no transactions: "
+                + ", ".join(report.accounts_summary_cleaned),
+            )
         return redirect("bank_transactions_build_month_summary")
+
 
     return render(request, "bank_transactions/bank_transactions_build_month_summary.html", {})
 

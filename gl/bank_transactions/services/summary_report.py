@@ -37,27 +37,42 @@ class AccountSummaryReport:
 
 
 def build_summary_report(
-    fy,
-    *,
-    SourceBankCashAc,
-    BankTransactionSourceSummary,
+        fy,
+        *,
+        SourceBankCashAc,
+        BankTransactionSourceSummary,
+        BankTransactionSourceOb,
 ) -> list[AccountSummaryReport]:
     """
     All accounts x all calendar months in ``fy``.
 
     Each account gets one row per month in the FY; months with no
     ``BankTransactionSourceSummary`` row show as blank (no data built yet).
+
+    Only accounts that have at least one transaction summary row in this
+    FY, or an opening balance recorded at all, are included — accounts
+    with neither are skipped rather than listed with all-blank rows.
     """
     months = calendar_months_in_fiscal_year(fy)
     ym_keys = [m["ym"] for m in months]
 
-    accounts = list(SourceBankCashAc.objects.all())
+    all_accounts = list(SourceBankCashAc.objects.all())
     rows_by_account: dict[str, dict[str, object]] = {}
     for row in BankTransactionSourceSummary.objects.filter(
-        source_ac__in=accounts, ym__in=ym_keys
+            source_ac__in=all_accounts, ym__in=ym_keys
     ).select_related("source_ac", "statement_upload"):
-        
         rows_by_account.setdefault(row.source_ac_id, {})[row.ym] = row
+
+    accounts_with_ob = set(
+        BankTransactionSourceOb.objects.filter(source_ac__in=all_accounts)
+        .values_list("source_ac_id", flat=True)
+    )
+
+    accounts = [
+        account
+        for account in all_accounts
+        if account.source_ac in rows_by_account or account.source_ac in accounts_with_ob
+    ]
 
     report: list[AccountSummaryReport] = []
     for account in accounts:

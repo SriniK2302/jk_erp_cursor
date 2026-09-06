@@ -188,12 +188,17 @@ def read_sheet_headers_only(path: Path, sheet_name: str) -> list[str]:
         wb.close()
 
 
-def _header_cell_str(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, float) and value == int(value):
-        return str(int(value))
-    return str(value).strip()
+def _parse_int_cell(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        if value == int(value):
+            return int(value)
+        return None
 
 
 def _cell_raw(value: Any) -> Any:
@@ -205,7 +210,7 @@ def _cell_raw(value: Any) -> Any:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
-        if math.isnan(value):
+        if not math.isfinite(value):
             return None
         return value
     if isinstance(value, datetime):
@@ -244,7 +249,14 @@ def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[li
                 cells = cells + [None] * (width - len(cells))
             else:
                 cells = cells[:width]
-            data.append([_cell_raw(c) for c in cells])
+            normalized = [_cell_raw(c) for c in cells]
+            # Excel's "used range" often extends far past the real data
+            # (leftover formatting on empty cells), so iter_rows can yield
+            # many trailing fully-blank rows. Skip them here rather than
+            # treating them as data rows to import.
+            if all(c is None for c in normalized):
+                continue
+            data.append(normalized)
         return headers, data
     finally:
         wb.close()
@@ -592,6 +604,7 @@ def _parse_flexible_timestamp_str(raw: str) -> datetime | None:
         "%Y-%m-%d",
         "%Y/%m/%d",
         "%d-%m-%Y",
+        "%d.%m.%Y",
     ):
         try:
             return datetime.strptime(s, fmt)
@@ -751,6 +764,8 @@ def _coerce_for_pg(
         if isinstance(value, int):
             return value
         if isinstance(value, float):
+            if not math.isfinite(value):
+                return None
             return int(value)
         if isinstance(value, str) and value.strip().lstrip("-").isdigit():
             return int(value.strip())
@@ -762,6 +777,8 @@ def _coerce_for_pg(
         if isinstance(value, int):
             return value
         if isinstance(value, float):
+            if not math.isfinite(value):
+                return None
             return int(value)
         if isinstance(value, str):
             try:
@@ -769,6 +786,7 @@ def _coerce_for_pg(
             except ValueError:
                 return None
         return None
+
 
     if "DOUBLE" in pg_type or base == "DOUBLE":
         if isinstance(value, (int, float)):

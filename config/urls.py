@@ -223,6 +223,11 @@ urlpatterns = [
         name='select_duplicate_target_folder',
     ),
     path(
+        'utilities/select-decrypt-pdf-file/',
+        views.select_decrypt_pdf_file,
+        name='select_decrypt_pdf_file',
+    ),
+    path(
         'utilities/select-content-search-folder/',
         views.select_content_search_folder,
         name='select_content_search_folder',
@@ -372,6 +377,11 @@ urlpatterns = [
         name='process_it_xml_files',
     ),
 
+    path(
+        'utilities/decrypt-pdf/',
+        views.decrypt_pdf_execute,
+        name='decrypt_pdf_execute',
+    ),
 
     path(
         'utilities/delete-duplicate-files/',

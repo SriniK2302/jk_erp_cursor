@@ -37,6 +37,7 @@ class BuildMonthSummaryReport:
     accounts_needing_ob: list[str] = field(default_factory=list)
     accounts_built_without_ob: list[str] = field(default_factory=list)
     accounts_with_invalid_ym_transactions: list[str] = field(default_factory=list)
+    accounts_summary_cleaned: list[str] = field(default_factory=list)
 
 
 def build_month_summary(
@@ -89,7 +90,15 @@ def build_month_summary(
             running_ob = 0.0
             report.accounts_built_without_ob.append(ac)
         else:
-            # No OB and no transactions at all: nothing to build.
+            # No OB and no transactions at all: nothing to build. If stale
+            # summary rows exist from before (e.g. source/OB data was
+            # cleared independently), that's a data-integrity mismatch —
+            # clean them up rather than leaving orphaned summary rows.
+            stale_rows = BankTransactionSourceSummary.objects.filter(source_ac=account)
+            stale_count = stale_rows.count()
+            if stale_count:
+                stale_rows.delete()
+                report.accounts_summary_cleaned.append(ac)
             report.accounts_needing_ob.append(ac)
             continue
 
@@ -156,3 +165,5 @@ def build_month_summary(
             ym = _next_ym(ym)
 
     return report
+
+

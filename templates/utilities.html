@@ -316,8 +316,61 @@
 
         <p id="prefix-fy-xml-result" class="muted utility-result" aria-live="polite"></p>
       </article>
-    </nav>
 
+      <article class="tile-link utility-tile">
+        <span class="tile-title">Decrypt Password-Protected PDF</span>
+        <span class="tile-subtitle">Writes an unprotected copy using a known password; original file untouched</span>
+
+        <form id="select-decrypt-pdf-file-form" method="post" action="{% url 'select_decrypt_pdf_file' %}" hidden>
+          {% csrf_token %}
+        </form>
+
+        <form
+          method="post"
+          action="{% url 'decrypt_pdf_execute' %}"
+          id="decrypt-pdf-form"
+          class="utility-form-stack"
+        >
+          {% csrf_token %}
+          <div class="utility-folder-path-row">
+            <label for="decrypt-pdf-file" class="muted utility-label">PDF File</label>
+            <div class="utility-folder-path-row__input-wrap">
+              <input
+                id="decrypt-pdf-file"
+                name="decrypt_pdf_file"
+                type="text"
+                class="utility-input"
+                value="{{ decrypt_pdf_path }}"
+                placeholder="No file selected yet"
+              >
+              <button
+                type="submit"
+                form="select-decrypt-pdf-file-form"
+                class="icon-btn icon-btn-muted"
+                title="Select file"
+                aria-label="Select file"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.69-.9l-.83-1.24A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <label for="decrypt-pdf-password" class="muted utility-label">Password</label>
+          <input
+            id="decrypt-pdf-password"
+            name="decrypt_pdf_password"
+            type="password"
+            class="utility-input"
+            autocomplete="off"
+            placeholder="PDF password"
+          >
+
+          <button type="submit" id="execute-decrypt-pdf-btn" class="button button-compact">Decrypt</button>
+        </form>
+
+        <p id="decrypt-pdf-result" class="muted utility-result" aria-live="polite"></p>
+      </article>
+    </nav>
 
     <p class="muted"><a href="{% url 'tools_utilities' %}">← Tools & utilities</a></p>
   </section>
@@ -743,5 +796,61 @@
     });
   })();
 
+  (function () {
+    const form = document.getElementById("decrypt-pdf-form");
+    const resultBox = document.getElementById("decrypt-pdf-result");
+    const executeBtn = document.getElementById("execute-decrypt-pdf-btn");
+
+    if (!form || !resultBox || !executeBtn) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const fileInput = document.getElementById("decrypt-pdf-file");
+      const passwordInput = document.getElementById("decrypt-pdf-password");
+      const fileValue = fileInput ? fileInput.value.trim() : "";
+      const passwordValue = passwordInput ? passwordInput.value : "";
+
+      if (!fileValue) {
+        resultBox.textContent = "Select a PDF file first.";
+        return;
+      }
+      if (!passwordValue) {
+        resultBox.textContent = "Enter the PDF's password.";
+        return;
+      }
+
+      const formData = new FormData(form);
+      resultBox.textContent = "";
+      executeBtn.disabled = true;
+      executeBtn.textContent = "Decrypting...";
+
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest"
+          }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.message || "Failed to decrypt PDF.");
+        }
+        resultBox.textContent = payload.message;
+        if (passwordInput) {
+          passwordInput.value = "";
+        }
+      } catch (error) {
+        resultBox.textContent = error.message || "Unexpected error while decrypting PDF.";
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = "Decrypt";
+      }
+    });
+  })();
+
 </script>
 {% endblock %}
+

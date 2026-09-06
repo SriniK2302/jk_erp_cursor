@@ -47,6 +47,7 @@
         <a href="?invoice_status=invoiced" class="filter-chip {% if invoice_status == 'invoiced' %}filter-chip--active{% endif %}">Invoiced</a>
         <a href="?invoice_status=pending" class="filter-chip {% if invoice_status == 'pending' %}filter-chip--active{% endif %}">Pending</a>
         <a href="?invoice_status=data_pending" class="filter-chip {% if invoice_status == 'data_pending' %}filter-chip--active{% endif %}">Invoice data pending</a>
+        <a href="?invoice_status=invoiced_fresh" class="filter-chip {% if invoice_status == 'invoiced_fresh' %}filter-chip--active{% endif %}">Invoiced (Fresh)</a>
       </div>
       <div class="grid-toolbar">
         <button type="submit" form="udins-bulk-invoice-form" class="button button-secondary" title="Creates one invoice per selected UDIN and downloads a ZIP of A4 PDFs. Uses Microsoft Edge when available; otherwise run: playwright install chromium">
@@ -138,7 +139,18 @@
                       </button>
                     </form>
                     {% endif %}
-                    {% include "includes/grid_row_actions.html" with list_url_name="udins" edit_url_name="udin_edit" edit_pk=row.id pk=row.id delete_action="delete" confirm_message="Delete this UDIN?" %}
+                    {% if row.is_invoiced and not row.locked_for_edit %}
+                    <form method="post" class="inline-form" onsubmit="return confirm('Refresh this UDIN\'s invoice from current UDIN data? Inv No stays the same.');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="refresh_invoice_row">
+                      <input type="hidden" name="pk" value="{{ row.id }}">
+                      <input type="hidden" name="invoice_status" value="{{ invoice_status }}">
+                      <button type="submit" class="icon-btn" title="Refresh Invoice (Inv No unchanged)" aria-label="Refresh Invoice">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                      </button>
+                    </form>
+                    {% endif %}
+                    {% include "includes/grid_row_actions.html" with list_url_name="udins" edit_url_name="udin_edit" edit_pk=row.id pk=row.id delete_action="delete" confirm_message="Delete this UDIN?" edit_disabled=row.locked_for_edit edit_disabled_title="Cannot edit — invoiced on an Authorised invoice." %}
                   </div>
                 </td>
               </tr>
@@ -245,5 +257,3 @@
   })();
 </script>
 {% endblock %}
-
-

@@ -331,6 +331,40 @@ def invoice_list(request):
             inv.delete()
             sync_udin_flags_for_pks(udin_pks)
             return redirect("invoices")
+        if action == "refresh_from_udin":
+            inv = get_object_or_404(Invoice, pk=request.POST.get("pk"))
+            if inv.posted_gl_header_id:
+                messages.error(request, "This invoice is posted to the general ledger and cannot be refreshed.")
+                return redirect("invoices")
+            maps = list(
+                inv.inv_udin_maps.select_related("udin", "udin__client", "udin__service").order_by("line_no")
+            )
+            if not maps:
+                messages.error(request, "This invoice has no linked UDINs to refresh from.")
+                return redirect("invoices")
+            map_rows = []
+            for m in maps:
+                udin = m.udin
+                service_desc = (udin.service_remarks or udin.remarks or m.service_desc or "").strip()
+                line_amount = udin.inv_tv_amount if udin.inv_tv_amount is not None else m.line_amount
+                map_rows.append((udin, service_desc, money2(line_amount)))
+            first_udin = maps[0].udin
+            tax_type = first_udin.client.invoice_tax_type
+            entries = [{"line_amount": r[2], "service_desc": r[1]} for r in map_rows]
+            lines = build_invoice_lines_from_map_entries(map_entries=entries, invoice_tax_type=tax_type)
+            tv = money2(sum(r[2] for r in map_rows))
+            tax_tot = taxes_total_from_lines(lines)
+            gross = gross_from_lines(lines, tv)
+            with transaction.atomic():
+                inv.client = first_udin.client
+                inv.service = first_udin.service
+                inv.inv_taxable_value = tv
+                inv.taxes = tax_tot
+                inv.inv_gross = gross
+                inv.save()
+                persist_maps_and_lines(invoice=inv, map_rows=map_rows, invoice_tax_type=tax_type)
+            messages.success(request, f"Invoice {inv.invoice_no} refreshed from UDIN data (Inv No unchanged).")
+            return redirect("invoices")
         if action == "bulk_authorize":
             ids = request.POST.getlist("invoice_id")
             n, errs = bulk_post_fresh_invoices_to_gl(invoice_pks=ids, user=request.user)
@@ -545,3 +579,4 @@ def invoice_next_no(request):
         return JsonResponse({"invoice_no": ""}, status=404)
     suggested = next_invoice_no(client=client, invoice_date=inv_date)
     return JsonResponse({"invoice_no": suggested})
+
