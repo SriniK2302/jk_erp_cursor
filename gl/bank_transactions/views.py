@@ -58,9 +58,24 @@ def bank_transactions_summary_report(request):
     if fy_param and str(fy_param).isdigit():
         selected_fy = FiscalYear.objects.filter(pk=int(fy_param)).first()
     if selected_fy is None:
+        latest_value_date = (
+            BankTransactionSource.objects.order_by("-value_date")
+            .values_list("value_date", flat=True)
+            .first()
+        )
+        if latest_value_date is not None:
+            for fy in sorted(fiscal_years, key=lambda f: f.fy_no, reverse=True):
+                if fy.start_date <= latest_value_date <= fy.end_date:
+                    selected_fy = fy
+                    break
+    if selected_fy is None:
         selected_fy = current_fy
     if selected_fy is None and fiscal_years:
         selected_fy = fiscal_years[0]
+
+
+    source_ac_param = (request.GET.get("source_ac") or "").strip()
+    selected_account = source_ac_param or None
 
     report_rows = []
     if selected_fy is not None:
@@ -70,6 +85,9 @@ def bank_transactions_summary_report(request):
             BankTransactionSourceSummary=BankTransactionSourceSummary,
             BankTransactionSourceOb=BankTransactionSourceOb,
         )
+
+        if selected_account:
+            report_rows = [r for r in report_rows if r.source_ac == selected_account]
 
         latest_uploads = {}
         for upload in BankStatementUpload.objects.filter(fiscal_year=selected_fy).order_by("source_ac_id", "-uploaded_on"):
@@ -89,6 +107,7 @@ def bank_transactions_summary_report(request):
                 "selected_fy": selected_fy,
                 "report_rows": report_rows,
                 "all_accounts": SourceBankCashAc.objects.all(),
+                "selected_account": selected_account,
             },
         )
 

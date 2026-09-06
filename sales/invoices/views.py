@@ -1,4 +1,6 @@
+import re
 from datetime import date, datetime
+
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -48,6 +50,10 @@ from .sales_ledger_tb import (
 from .narration_build import narration_suggestion_for_udin
 from .permissions import require_setup_module as _require_setup_module
 from .preview_context import build_invoice_preview_context
+from .bulk_pdf_zip import save_bulk_invoice_zip
+from .pdf_export import PdfExportError, invoice_html_list_to_pdf_bytes
+from django.template.loader import render_to_string
+from django.http import FileResponse
 from .udin_map_sync import sync_udin_flags_for_pks
 
 MAP_FORMSET_PREFIX = "maps"
@@ -358,6 +364,7 @@ def invoice_list(request):
             with transaction.atomic():
                 inv.client = first_udin.client
                 inv.service = first_udin.service
+                inv.invoice_date = first_udin.inv_date or inv.invoice_date
                 inv.inv_taxable_value = tv
                 inv.taxes = tax_tot
                 inv.inv_gross = gross
@@ -365,6 +372,39 @@ def invoice_list(request):
                 persist_maps_and_lines(invoice=inv, map_rows=map_rows, invoice_tax_type=tax_type)
             messages.success(request, f"Invoice {inv.invoice_no} refreshed from UDIN data (Inv No unchanged).")
             return redirect("invoices")
+        if action == "bulk_print_pdfs":
+            ids = request.POST.getlist("invoice_id")
+            invs = list(
+                Invoice.objects.filter(pk__in=ids)
+                .select_related("client", "service", "fiscal_year", "created_by")
+                .prefetch_related(
+                    Prefetch(
+                        "inv_udin_maps",
+                        queryset=InvUdinMap.objects.select_related("udin").order_by("line_no"),
+                    )
+                )
+            )
+            if not invs:
+                messages.warning(request, "Select at least one invoice to print.")
+                return redirect("invoices")
+            html_docs = []
+            safe_names = []
+            for inv in invs:
+                ctx = build_invoice_preview_context(request, inv)
+                html_docs.append(render_to_string("invoices/invoice_preview.html", ctx, request=request))
+                safe_names.append(re.sub(r"[^\w.\-]+", "_", inv.invoice_no) or f"inv_{inv.pk}")
+            try:
+                pdf_parts = invoice_html_list_to_pdf_bytes(html_documents=html_docs)
+            except PdfExportError as exc:
+                messages.error(request, f"PDF export failed: {exc}")
+                return redirect("invoices")
+            rel_path, abs_path = save_bulk_invoice_zip(pdf_parts=pdf_parts, safe_names=safe_names)
+            return FileResponse(
+                open(abs_path, "rb"),
+                as_attachment=True,
+                filename=abs_path.name,
+                content_type="application/zip",
+            )
         if action == "bulk_authorize":
             ids = request.POST.getlist("invoice_id")
             n, errs = bulk_post_fresh_invoices_to_gl(invoice_pks=ids, user=request.user)

@@ -164,6 +164,7 @@ def udins(request):
             with transaction.atomic():
                 inv.client = first_udin.client
                 inv.service = first_udin.service
+                inv.invoice_date = first_udin.inv_date or inv.invoice_date
                 inv.inv_taxable_value = tv
                 inv.taxes = tax_tot
                 inv.inv_gross = gross

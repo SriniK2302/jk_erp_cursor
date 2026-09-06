@@ -143,35 +143,51 @@ def _closing_balance_by_label(text: str) -> float | None:
 
 
 def _closing_balance_for_month(text: str, ym: str) -> float | None:
-    """Last value-dated transaction line's trailing amount, for the given ``ym`` (MYYMM)."""
+    """
+    Last value-dated transaction's trailing amount, for the given ``ym`` (MYYMM).
+
+    Narration in some statements wraps across multiple physical lines, so the
+    balance amount can land on a different line than the date. To handle
+    this, every dated line marks the start of a transaction "block" that runs
+    until the next dated line; the last amount found anywhere in that block
+    is taken as the balance for that transaction.
+    """
     if not ym or len(ym) != 5 or ym[0] != "M" or not ym[1:].isdigit():
         return None
     target_year = _full_year(int(ym[1:3]))
     target_month = int(ym[3:5])
 
     value_date_position = _value_date_position(text)
+    lines = text.splitlines()
 
-    best_date: date | None = None
-    best_amount: float | None = None
-
-    for line in text.splitlines():
+    dated_lines: list[tuple[int, date]] = []
+    for i, line in enumerate(lines):
         line_date = _line_value_date(line, value_date_position)
-        if line_date is None:
-            continue
-        if line_date.year != target_year or line_date.month != target_month:
-            continue
-        amounts = _AMOUNT_RE.findall(line)
-        if not amounts:
-            continue
-        try:
-            amount = float(amounts[-1].replace(",", ""))
-        except ValueError:
-            continue
-        if best_date is None or line_date >= best_date:
-            best_date = line_date
-            best_amount = amount
+        if line_date is not None:
+            dated_lines.append((i, line_date))
+
+    match_pos: int | None = None
+    for pos, (_, line_date) in enumerate(dated_lines):
+        if line_date.year == target_year and line_date.month == target_month:
+            match_pos = pos
+
+    if match_pos is None:
+        return None
+
+    match_idx = dated_lines[match_pos][0]
+    next_idx = dated_lines[match_pos + 1][0] if match_pos + 1 < len(dated_lines) else len(lines)
+
+    best_amount: float | None = None
+    for block_line in lines[match_idx:next_idx]:
+        amounts = _AMOUNT_RE.findall(block_line)
+        if amounts:
+            try:
+                best_amount = float(amounts[-1].replace(",", ""))
+            except ValueError:
+                continue
 
     return best_amount
+
 
 
 def extract_closing_balance(file_obj, *, ym: str | None = None) -> float | None:

@@ -24,7 +24,7 @@ from psycopg import Error as PsycopgError
 from django.conf import settings
 from openpyxl import load_workbook
 from psycopg import sql
-#from tkinter import Tk, TclError, filedialog
+# from tkinter import Tk, TclError, filedialog
 
 from utilities.pg_row_delete import connect_with_params
 
@@ -35,13 +35,11 @@ EXCEL_FILETYPES = [
     ("All files", "*.*"),
 ]
 
-
 # Synthetic single "sheet" name used for CSV files (which have no sheets).
 CSV_SHEET_NAME = "Sheet1"
 
 # Default width when information_schema has no length (e.g. VARCHAR without max)
 MIN_VARCHAR_LEN = 255
-
 
 
 def choose_excel_file() -> Path | None:
@@ -87,6 +85,14 @@ def _csv_cell_value(raw: str | None) -> Any:
     except ValueError:
         pass
     return s
+
+
+def _header_cell_str(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and math.isfinite(value) and value == int(value):
+        return str(int(value))
+    return str(value).strip()
 
 
 def _read_csv_rows(path: Path) -> tuple[list[str], list[list[Any]]]:
@@ -188,19 +194,6 @@ def read_sheet_headers_only(path: Path, sheet_name: str) -> list[str]:
         wb.close()
 
 
-def _parse_int_cell(value: Any) -> int | None:
-    if value is None or value == "":
-        return None
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float) and math.isfinite(value):
-        if value == int(value):
-            return int(value)
-        return None
-
-
 def _cell_raw(value: Any) -> Any:
     """Normalize openpyxl cell to Python value for typing (bool before int)."""
     if value is None:
@@ -260,7 +253,6 @@ def read_sheet_rows_raw(path: Path, sheet_name: str) -> tuple[list[str], list[li
         return headers, data
     finally:
         wb.close()
-        
 
 
 def read_sheet_rows(path: Path, sheet_name: str) -> tuple[list[str], list[list[Any]]]:
@@ -275,7 +267,7 @@ def _cell_str_from_raw(value: Any) -> str:
         return ""
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, float) and value == int(value):
+    if isinstance(value, float) and math.isfinite(value) and value == int(value):
         return str(int(value))
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -285,7 +277,7 @@ def _cell_str_from_raw(value: Any) -> str:
 def _cell_str(value: Any) -> str:
     if value is None:
         return ""
-    if isinstance(value, float) and value == int(value):
+    if isinstance(value, float) and math.isfinite(value) and value == int(value):
         return str(int(value))
     return str(value).strip()
 
@@ -315,7 +307,7 @@ def unique_column_names(headers: list[str]) -> list[str]:
 
 
 def _selected_header_indices(
-    headers: list[str], selected_headers: list[str] | None
+        headers: list[str], selected_headers: list[str] | None
 ) -> list[int]:
     """Indices into ``headers`` for import, in sheet order. Empty selection = all columns."""
     if not selected_headers:
@@ -364,7 +356,7 @@ def _existing_public_table_columns(cur, table_name: str) -> list[str] | None:
 
 
 def _fetch_public_column_metadata(
-    cur, table_name: str
+        cur, table_name: str
 ) -> dict[str, dict[str, Any]]:
     """
     lower(column_name) -> column metadata for ``public`` table (case-insensitive name).
@@ -403,7 +395,6 @@ def _fetch_public_column_metadata(
             "is_calculated": is_calculated,
         }
     return out
-
 
 
 def _coercion_pg_type_from_db_meta(meta: dict[str, Any] | None) -> str:
@@ -472,7 +463,7 @@ def _infer_string_kind_width(inferred_pg_type: str) -> tuple[str | None, int | N
 
 
 def _string_max_chars_for_insert(
-    pg_type: str, db_column_meta: dict[str, Any] | None
+        pg_type: str, db_column_meta: dict[str, Any] | None
 ) -> int | None:
     """
     Maximum string length allowed for INSERT, or None if unbounded (TEXT).
@@ -494,7 +485,7 @@ def _string_max_chars_for_insert(
 
 
 def _match_import_names_to_db(
-    import_pg_names: list[str], existing_cols: list[str]
+        import_pg_names: list[str], existing_cols: list[str]
 ) -> tuple[list[tuple[int, str]], list[str]]:
     """
     Map subset column index -> actual DB column name (case-insensitive match).
@@ -532,7 +523,7 @@ def cell_display_for_filter(value: Any) -> str:
         return ""
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, float) and not math.isnan(value) and value == int(value):
+    if isinstance(value, float) and math.isfinite(value) and value == int(value):
         return str(int(value))
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -544,9 +535,9 @@ def cell_display_for_filter(value: Any) -> str:
 
 
 def row_passes_filters(
-    row: list[Any],
-    headers: list[str],
-    filters: list[tuple[str, str]],
+        row: list[Any],
+        headers: list[str],
+        filters: list[tuple[str, str]],
 ) -> bool:
     idx_map = _header_index_map(headers)
     for col_name, want in filters:
@@ -595,16 +586,18 @@ def _parse_flexible_timestamp_str(raw: str) -> datetime | None:
         pass
 
     for fmt in (
-        "%d-%b-%Y",
-        "%d-%B-%Y",
-        "%b %d, %Y",
-        "%B %d, %Y",
-        "%m/%d/%Y",
-        "%d/%m/%Y",
-        "%Y-%m-%d",
-        "%Y/%m/%d",
-        "%d-%m-%Y",
-        "%d.%m.%Y",
+            "%d-%b-%Y",
+            "%d-%B-%Y",
+            "%d-%b-%y",
+            "%d-%B-%y",
+            "%b %d, %Y",
+            "%B %d, %Y",
+            "%m/%d/%Y",
+            "%d/%m/%Y",
+            "%Y-%m-%d",
+            "%Y/%m/%d",
+            "%d-%m-%Y",
+            "%d.%m.%Y",
     ):
         try:
             return datetime.strptime(s, fmt)
@@ -651,7 +644,7 @@ def _parse_flexible_timestamp_str(raw: str) -> datetime | None:
 
 
 def _effective_coerce_pg_type(
-    inferred: str, db_column_meta: dict[str, Any] | None
+        inferred: str, db_column_meta: dict[str, Any] | None
 ) -> str:
     """Prefer DB column type so TIMESTAMP/DATE columns get correct coercion."""
     if not db_column_meta:
@@ -665,13 +658,13 @@ def _effective_coerce_pg_type(
 
 
 def _format_import_psycopg_error(
-    exc: PsycopgError,
-    *,
-    sheet_name: str,
-    sheet_row_1based: int,
-    sel_headers: list[str],
-    insert_plan: list[tuple[int, str]],
-    payload: tuple[Any, ...] | None = None,
+        exc: PsycopgError,
+        *,
+        sheet_name: str,
+        sheet_row_1based: int,
+        sel_headers: list[str],
+        insert_plan: list[tuple[int, str]],
+        payload: tuple[Any, ...] | None = None,
 ) -> str:
     """
     Add sheet row and column context. insert_plan maps subset index -> DB column name
@@ -741,9 +734,9 @@ def _format_import_psycopg_error(
 
 
 def _coerce_for_pg(
-    value: Any,
-    pg_type: str,
-    db_column_meta: dict[str, Any] | None = None,
+        value: Any,
+        pg_type: str,
+        db_column_meta: dict[str, Any] | None = None,
 ) -> Any:
     if value is None or value == "":
         return None
@@ -786,7 +779,6 @@ def _coerce_for_pg(
             except ValueError:
                 return None
         return None
-
 
     if "DOUBLE" in pg_type or base == "DOUBLE":
         if isinstance(value, (int, float)):
@@ -868,12 +860,12 @@ def _shorten_bank_account_name(raw: str) -> str:
 
 
 def _ensure_source_bank_cash_accounts(
-    cur,
-    *,
-    insert_plan: list[tuple[int, str]],
-    sel_idx: list[int],
-    headers: list[str],
-    data_rows: list[list[Any]],
+        cur,
+        *,
+        insert_plan: list[tuple[int, str]],
+        sel_idx: list[int],
+        headers: list[str],
+        data_rows: list[list[Any]],
 ) -> list[str]:
     """
     For an import into ``bank_transactions_source``: scan the sheet's
@@ -940,13 +932,13 @@ def _ensure_source_bank_cash_accounts(
 
 
 def import_sheet_to_postgres(
-    file_path: Path,
-    sheet_name: str,
-    postgres_db: str,
-    table_name: str,
-    filter_triples: list[tuple[str, str]] | None = None,
-    progress_callback: ProgressCallback | None = None,
-    selected_headers: list[str] | None = None,
+        file_path: Path,
+        sheet_name: str,
+        postgres_db: str,
+        table_name: str,
+        filter_triples: list[tuple[str, str]] | None = None,
+        progress_callback: ProgressCallback | None = None,
+        selected_headers: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Import selected sheet columns into existing ``table_name``. Column types and
@@ -1082,7 +1074,7 @@ def import_sheet_to_postgres(
             notify_every = max(1, nrows // 500) if nrows > 500 else 1
             for i, full_row in enumerate(data_rows, start=1):
                 if progress_callback and (
-                    i == 1 or i == nrows or i % notify_every == 0
+                        i == 1 or i == nrows or i % notify_every == 0
                 ):
                     progress_callback(
                         "inserting",
@@ -1131,7 +1123,7 @@ def import_sheet_to_postgres(
                             payload=payload,
                         )
                     ) from e
-                
+
                 inserted += 1
         conn.commit()
     except Exception:
@@ -1165,12 +1157,13 @@ def import_sheet_to_postgres(
         out["opening_balance_rows_skipped"] = opening_balance_skipped
     return out
 
+
 def inspect_import_column_mapping(
-    file_path: Path,
-    sheet_name: str,
-    postgres_db: str,
-    table_name: str,
-    selected_headers: list[str] | None = None,
+        file_path: Path,
+        sheet_name: str,
+        postgres_db: str,
+        table_name: str,
+        selected_headers: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Compare selected Excel headers (sanitized for import) with existing table columns.
@@ -1245,8 +1238,8 @@ def inspect_import_column_mapping(
         c
         for c in existing_cols
         if c.lower() not in selected_lower
-        and not (column_meta.get(c.lower()) or {}).get("is_auto")
-        and not (column_meta.get(c.lower()) or {}).get("is_calculated")
+           and not (column_meta.get(c.lower()) or {}).get("is_auto")
+           and not (column_meta.get(c.lower()) or {}).get("is_calculated")
     ]
 
     for pair in selected_pairs:
@@ -1273,7 +1266,6 @@ def inspect_import_column_mapping(
         "table_only_columns": table_only_columns,
         "exact_match": exact_match,
     }
-
 
 
 def _header_key_label(h: str) -> str:
@@ -1354,7 +1346,9 @@ def _parse_int_cell(value: Any) -> int | None:
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, float) and not math.isnan(value):
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
         if value == int(value):
             return int(value)
         return None
@@ -1368,9 +1362,9 @@ def _parse_int_cell(value: Any) -> int | None:
 
 
 def combine_base_type_and_size_cells(
-    base_raw: Any,
-    size_raw: Any,
-    scale_raw: Any = None,
+        base_raw: Any,
+        size_raw: Any,
+        scale_raw: Any = None,
 ) -> str:
     """
     Build a single PostgreSQL type string from a base type cell and optional size/scale cells
@@ -1521,7 +1515,7 @@ def read_schema_definition_from_sheet(path: Path, sheet_name: str) -> list[tuple
     db_names = unique_column_names(logical_names)
     out: list[tuple[str, str]] = []
     for dbn, ts, sz, sc in zip(
-        db_names, type_strings, size_vals, scale_vals, strict=True
+            db_names, type_strings, size_vals, scale_vals, strict=True
     ):
         if not ts and not split_mode:
             raise ValueError(f"Missing data_type for column {dbn!r}.")
@@ -1536,15 +1530,15 @@ def read_schema_definition_from_sheet(path: Path, sheet_name: str) -> list[tuple
 
 
 def create_public_table_from_schema_sheet(
-    file_path: Path,
-    sheet_name: str,
-    *,
-    host: str,
-    port: int,
-    user: str,
-    password: str,
-    dbname: str,
-    table_name: str,
+        file_path: Path,
+        sheet_name: str,
+        *,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        dbname: str,
+        table_name: str,
 ) -> dict[str, Any]:
     """
     CREATE TABLE in ``public`` from an Excel sheet defining column names and types.
@@ -1568,11 +1562,11 @@ def create_public_table_from_schema_sheet(
     )
 
     with connect_with_params(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        dbname=dbname,
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            dbname=dbname,
     ) as conn:
         conn.autocommit = True
         with conn.cursor() as cur:
@@ -1586,4 +1580,3 @@ def create_public_table_from_schema_sheet(
         "database": dbname,
         "columns": [[c, t] for c, t in columns],
     }
-

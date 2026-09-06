@@ -32,6 +32,19 @@
             </select>
           </div>
         </div>
+        <div class="sap-row" style="margin: 0;">
+          <label for="id_bt_summary_source_ac">Bank account</label>
+          <div class="sap-control">
+            <select name="source_ac" id="id_bt_summary_source_ac" class="input-medium">
+              <option value=""{% if not selected_account %} selected{% endif %}>All accounts</option>
+              {% for account in all_accounts %}
+                <option value="{{ account.source_ac }}"{% if selected_account == account.source_ac %} selected{% endif %}>
+                  {{ account.source_ac }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
         <button type="submit" class="button">Show report</button>
       </form>
 
@@ -112,6 +125,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="pk" value="{{ m.pk }}">
                             <input type="hidden" name="fy" value="{{ selected_fy.pk }}">
+                            <input type="hidden" name="source_ac" value="{{ selected_account }}">
                             <input type="hidden" name="anchor" value="row-{{ m.pk }}">
                             <input
                               type="number"

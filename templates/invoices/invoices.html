@@ -46,9 +46,9 @@
 
     <form id="bulkAuthorizeForm" method="post" action="{% url 'invoices' %}" class="inline-form">
       {% csrf_token %}
-      <input type="hidden" name="action" value="bulk_authorize">
       <input type="hidden" name="next_status" value="{{ status_filter }}">
-      <button type="submit" class="button button-secondary" id="bulkAuthorizeBtn" disabled>Authorise selected &amp; post to GL</button>
+      <button type="submit" name="action" value="bulk_authorize" class="button button-secondary" id="bulkAuthorizeBtn" disabled>Authorise selected &amp; post to GL</button>
+      <button type="submit" name="action" value="bulk_print_pdfs" class="button button-secondary" id="bulkPrintBtn" disabled>Print invoices (PDF)</button>
     </form>
     <p class="muted invoice-udin-hint" style="margin-top: 0.35rem;">Select Fresh invoices, then post. Each invoice becomes an <strong>Authorised</strong> GL entry (Dr receivables · Cr fees · Cr GST per Sales ledger settings).</p>
 
@@ -166,6 +166,7 @@
     (function () {
       var master = document.getElementById("selectAllInvoices");
       var btn = document.getElementById("bulkAuthorizeBtn");
+      var printBtn = document.getElementById("bulkPrintBtn");
       if (!master || !btn) return;
       function eligibleBoxes() {
         return Array.prototype.slice.call(document.querySelectorAll("input.invoice-bulk-check"));
@@ -184,6 +185,7 @@
       function syncButton() {
         var any = eligibleBoxes().some(function (b) { return b.checked; });
         btn.disabled = !any;
+        if (printBtn) { printBtn.disabled = !any; }
       }
       master.addEventListener("change", function () {
         eligibleBoxes().forEach(function (b) { b.checked = master.checked; });
