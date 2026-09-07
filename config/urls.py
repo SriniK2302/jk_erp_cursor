@@ -81,6 +81,11 @@ urlpatterns = [
         name='select_excel_import_file',
     ),
     path(
+        'data-utilities/excel-import/select-doc-file/',
+        views.select_doc_import_file,
+        name='select_doc_import_file',
+    ),
+    path(
         'data-utilities/excel-import/sheets/',
         views.excel_import_sheets_json,
         name='excel_import_sheets_json',
@@ -95,6 +100,12 @@ urlpatterns = [
         views.excel_import_headers_json,
         name='excel_import_headers_json',
     ),
+    path(
+        'data-utilities/excel-import/preview/',
+        views.excel_import_preview_json,
+        name='excel_import_preview_json',
+    ),
+
     path(
         'data-utilities/excel-import/match-report/',
         views.excel_import_match_report,
@@ -292,16 +303,16 @@ urlpatterns = [
         name='select_move_first_chars_folder',
     ),
 
-        path(
-        'utilities/select-prefix-fy-xml-folder/',
-        views.select_prefix_fy_xml_folder,
-        name='select_prefix_fy_xml_folder',
+    path(
+    'utilities/select-prefix-fy-xml-folder/',
+    views.select_prefix_fy_xml_folder,
+    name='select_prefix_fy_xml_folder',
     ),
 
     path(
-        'utilities/select-similar-files-folder/',
-        views.select_similar_files_folder,
-        name='select_similar_files_folder',
+    'utilities/select-similar-files-folder/',
+    views.select_similar_files_folder,
+    name='select_similar_files_folder',
     ),
 
     path(
@@ -578,3 +589,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

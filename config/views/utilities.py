@@ -1,4 +1,6 @@
 from config.views._std_imports import *  # noqa: F403
+from utilities.doc_to_postgres import choose_doc_file
+
 
 import pikepdf
 

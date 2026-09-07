@@ -15,6 +15,9 @@ from .utility_jobs import (
     _is_truthy_form_value,
     _excel_import_mapping_warning,
 )
+from utilities.doc_to_postgres import choose_doc_file
+from utilities.pdf_to_postgres import find_header_row
+from utilities.pdf_to_postgres import find_header_row, extract_transactions
 
 
 def data_utilities(request):
@@ -132,7 +135,7 @@ def create_table_run(request):
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
 
     raw = request.session.get("data_create_table_excel_path") or (
-        request.POST.get("excel_path") or ""
+            request.POST.get("excel_path") or ""
     ).strip()
     sheet_name = (request.POST.get("sheet_name") or "").strip()
     table_name = (request.POST.get("table_name") or "").strip()
@@ -226,6 +229,41 @@ def select_excel_import_file(request):
 
 
 @login_required
+@require_POST
+def select_doc_import_file(request):
+    retained_db = (request.POST.get("retain_postgres_db") or "").strip()
+    retained_sheet = (request.POST.get("retain_sheet_name") or "").strip()
+    retained_table = (request.POST.get("retain_table_name") or "").strip()
+    retained_cols = [
+        x.strip() for x in request.POST.getlist("retain_selected_column") if x.strip()
+    ]
+    _save_excel_import_preferences(
+        request,
+        postgres_db=retained_db,
+        sheet_name=retained_sheet,
+        table_name=retained_table,
+        selected_headers=retained_cols,
+    )
+
+    try:
+        path = choose_doc_file()
+    except RuntimeError:
+        messages.error(
+            request,
+            "Could not open file picker. Run on a machine with desktop access.",
+        )
+        return redirect("data_excel_import")
+
+    if path is None:
+        messages.info(request, "File selection cancelled.")
+        return redirect("data_excel_import")
+
+    request.session["data_excel_import_path"] = str(path.resolve())
+    messages.success(request, f"Selected: {path.name}")
+    return redirect("data_excel_import")
+
+
+@login_required
 @require_GET
 def excel_import_sheets_json(request):
     raw = request.session.get("data_excel_import_path", "")
@@ -265,16 +303,25 @@ def excel_import_tables_json(request):
 @login_required
 @require_GET
 def excel_import_headers_json(request):
-
     raw = request.session.get("data_excel_import_path", "")
     sheet = (request.GET.get("sheet") or "").strip()
     if not raw:
         return JsonResponse({"ok": False, "message": "No file selected."}, status=400)
-    if not sheet:
-        return JsonResponse({"ok": False, "message": "Sheet name required."}, status=400)
     path = Path(raw).expanduser()
     if not path.is_file():
         return JsonResponse({"ok": False, "message": "File not found."}, status=400)
+
+    if path.suffix.lower() == ".pdf":
+        try:
+            headers = find_header_row(path)
+        except Exception as exc:
+            return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+        if headers is None:
+            return JsonResponse({"ok": False, "message": "Could not detect header row in PDF."}, status=400)
+        return JsonResponse({"ok": True, "headers": headers})
+
+    if not sheet:
+        return JsonResponse({"ok": False, "message": "Sheet name required."}, status=400)
     try:
         headers = read_sheet_headers_only(path, sheet)
     except Exception as exc:
@@ -305,7 +352,7 @@ def _validate_table_exists(*, postgres_db: str, table_name: str) -> str | None:
 def excel_import_match_report(request):
     """Return Excel Γåö PostgreSQL column mapping and types without importing."""
     raw = request.session.get("data_excel_import_path", "") or (
-        request.POST.get("excel_path") or ""
+            request.POST.get("excel_path") or ""
     ).strip()
     sheet_name = (request.POST.get("sheet_name") or "").strip()
     postgres_db = (request.POST.get("postgres_db") or "").strip()
@@ -361,7 +408,7 @@ def excel_import_match_report(request):
 @require_POST
 def excel_import_run(request):
     raw = request.session.get("data_excel_import_path", "") or (
-        request.POST.get("excel_path") or ""
+            request.POST.get("excel_path") or ""
     ).strip()
     sheet_name = (request.POST.get("sheet_name") or "").strip()
     postgres_db = (request.POST.get("postgres_db") or "").strip()
@@ -410,7 +457,7 @@ def excel_import_run(request):
             filter_triples=None,
             selected_headers=selected_headers,
         )
-        
+
     except Exception as exc:
         messages.error(request, f"Import failed: {exc}")
         return redirect("data_excel_import")
@@ -452,7 +499,7 @@ def excel_import_run(request):
 def excel_import_start(request):
     """Start Excel import in a background thread; poll ``excel_import_status`` for progress."""
     raw = request.session.get("data_excel_import_path", "") or (
-        request.POST.get("excel_path") or ""
+            request.POST.get("excel_path") or ""
     ).strip()
     sheet_name = (request.POST.get("sheet_name") or "").strip()
     postgres_db = (request.POST.get("postgres_db") or "").strip()
@@ -574,7 +621,7 @@ def _pg_row_delete_conn_params_from_post(request) -> dict[str, str | int]:
 
 
 def _pg_conn_params_from_post_with_default_db(
-    request, *, default_db: str = "postgres"
+        request, *, default_db: str = "postgres"
 ) -> dict[str, str | int]:
     """Like ``_pg_row_delete_conn_params_from_post`` but uses ``default_db`` when db name is empty."""
     port_raw = (request.POST.get("pg_port") or "").strip()
@@ -747,5 +794,22 @@ def pg_row_delete_execute(request):
             ),
         }
     )
+
+@login_required
+@require_GET
+def excel_import_preview_json(request):
+    raw = request.session.get("data_excel_import_path", "")
+    if not raw:
+        return JsonResponse({"ok": False, "message": "No file selected."}, status=400)
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        return JsonResponse({"ok": False, "message": "File not found."}, status=400)
+    if path.suffix.lower() != ".pdf":
+        return JsonResponse({"ok": False, "message": "Preview only supports PDF files for now."}, status=400)
+    try:
+        rows = extract_transactions(path)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    return JsonResponse({"ok": True, "rows": rows})
 
 

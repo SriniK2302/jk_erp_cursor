@@ -110,7 +110,10 @@ def _read_csv_rows(path: Path) -> tuple[list[str], list[list[Any]]]:
         else:
             row = row[:width]
         data.append([_csv_cell_value(c) for c in row])
+    while data and all(v is None for v in data[-1]):
+        data.pop()
     return headers, data
+
 
 
 def list_sheet_names(path: Path) -> list[str]:

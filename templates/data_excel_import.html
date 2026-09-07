@@ -6,7 +6,7 @@
 <div class="page">
   <section class="home-frame">
     <header class="page-header">
-      <h1>Upload data (Excel → PostgreSQL)</h1>
+      <h1>Upload data (Doc → PostgreSQL)</h1>
       <p class="muted">
         <strong>What this does:</strong> pick the database (<strong>Load DBs</strong>), choose the sheet — the <strong>table name</strong> is the sheet name (sanitized for PostgreSQL) and must already exist
         (create it with <a href="{% url 'data_create_table' %}">Create PostgreSQL table</a> using the same sheet if needed). Load columns, select what to import; types come from PostgreSQL.
@@ -14,7 +14,7 @@
       </p>
     </header>
 
-    <form method="post" action="{% url 'select_excel_import_file' %}" class="utility-form-inline" id="excel-select-file-form">
+    <form method="post" action="{% url 'select_doc_import_file' %}" class="utility-form-inline" id="excel-select-file-form">
       {% csrf_token %}
       <input type="hidden" name="retain_postgres_db" id="retain-postgres-db" value="{{ initial_postgres_db|default:'' }}">
       <input type="hidden" name="retain_sheet_name" id="retain-sheet-name" value="{{ initial_sheet_name|default:'' }}">
@@ -27,7 +27,7 @@
         <label for="excel-path" class="muted utility-label">Workbook path</label>
         <div class="utility-field-row__grow">
           <input id="excel-path" type="text" class="utility-input" value="{{ excel_path }}" readonly>
-          <button type="submit" class="button button-compact button-secondary" form="excel-select-file-form">Select Excel / CSV File</button>
+          <button type="submit" class="button button-compact button-secondary" form="excel-select-file-form">Select Doc File</button>
         </div>
       </div>
 
@@ -102,6 +102,8 @@
         <input type="hidden" name="sheet_name" id="sheet-name-hidden" value="">
         <button type="submit" class="button button-compact" id="excel-import-submit-btn">Import to PostgreSQL</button>
       </form>
+      <button type="button" class="button button-compact" id="excel-import-preview-btn">Preview</button>
+      <p class="muted" id="excel-import-preview-result" aria-live="polite"></p>
     </div>
 
     <p class="muted"><a href="{% url 'data_utilities' %}">← Back to Data Utilities</a></p>
@@ -131,6 +133,9 @@
     const progressText = document.getElementById("excel-import-progress-text");
     const resultBox = document.getElementById("excel-import-result");
     const submitBtn = document.getElementById("excel-import-submit-btn");
+    const previewBtn = document.getElementById("excel-import-preview-btn");
+    const previewResult = document.getElementById("excel-import-preview-result");
+
     const importColumnList = document.getElementById("import-column-list");
     const importColumnToolbar = document.getElementById("import-column-toolbar");
     const importColSelectAll = document.getElementById("import-col-select-all");
@@ -440,6 +445,22 @@
         syncRetainedState();
       });
     }
+
+    previewBtn.addEventListener("click", async function () {
+      previewBtn.disabled = true;
+      try {
+        const res = await fetch("{% url 'excel_import_preview_json' %}", { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Preview failed.");
+        }
+        previewResult.textContent = data.rows.length + " row(s) found.";
+      } catch (e) {
+        previewResult.textContent = e.message || "Preview failed.";
+      } finally {
+        previewBtn.disabled = false;
+      }
+    });
 
     loadHeadersBtn.addEventListener("click", async function () {
       const sheet = sheetSelect.value;
