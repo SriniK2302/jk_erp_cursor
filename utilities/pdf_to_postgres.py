@@ -39,28 +39,58 @@ _DATE_FORMATS = (
     },
 )
 
+_COLUMN_KEYWORDS = {
+    "tran_date": ["tran date", "tran dt", "transaction date", "txn date", "date"],
+    "value_date": ["value date", "value dt"],
+    "narration": ["narration", "description", "particulars", "transaction remarks", "remarks"],
+    "reference": ["chq", "cheque", "ref no", "reference", "chq/ref no",
+                  "chq / ref no", "cheque no", "utr", "chq no"],
+    "debit": ["withdrawal", "withdrawals", "withdrawl", "debit"],
+    "credit": ["deposit", "deposits", "credit"],
+    "closing_balance": ["balance", "closing balance"],
+}
+
+def identify_columns(headers: list[dict]) -> dict:
+    """Map detected PDF header text to the 7 canonical columns.
+    Returns {canonical_name: header_dict_or_None}."""
+    result = {}
+    for canonical, keywords in _COLUMN_KEYWORDS.items():
+        match = None
+        for h in (headers or []):
+            h_lower = h["text"].lower()
+            if any(kw in h_lower for kw in keywords):
+                match = h
+                break
+        result[canonical] = match
+    return result
+
 
 def _score_line(line: str) -> int:
     lower = line.lower()
     return sum(1 for kw in _HEADER_KEYWORDS if kw in lower)
 
 
-def _group_words_by_gap(row_words: list[dict], gap_thresh: float = 10.0) -> list[str]:
+def _group_words_by_gap(row_words: list[dict], gap_thresh: float = 10.0) -> list[dict]:
     """Merge words on the same line into columns using x-position gaps
-    (small gap = same column, e.g. 'Ref' + 'No.' -> 'Ref No.')."""
+    (small gap = same column, e.g. 'Ref' + 'No.' -> 'Ref No.').
+    Returns list of {"text": str, "x0": float, "x1": float}."""
     row_words = sorted(row_words, key=lambda w: w["x0"])
     columns = []
-    cur = ""
+    cur_text = ""
+    cur_x0 = None
     prev_x1 = None
     for w in row_words:
         if prev_x1 is not None and (w["x0"] - prev_x1) > gap_thresh:
-            if cur:
-                columns.append(cur)
-            cur = ""
-        cur = f"{cur} {w['text']}".strip()
+            if cur_text:
+                columns.append({"text": cur_text, "x0": cur_x0, "x1": prev_x1})
+            cur_text = ""
+            cur_x0 = None
+        cur_text = f"{cur_text} {w['text']}".strip()
+        if cur_x0 is None:
+            cur_x0 = w["x0"]
         prev_x1 = w["x1"]
-    if cur:
-        columns.append(cur)
+    if cur_text:
+        columns.append({"text": cur_text, "x0": cur_x0, "x1": prev_x1})
     return columns
 
 
@@ -83,11 +113,11 @@ def _reconstruct_words(line_chars: list[dict], gap_thresh: float = 2.0) -> list[
     return words
 
 
-def find_header_single_line(page) -> list[str] | None:
+def find_header_single_line(page) -> list[dict] | None:
     """
     Technique 1: one text line scores >= _SINGLE_LINE_PASS_SCORE keyword
-    matches. Returns its columns (grouped by word x-position gaps), or
-    None if no single line passes.
+    matches. Returns its columns as {"text","x0","x1"} dicts (grouped by
+    word x-position gaps), or None if no single line passes.
     """
     lines = (page.extract_text() or "").splitlines()
     best_line = max(lines, key=_score_line, default=None)
@@ -103,15 +133,16 @@ def find_header_single_line(page) -> list[str] | None:
         row_text = " ".join(w["text"] for w in sorted(row, key=lambda w: w["x0"]))
         if row_text == best_line:
             return _group_words_by_gap(row)
-    return best_line.split()
+    return [{"text": t, "x0": None, "x1": None} for t in best_line.split()]
 
 
-def find_header_two_line(page) -> list[str] | None:
+def find_header_two_line(page) -> list[dict] | None:
     """
     Technique 2: header wrapped across two adjacent lines (e.g. "Tran" /
     "ID" -> "Tran ID"). Pairs each word on the second line to the nearest
-    word (by x-position) on the first line. Returns None if no adjacent
-    pair scores >= _TWO_LINE_PASS_SCORE.
+    word (by x-position) on the first line. Returns columns as
+    {"text","x0","x1"} dicts, or None if no adjacent pair scores
+    >= _TWO_LINE_PASS_SCORE.
     """
     words = page.extract_words()
     by_top = defaultdict(list)
@@ -126,22 +157,27 @@ def find_header_two_line(page) -> list[str] | None:
         if _score_line(combined_text) < _TWO_LINE_PASS_SCORE:
             continue
 
-        columns: dict[int, list[str]] = {j: [w["text"]] for j, w in enumerate(row_a)}
+        columns: dict[int, dict] = {
+            j: {"text": w["text"], "x0": w["x0"], "x1": w["x1"]}
+            for j, w in enumerate(row_a)
+        }
         for w in row_b:
             nearest_idx = min(
                 range(len(row_a)),
                 key=lambda j: abs(row_a[j]["x0"] - w["x0"]),
             )
-            columns[nearest_idx].append(w["text"])
-        return [" ".join(columns[j]) for j in sorted(columns)]
+            columns[nearest_idx]["text"] += " " + w["text"]
+            columns[nearest_idx]["x1"] = max(columns[nearest_idx]["x1"], w["x1"])
+        return [columns[j] for j in sorted(columns)]
     return None
 
 
-def find_header_row(pdf_path) -> list[str] | None:
+def find_header_row(pdf_path) -> list[dict] | None:
     """
-    Identify the header row on the first page and return its column names.
-    Tries find_header_single_line, then find_header_two_line, then
-    char-gap reconstruction (for fragmented/overlapping text extraction).
+    Identify the header row on the first page and return its columns as
+    {"text","x0","x1"} dicts. Tries find_header_single_line, then
+    find_header_two_line, then char-gap reconstruction (for
+    fragmented/overlapping text extraction; x0/x1 set to None there).
     Returns None if no technique finds a header.
     """
     with pdfplumber.open(pdf_path) as pdf:
@@ -166,7 +202,7 @@ def find_header_row(pdf_path) -> list[str] | None:
             words = _reconstruct_words(by_top_chars[t])
             joined = " ".join(words)
             if _score_line(joined) >= 3:
-                return words
+                return [{"text": w, "x0": None, "x1": None} for w in words]
 
     return None
 
@@ -185,14 +221,16 @@ def detect_date_format(pdf_path) -> str | None:
     return None
 
 
-def _extract_transactions_generic(pdf_path, fmt: dict) -> list[dict]:
+def _extract_transactions_generic(pdf_path, fmt: dict, columns: dict) -> list[dict]:
     """
     Extract transaction rows using the given format's regex config
-    (from _DATE_FORMATS). Handles both amount_position styles:
-    "trailing" (last 3 amounts in the block) and "after_dates" (first 3
-    amounts after the second date).
+    (from _DATE_FORMATS), plus narration/reference split by column
+    x-position (from `columns`, as returned by identify_columns()).
     """
     rows = []
+    narration_col = columns.get("narration")
+    reference_col = columns.get("reference")
+
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             raw_lines = (page.extract_text() or "").splitlines()
@@ -203,14 +241,23 @@ def _extract_transactions_generic(pdf_path, fmt: dict) -> list[dict]:
                 lines.append(l)
 
             row_start_idxs = [i for i, l in enumerate(lines) if fmt["row_start_regex"].match(l.strip())]
+
+            words = page.extract_words()
+            by_top = defaultdict(list)
+            for w in words:
+                by_top[round(w["top"])].append(w)
+            tops_sorted = sorted(by_top)
+
             for pos, idx in enumerate(row_start_idxs):
                 next_idx = row_start_idxs[pos + 1] if pos + 1 < len(row_start_idxs) else len(lines)
                 block = " ".join(lines[idx:next_idx])
                 block = re.sub(r'(\d{2}-[A-Za-z]{3}-)\s+(\d{4})', r'\1\2', block)
 
                 date_matches = list(fmt["date_regex"].finditer(block))
-                if len(date_matches) < 2:
+                if len(date_matches) < 1:
                     continue
+                tran_date = date_matches[0].group()
+                value_date = date_matches[1].group() if len(date_matches) >= 2 else tran_date
 
                 if fmt["amount_position"] == "trailing":
                     amount_matches = list(_AMOUNT_OR_NA_RE.finditer(block))
@@ -218,7 +265,7 @@ def _extract_transactions_generic(pdf_path, fmt: dict) -> list[dict]:
                         continue
                     a, b, c = (m.group() for m in amount_matches[-3:])
                 else:
-                    after_dates = block[date_matches[1].end():]
+                    after_dates = block[date_matches[-1].end():]
                     amount_matches = list(_AMOUNT_OR_NA_RE.finditer(after_dates))
                     if len(amount_matches) < 3:
                         continue
@@ -227,9 +274,26 @@ def _extract_transactions_generic(pdf_path, fmt: dict) -> list[dict]:
                 def _num(x):
                     return None if x == "NA" else float(x.replace(",", ""))
 
+                narration_text = ""
+                reference_text = ""
+                if narration_col or reference_col:
+                    row_line_tops = [t for t in tops_sorted if idx <= tops_sorted.index(t) < next_idx]
+                for t in tops_sorted:
+                    row_words = sorted(by_top[t], key=lambda w: w["x0"])
+                    line_text = " ".join(w["text"] for w in row_words)
+                    if line_text not in lines[idx:next_idx]:
+                        continue
+                    for w in row_words:
+                        if narration_col and narration_col["x0"] is not None and narration_col["x0"] <= w["x0"] < narration_col["x1"] + 20:
+                            narration_text += " " + w["text"]
+                        elif reference_col and reference_col["x0"] is not None and reference_col["x0"] <= w["x0"] < reference_col["x1"] + 20:
+                            reference_text += " " + w["text"]
+
                 rows.append({
-                    "tran_date": date_matches[0].group(),
-                    "value_date": date_matches[1].group(),
+                    "tran_date": tran_date,
+                    "value_date": value_date,
+                    "narration": narration_text.strip(),
+                    "reference": reference_text.strip(),
                     "credit": _num(a),
                     "debit": _num(b),
                     "closing_balance": _num(c),
@@ -238,9 +302,19 @@ def _extract_transactions_generic(pdf_path, fmt: dict) -> list[dict]:
 
 
 def extract_transactions(pdf_path) -> list[dict]:
-    """Detect the date format, then convert using the generic extractor."""
+    """Identify the 7 required columns, then detect date format and convert."""
+    headers = find_header_row(pdf_path)
+    columns = identify_columns(headers)
+    missing = [k for k, v in columns.items() if v is None]
+    if missing:
+        found_text = ", ".join(h["text"] for h in (headers or []))
+        raise ValueError(f"Columns not found in PDF: {', '.join(missing)}. Headers detected: [{found_text}]")
+
+
     name = detect_date_format(pdf_path)
     fmt = next((f for f in _DATE_FORMATS if f["name"] == name), None)
     if fmt is None:
         return []
-    return _extract_transactions_generic(pdf_path, fmt)
+    return _extract_transactions_generic(pdf_path, fmt, columns)
+
+

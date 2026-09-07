@@ -808,8 +808,10 @@ def excel_import_preview_json(request):
         return JsonResponse({"ok": False, "message": "Preview only supports PDF files for now."}, status=400)
     try:
         rows = extract_transactions(path)
-    except Exception as exc:
+    except ValueError as exc:
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}" if str(exc) else f"{type(exc).__name__} (no message) — file may be password-protected"}, status=400)
     return JsonResponse({"ok": True, "rows": rows})
 
 
