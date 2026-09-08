@@ -677,38 +677,38 @@ def bank_transactions_import_preview_json(request):
     try:
         result = orchestrate_import_preview(path, sheet_name, context)
     except Exception as exc:
-        return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"}, status=400)
+        return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"},
+                            status=400)
 
-        if not result.get("ok"):
-            return JsonResponse(result, status=400)
-        return JsonResponse(result)
+    if not result.get("ok"):
+        return JsonResponse(result, status=400)
+    return JsonResponse(result)
 
-    @login_required
-    @require_POST
-    def bank_transactions_import_commit_json(request):
-        raw = request.session.get("data_excel_import_path", "")
-        sheet_name = (request.POST.get("sheet_name") or "").strip()
 
-        if not raw:
-            return JsonResponse({"ok": False, "stage": "input", "message": "No file selected."}, status=400)
-        path = Path(raw).expanduser()
-        if not path.is_file():
-            return JsonResponse({"ok": False, "stage": "input", "message": "File not found."}, status=400)
+@login_required
+@require_POST
+def bank_transactions_import_commit_json(request):
+    raw = request.session.get("data_excel_import_path", "")
+    sheet_name = (request.POST.get("sheet_name") or "").strip()
 
-        context = {"file_path": str(path), "sheet_name": sheet_name}
+    if not raw:
+        return JsonResponse({"ok": False, "stage": "input", "message": "No file selected."}, status=400)
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        return JsonResponse({"ok": False, "stage": "input", "message": "File not found."}, status=400)
 
-        try:
-            preview = orchestrate_import_preview(path, sheet_name, context)
-        except Exception as exc:
-            return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"},
-                                status=400)
+    context = {"file_path": str(path), "sheet_name": sheet_name}
 
-        if not preview.get("ok"):
-            return JsonResponse(preview, status=400)
+    try:
+        preview = orchestrate_import_preview(path, sheet_name, context)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"},
+                            status=400)
 
-        result = commit_dataset_to_postgres(preview["rows"])
-        if not result.get("ok"):
-            return JsonResponse({"ok": False, "stage": "commit", "message": result["message"]}, status=400)
-        return JsonResponse(
-            {"ok": True, "stage": "commit", "message": result["message"], "inserted": result["inserted"]})
+    if not preview.get("ok"):
+        return JsonResponse(preview, status=400)
 
+    result = commit_dataset_to_postgres(preview["rows"])
+    if not result.get("ok"):
+        return JsonResponse({"ok": False, "stage": "commit", "message": result["message"]}, status=400)
+    return JsonResponse({"ok": True, "stage": "commit", "message": result["message"], "inserted": result["inserted"]})
