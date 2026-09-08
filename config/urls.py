@@ -100,6 +100,11 @@ urlpatterns = [
         views.excel_import_headers_json,
         name='excel_import_headers_json',
     ),
+    path(
+        'data-utilities/excel-import/orchestrator-preview/',
+        views.excel_import_orchestrator_preview_json,
+        name='excel_import_orchestrator_preview_json',
+    ),
 
     path(
         'data-utilities/excel-import/match-report/',

@@ -346,6 +346,34 @@ def _validate_table_exists(*, postgres_db: str, table_name: str) -> str | None:
 
 @login_required
 @require_POST
+def excel_import_orchestrator_preview_json(request):
+    """Run the orchestrator preview pipeline; returns JSON for the UI."""
+    raw = request.session.get("data_excel_import_path", "") or (
+            request.POST.get("excel_path") or ""
+    ).strip()
+    sheet_name = (request.POST.get("sheet_name") or "").strip()
+    postgres_db = (request.POST.get("postgres_db") or "").strip()
+    table_name = (request.POST.get("table_name") or "").strip()
+
+    if not raw:
+        return JsonResponse({"ok": False, "stage": "input", "message": "No file selected."}, status=400)
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        return JsonResponse({"ok": False, "stage": "input", "message": "File not found."}, status=400)
+
+    context = {"postgres_db": postgres_db, "table_name": table_name, "file_path": str(path), "sheet_name": sheet_name}
+
+    try:
+        result = orchestrate_import_preview(path, sheet_name, context)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"}, status=400)
+
+    if not result.get("ok"):
+        return JsonResponse(result, status=400)
+    return JsonResponse(result)
+
+@login_required
+@require_POST
 def excel_import_match_report(request):
     """Return Excel Γåö PostgreSQL column mapping and types without importing."""
     raw = request.session.get("data_excel_import_path", "") or (

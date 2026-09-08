@@ -81,6 +81,8 @@
 
       <div id="excel-import-match-report-wrap" class="excel-import-match-report-wrap" hidden></div>
 
+      <div id="excel-import-orchestrator-preview-wrap" class="excel-import-match-report-wrap" hidden></div>
+
       <div id="excel-import-progress-wrap" class="utility-progress-wrap" hidden>
         <div
           class="utility-progress-track"
@@ -644,6 +646,56 @@
       }
 
       const formData = new FormData(runForm);
+
+      try {
+        const previewRes = await fetch("{% url 'excel_import_orchestrator_preview_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const previewPayload = await previewRes.json();
+        if (!previewPayload.ok) {
+          alert("Preview failed at stage '" + previewPayload.stage + "': " + previewPayload.message);
+          return;
+        }
+        const previewWrap = document.getElementById("excel-import-orchestrator-preview-wrap");
+        if (previewWrap) {
+          previewWrap.hidden = false;
+          const cm = previewPayload.column_map || {};
+          const expected = Object.keys(cm);
+          const found = expected.filter(k => cm[k]);
+          const missing = expected.filter(k => !cm[k]);
+          const rows = previewPayload.rows || [];
+
+          let html = '<h2 class="excel-import-report-heading">Orchestrator preview</h2>';
+          html += '<p class="excel-import-report-summary">Stage: ' + escapeHtmlCell(previewPayload.stage) +
+            ' — ' + escapeHtmlCell(previewPayload.message) + '</p>';
+          html += '<p class="muted">Columns expected: ' + expected.join(", ") + '<br>' +
+            'Columns found: ' + found.map(k => k + " -> " + cm[k]).join(", ") + '<br>' +
+            'Missing: ' + (missing.length ? missing.join(", ") : "none") + '</p>';
+          html += '<p class="muted">Total rows: ' + (previewPayload.total_count || 0) +
+            ' — Matched: ' + (previewPayload.match_count || 0) + '</p>';
+
+          if (rows.length) {
+            const cols = Object.keys(rows[0]);
+            let head = "<thead><tr>" + cols.map(c => "<th>" + escapeHtmlCell(c) + "</th>").join("") + "</tr></thead>";
+            let body = rows.map(function (r) {
+              return "<tr>" + cols.map(c => "<td>" + escapeHtmlCell(r[c]) + "</td>").join("") + "</tr>";
+            }).join("");
+            html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">' + head + "<tbody>" + body + "</tbody></table></div>";
+          }
+
+          previewWrap.innerHTML = html;
+        }
+        return;
+
+      } catch (e) {
+        alert("Preview request failed: " + (e.message || e));
+        return;
+      }
 
       try {
         let response = await fetch(runForm.action, {
