@@ -1630,7 +1630,11 @@ def build_dataset(rows: list[dict], column_map: dict) -> list[dict]:
     dataset = []
     for row in rows:
         tran_date = row.get(column_map["tran_date"])
+        if tran_date and "T" in tran_date:
+            tran_date = tran_date.split("T")[0]
         value_date = row.get(column_map["value_date"]) or tran_date
+        if value_date and "T" in value_date:
+            value_date = value_date.split("T")[0]
         dataset.append({
             "tran_date": tran_date,
             "value_date": value_date,
