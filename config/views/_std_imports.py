@@ -36,7 +36,6 @@ from utilities.similar_files import (
     find_similar_to_reference_file,
 )
 
-
 from utilities.excel_to_postgres import (
     choose_excel_file,
     create_public_table_from_schema_sheet,
@@ -44,8 +43,8 @@ from utilities.excel_to_postgres import (
     import_sheet_to_postgres,
     list_sheet_names,
     read_sheet_headers_only,
-
 )
+
 
 from utilities.pg_row_delete import (
     delete_rows_public,

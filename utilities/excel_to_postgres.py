@@ -35,6 +35,16 @@ EXCEL_FILETYPES = [
     ("All files", "*.*"),
 ]
 
+HEADER_TRANSLATORS = {
+    "tran_date": ["tran date", "tran dt", "transaction date", "txn date", "date"],
+    "value_date": ["value date", "value dt"],
+    "narration": ["narration", "description", "particulars", "transaction remarks", "remarks"],
+    "reference": ["chq", "cheque", "ref no", "reference", "chq / ref no", "chq/ref no", "utr", "chq no"],
+    "debit": ["withdrawal", "withdrawals", "withdrawl", "debit"],
+    "credit": ["deposit", "deposits", "credit"],
+    "closing_balance": ["balance", "closing balance"],
+}
+
 # Synthetic single "sheet" name used for CSV files (which have no sheets).
 CSV_SHEET_NAME = "Sheet1"
 
