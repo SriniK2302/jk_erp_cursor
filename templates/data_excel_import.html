@@ -688,7 +688,14 @@
             html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">' + head + "<tbody>" + body + "</tbody></table></div>";
           }
 
+          html += '<button type="button" id="orchestrator-proceed-btn" class="button button-compact">Proceed with import</button>';
           previewWrap.innerHTML = html;
+          const proceedBtn = document.getElementById("orchestrator-proceed-btn");
+          if (proceedBtn) {
+            proceedBtn.addEventListener("click", function () {
+              runActualImport(formData);
+            });
+          }
         }
         return;
 
@@ -697,6 +704,12 @@
         return;
       }
 
+      return;
+    });
+
+    async function runActualImport(formData) {
+      const postgresDb = document.getElementById("postgres-db");
+      const tableNameEl = document.getElementById("table-name");
       try {
         let response = await fetch(runForm.action, {
           method: "POST",
@@ -827,7 +840,7 @@
       } finally {
         submitBtn.disabled = false;
       }
-    });
+    }
   })();
 </script>
 {% endblock %}

@@ -1653,6 +1653,11 @@ def preview_dataset(dataset: list[dict]) -> dict:
     return {"rows": dataset, "total_count": len(dataset), "match_count": len(dataset)}
 
 
+def commit_dataset_to_postgres(dataset: list[dict], postgres_db: str, table_name: str) -> dict:
+    """Insert the orchestrator dataset rows into the selected table.
+    Returns {"ok": bool, "inserted": int, "message": str}."""
+    pass
+
 def orchestrate_import_preview(file_path, sheet_name, context: dict) -> dict:
     """
     Runs: match_headers -> check_required_columns (abort if missing)

@@ -39,10 +39,12 @@
         <span class="tile-title">Ledger Report</span>
         <span class="tile-subtitle">Choose a fiscal year and source account; raw transaction list</span>
       </a>
-      <a class="tile-link" href="{% url 'data_excel_import' %}">
-        <span class="tile-title">Upload data (Excel → PostgreSQL)</span>
-        <span class="tile-subtitle">Match table and column names; import selected columns; long text truncated</span>
+
+      <a class="tile-link" href="{% url 'bank_transactions_import' %}">
+        <span class="tile-title">Import</span>
+        <span class="tile-subtitle">Import transactions from Excel/CSV into Bank Transactions Source</span>
       </a>
+
     </nav>
       <p class="muted"><a href="{% url 'gl_hub' %}">← Back to GL</a></p>
   </section>

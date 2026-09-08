@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .forms import BankTransactionSourceObForm, FbForm, SourceBankCashAcForm
 from .models import (
@@ -20,6 +24,7 @@ from .services.extract_closing_balance import (
     extract_closing_balances_for_months,
 )
 from .services.summary_report import build_summary_report, calendar_months_in_fiscal_year
+from .services.import_into_bank_transactions_source import orchestrate_import_preview
 
 
 @login_required
@@ -626,4 +631,35 @@ def bank_transactions_source_ob_edit(request, pk):
     ob = get_object_or_404(BankTransactionSourceOb, pk=pk)
     return _bank_transactions_source_ob_form_view(request, instance=ob)
 
+
+
+@login_required
+def bank_transactions_import(request):
+    return render(request, "bank_transactions/bank_transactions_import.html", {})
+
+
+@login_required
+@require_POST
+def bank_transactions_import_preview_json(request):
+    raw = request.session.get("data_excel_import_path", "") or (
+        request.POST.get("excel_path") or ""
+    ).strip()
+    sheet_name = (request.POST.get("sheet_name") or "").strip()
+
+    if not raw:
+        return JsonResponse({"ok": False, "stage": "input", "message": "No file selected."}, status=400)
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        return JsonResponse({"ok": False, "stage": "input", "message": "File not found."}, status=400)
+
+    context = {"file_path": str(path), "sheet_name": sheet_name}
+
+    try:
+        result = orchestrate_import_preview(path, sheet_name, context)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"}, status=400)
+
+    if not result.get("ok"):
+        return JsonResponse(result, status=400)
+    return JsonResponse(result)
 

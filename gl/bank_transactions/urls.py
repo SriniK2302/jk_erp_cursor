@@ -34,4 +34,6 @@ urlpatterns = [
     path("fbs/", views.bank_transactions_fbs, name="bank_transactions_fbs"),
     path("fbs/new/", views.bank_transactions_fb_create, name="bank_transactions_fb_create"),
     path("fbs/<int:pk>/edit/", views.bank_transactions_fb_edit, name="bank_transactions_fb_edit"),
+    path("import/", views.bank_transactions_import, name="bank_transactions_import"),
+    path("import/preview/", views.bank_transactions_import_preview_json, name="bank_transactions_import_preview_json"),
 ]
