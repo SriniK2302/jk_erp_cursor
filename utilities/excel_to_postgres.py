@@ -28,31 +28,11 @@ from psycopg import sql
 
 from utilities.pg_row_delete import connect_with_params
 
-
 EXCEL_FILETYPES = [
     ("Excel and CSV files", "*.xlsx *.xlsm *.xltx *.xltm *.csv"),
     ("Excel workbooks", "*.xlsx *.xlsm *.xltx *.xltm"),
     ("CSV files", "*.csv"),
     ("All files", "*.*"),
-]
-
-HEADER_TRANSLATORS = {
-    "tran_date": ["tran date", "tran dt", "transaction date", "txn date", "date"],
-    "value_date": ["value date", "value dt"],
-    "narration": ["narration", "description", "particulars", "transaction remarks", "remarks"],
-    "reference": ["chq", "cheque", "ref no", "reference", "chq / ref no", "chq/ref no", "utr", "chq no"],
-    "debit": ["withdrawal", "withdrawals", "withdrawl", "debit"],
-    "credit": ["deposit", "deposits", "credit"],
-    "closing_balance": ["balance", "closing balance"],
-}
-
-DATE_FORMAT_TRANSLATORS = [
-    "%d/%m/%Y",
-    "%d-%m-%Y",
-    "%d-%b-%Y",
-    "%d-%b-%y",
-    "%d/%m/%y",
-    "%d-%m-%y",
 ]
 
 # Synthetic single "sheet" name used for CSV files (which have no sheets).
@@ -1603,105 +1583,3 @@ def create_public_table_from_schema_sheet(
         "database": dbname,
         "columns": [[c, t] for c, t in columns],
     }
-
-def match_headers(headers: list[str]) -> dict:
-    """Map raw file headers to canonical columns using HEADER_TRANSLATORS.
-    Returns {canonical_name: matched_header_or_None}."""
-    pass
-
-
-def check_required_columns(column_map: dict) -> list[str]:
-    """Return list of missing canonical column names, or [] if all found."""
-    pass
-
-
-def derive_source_ac(context: dict) -> str:
-    """Derive source_ac from the given clue (e.g. selected file/account
-    context), not from the input file rows."""
-    pass
-
-
-def validate_source_ac(source_ac: str) -> bool:
-    """Check source_ac exists in the Source Accounts master table."""
-    pass
-
-
-def build_dataset(rows: list[dict], column_map: dict, source_ac: str) -> list[dict]:
-    """Build the final row dataset: parsed dates, value_date fallback,
-    source_ac attached to every row."""
-    pass
-
-
-def preview_dataset(dataset: list[dict]) -> dict:
-    """Return preview-ready structure: full row list + match count summary."""
-    pass
-
-
-def import_dataset_to_postgres(dataset: list[dict], postgres_db: str, table_name: str) -> dict:
-    """Insert dataset into PostgreSQL. Called only after user confirms."""
-    pass
-
-
-def orchestrate_import_preview(file_path, sheet_name, context: dict) -> dict:
-    """
-    Runs: match_headers -> check_required_columns (abort if missing)
-    -> derive_source_ac -> validate_source_ac (abort if invalid)
-    -> build_dataset -> preview_dataset.
-    Returns preview + match count for user decision (proceed/abandon).
-    Does NOT write to postgres.
-    """
-    pass
-
-def orchestrate_import_preview(file_path, sheet_name, context: dict) -> dict:
-    """
-    Runs the full preview pipeline. Returns a dict:
-      {"ok": True, "rows": [...], "match_count": int, "total_count": int}
-      or
-      {"ok": False, "stage": str, "message": str}
-    Aborts at the first stage that fails.
-    """
-    headers = None  # TODO: load headers from file_path/sheet_name
-
-    column_map = match_headers(headers)
-    missing = check_required_columns(column_map)
-    if missing:
-        return {
-            "ok": False,
-            "stage": "check_required_columns",
-            "message": f"Missing required columns: {', '.join(missing)}",
-        }
-
-    source_ac = derive_source_ac(context)
-    if not source_ac:
-        return {
-            "ok": False,
-            "stage": "derive_source_ac",
-            "message": "Could not derive source account from the given context.",
-        }
-
-    if not validate_source_ac(source_ac):
-        return {
-            "ok": False,
-            "stage": "validate_source_ac",
-            "message": f"Source account '{source_ac}' not found in master.",
-        }
-
-    rows = None  # TODO: load raw rows from file_path/sheet_name
-
-    dataset = build_dataset(rows, column_map, source_ac)
-    if dataset is None:
-        return {
-            "ok": False,
-            "stage": "build_dataset",
-            "message": "Failed to build dataset from matched columns.",
-        }
-
-    preview = preview_dataset(dataset)
-    if preview is None:
-        return {
-            "ok": False,
-            "stage": "preview_dataset",
-            "message": "Failed to generate preview.",
-        }
-
-    return {"ok": True, **preview}

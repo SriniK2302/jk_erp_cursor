@@ -102,6 +102,18 @@ urlpatterns = [
     ),
 
     path(
+        'data-utilities/excel-import/orchestrator-preview/',
+        views.excel_import_orchestrator_preview_json,
+        name='excel_import_orchestrator_preview_json',
+    ),
+
+    path(
+        'data-utilities/excel-import/orchestrator-preview/',
+        views.excel_import_orchestrator_preview_json,
+        name='excel_import_orchestrator_preview_json',
+    ),
+
+    path(
         'data-utilities/excel-import/match-report/',
         views.excel_import_match_report,
         name='excel_import_match_report',
