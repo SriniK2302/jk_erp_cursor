@@ -24,7 +24,7 @@ from .services.extract_closing_balance import (
     extract_closing_balances_for_months,
 )
 from .services.summary_report import build_summary_report, calendar_months_in_fiscal_year
-from .services.import_into_bank_transactions_source import orchestrate_import_preview
+from .services.import_into_bank_transactions_source import orchestrate_import_preview, commit_dataset_to_postgres
 
 
 @login_required
@@ -635,8 +635,28 @@ def bank_transactions_source_ob_edit(request, pk):
 
 @login_required
 def bank_transactions_import(request):
-    return render(request, "bank_transactions/bank_transactions_import.html", {})
+    return render(request, "bank_transactions/bank_transactions_import.html", {
+        "excel_path": request.session.get("data_excel_import_path", ""),
+    })
 
+
+@login_required
+def bank_transactions_import_choose_file(request):
+    from utilities.doc_to_postgres import choose_doc_file
+
+    try:
+        path = choose_doc_file()
+    except RuntimeError:
+        messages.error(request, "Could not open file picker. Run on a machine with desktop access.")
+        return redirect("bank_transactions_import")
+
+    if path is None:
+        messages.info(request, "File selection cancelled.")
+        return redirect("bank_transactions_import")
+
+    request.session["data_excel_import_path"] = str(path.resolve())
+    messages.success(request, f"Selected: {path.name}")
+    return redirect("bank_transactions_import")
 
 @login_required
 @require_POST
@@ -659,7 +679,36 @@ def bank_transactions_import_preview_json(request):
     except Exception as exc:
         return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"}, status=400)
 
-    if not result.get("ok"):
-        return JsonResponse(result, status=400)
-    return JsonResponse(result)
+        if not result.get("ok"):
+            return JsonResponse(result, status=400)
+        return JsonResponse(result)
+
+    @login_required
+    @require_POST
+    def bank_transactions_import_commit_json(request):
+        raw = request.session.get("data_excel_import_path", "")
+        sheet_name = (request.POST.get("sheet_name") or "").strip()
+
+        if not raw:
+            return JsonResponse({"ok": False, "stage": "input", "message": "No file selected."}, status=400)
+        path = Path(raw).expanduser()
+        if not path.is_file():
+            return JsonResponse({"ok": False, "stage": "input", "message": "File not found."}, status=400)
+
+        context = {"file_path": str(path), "sheet_name": sheet_name}
+
+        try:
+            preview = orchestrate_import_preview(path, sheet_name, context)
+        except Exception as exc:
+            return JsonResponse({"ok": False, "stage": "orchestrator", "message": f"{type(exc).__name__}: {exc}"},
+                                status=400)
+
+        if not preview.get("ok"):
+            return JsonResponse(preview, status=400)
+
+        result = commit_dataset_to_postgres(preview["rows"])
+        if not result.get("ok"):
+            return JsonResponse({"ok": False, "stage": "commit", "message": result["message"]}, status=400)
+        return JsonResponse(
+            {"ok": True, "stage": "commit", "message": result["message"], "inserted": result["inserted"]})
 

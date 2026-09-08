@@ -9,8 +9,8 @@ from gl.bank_transactions.models import SourceBankCashAc
 
 
 HEADER_TRANSLATORS = {
-    "tran_date": ["tran date", "tran dt", "transaction date", "txn date", "date"],
-    "value_date": ["value date", "value dt"],
+    "tran_date": ["tran date", "tran_date", "tran dt", "transaction date", "txn date", "date"],
+    "value_date": ["value date", "value_date", "value dt"],
     "narration": ["narration", "description", "particulars", "transaction remarks", "remarks"],
     "reference": ["chq", "cheque", "ref no", "reference", "chq / ref no", "chq/ref no", "utr", "chq no"],
     "debit": ["withdrawal", "withdrawals", "withdrawl", "debit", "debit amt"],
@@ -75,10 +75,32 @@ def preview_dataset(dataset: list[dict]) -> dict:
     return {"rows": dataset, "total_count": len(dataset), "match_count": len(dataset)}
 
 
-def commit_dataset_to_postgres(dataset: list[dict], postgres_db: str, table_name: str) -> dict:
-    """Insert the orchestrator dataset rows into the selected table.
-    Returns {"ok": bool, "inserted": int, "message": str}."""
-    pass
+def commit_dataset_to_postgres(dataset: list[dict]) -> dict:
+    """Insert the orchestrator dataset rows into BankTransactionSource.
+    All rows insert, or none (atomic). Returns {"ok": bool, "inserted": int, "message": str}."""
+    from django.db import transaction
+    from gl.bank_transactions.models import BankTransactionSource
+
+    try:
+        with transaction.atomic():
+            objs = [
+                BankTransactionSource(
+                    source_ac_id=row["source_ac"],
+                    tran_date=row["tran_date"],
+                    value_date=row["value_date"],
+                    narration=row["narration"],
+                    debit=row["debit"] or None,
+                    credit=row["credit"] or None,
+                    reference=row["reference"],
+                    closing_balance=row["closing_balance"] or None,
+                )
+                for row in dataset
+            ]
+            BankTransactionSource.objects.bulk_create(objs)
+    except Exception as exc:
+        return {"ok": False, "inserted": 0, "message": f"{type(exc).__name__}: {exc}"}
+
+    return {"ok": True, "inserted": len(dataset), "message": f"Inserted {len(dataset)} row(s)."}
 
 
 def orchestrate_import_preview(file_path, sheet_name, context: dict) -> dict:

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Import · Bank Transactions Source · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Import into Bank Transactions Source</h1>
+      <p class="muted">Select a workbook and sheet. Columns are matched automatically (tran date, value date, narration, debit, credit, reference, closing balance, source AC).</p>
+    </header>
+
+    <div class="utility-form-stack">
+      <div class="utility-field-row">
+        <label for="bti-path" class="muted utility-label">Workbook path</label>
+        <div class="utility-field-row__grow">
+          <input id="bti-path" type="text" class="utility-input" value="{{ excel_path }}" readonly>
+          <a class="button button-compact button-secondary" href="{% url 'bank_transactions_import_choose_file' %}">Select File</a>
+        </div>
+      </div>
+
+      <div class="utility-field-row">
+        <label for="bti-sheet-select" class="muted utility-label">Sheet</label>
+        <div class="utility-field-row__grow">
+          <select id="bti-sheet-select" class="utility-input">
+            <option value="">— Load sheets first —</option>
+          </select>
+          <button type="button" id="bti-load-sheets-btn" class="button button-compact button-secondary">Load sheets</button>
+        </div>
+      </div>
+
+      <button type="button" id="bti-preview-btn" class="button button-compact">Preview import</button>
+
+      <div id="bti-preview-wrap" class="excel-import-match-report-wrap" hidden></div>
+
+      <button type="button" id="bti-commit-btn" class="button button-compact" hidden>Proceed with import</button>
+
+      <p class="muted" id="bti-commit-result" aria-live="polite"></p>
+    </div>
+
+    <p class="muted"><a href="{% url 'bank_transactions_hub' %}">← Back to Bank Transactions Source</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const sheetSelect = document.getElementById("bti-sheet-select");
+    const loadSheetsBtn = document.getElementById("bti-load-sheets-btn");
+    const previewBtn = document.getElementById("bti-preview-btn");
+    const previewWrap = document.getElementById("bti-preview-wrap");
+    const commitBtn = document.getElementById("bti-commit-btn");
+    const commitResult = document.getElementById("bti-commit-result");
+
+
+    function getCsrfToken() {
+      const match = document.cookie.match(/csrftoken=([^;]+)/);
+      return match ? match[1] : "";
+    }
+
+    function escapeHtmlCell(text) {
+      if (text === null || text === undefined) {
+        return "";
+      }
+      const div = document.createElement("div");
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
+    loadSheetsBtn.addEventListener("click", async function () {
+      loadSheetsBtn.disabled = true;
+      try {
+        const res = await fetch("{% url 'excel_import_sheets_json' %}", {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not load sheets.");
+        }
+        sheetSelect.innerHTML = "";
+        const opt0 = document.createElement("option");
+        opt0.value = "";
+        opt0.textContent = "— Choose a sheet —";
+        sheetSelect.appendChild(opt0);
+        (data.sheets || []).forEach(function (name) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          sheetSelect.appendChild(opt);
+        });
+        if ((data.sheets || []).length === 1) {
+          sheetSelect.selectedIndex = 1;
+        }
+      } catch (e) {
+        alert(e.message || "Failed to load sheets.");
+      } finally {
+        loadSheetsBtn.disabled = false;
+      }
+    });
+
+    previewBtn.addEventListener("click", async function () {
+      if (!sheetSelect.value) {
+        alert("Select a sheet first.");
+        return;
+      }
+      previewBtn.disabled = true;
+      previewWrap.hidden = false;
+      previewWrap.innerHTML = '<p class="muted">Running preview…</p>';
+      try {
+        const formData = new FormData();
+        formData.append("sheet_name", sheetSelect.value);
+        const res = await fetch("{% url 'bank_transactions_import_preview_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const payload = await res.json();
+        if (!payload.ok) {
+          previewWrap.innerHTML =
+            '<p class="field-error">Stage: ' + escapeHtmlCell(payload.stage) +
+            ' — ' + escapeHtmlCell(payload.message) + '</p>';
+          return;
+        }
+
+        const cm = payload.column_map || {};
+        const expected = Object.keys(cm);
+        const found = expected.filter(k => cm[k]);
+        const missing = expected.filter(k => !cm[k]);
+        const rows = payload.rows || [];
+
+        let html = '<h2 class="excel-import-report-heading">Preview</h2>';
+        html += '<p class="excel-import-report-summary">Stage: ' + escapeHtmlCell(payload.stage) +
+          ' — ' + escapeHtmlCell(payload.message) + '</p>';
+        html += '<p class="muted">Columns expected: ' + expected.join(", ") + '<br>' +
+          'Columns found: ' + found.map(k => k + " -> " + cm[k]).join(", ") + '<br>' +
+          'Missing: ' + (missing.length ? missing.join(", ") : "none") + '</p>';
+        html += '<p class="muted">Total rows: ' + (payload.total_count || 0) +
+          ' — Matched: ' + (payload.match_count || 0) + '</p>';
+
+        if (rows.length) {
+          const cols = Object.keys(rows[0]);
+          let head = "<thead><tr>" + cols.map(c => "<th>" + escapeHtmlCell(c) + "</th>").join("") + "</tr></thead>";
+          let body = rows.map(function (r) {
+            return "<tr>" + cols.map(c => "<td>" + escapeHtmlCell(r[c]) + "</td>").join("") + "</tr>";
+          }).join("");
+          html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">' + head + "<tbody>" + body + "</tbody></table></div>";
+        }
+
+        previewWrap.innerHTML = html;
+        commitBtn.hidden = false;
+      } catch (e) {
+        previewWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Preview request failed.") + '</p>';
+        commitBtn.hidden = true;
+      } finally {
+        previewBtn.disabled = false;
+      }
+    });
+
+    commitBtn.addEventListener("click", async function () {
+      if (!sheetSelect.value) {
+        alert("Select a sheet first.");
+        return;
+      }
+      commitBtn.disabled = true;
+      commitResult.textContent = "Importing…";
+      try {
+        const formData = new FormData();
+        formData.append("sheet_name", sheetSelect.value);
+        const res = await fetch("{% url 'bank_transactions_import_commit_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": getCsrfToken()
+          }
+        });
+        const payload = await res.json();
+        if (!payload.ok) {
+          commitResult.textContent = "Failed at stage '" + payload.stage + "': " + payload.message;
+          return;
+        }
+        commitResult.textContent = payload.message;
+        commitBtn.hidden = true;
+      } catch (e) {
+        commitResult.textContent = "Import request failed: " + (e.message || e);
+      } finally {
+        commitBtn.disabled = false;
+      }
+    });
+  })();
+
+</script>
+{% endblock %}
+
