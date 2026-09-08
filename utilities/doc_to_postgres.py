@@ -10,9 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 DOC_FILETYPES = [
-    ("PDF files", "*.pdf"),
     ("CSV files", "*.csv"),
     ("Excel workbooks", "*.xlsx *.xlsm *.xltx *.xltm *.xls"),
+    ("PDF files", "*.pdf"),
     ("All files", "*.*"),
 ]
 

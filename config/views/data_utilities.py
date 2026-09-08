@@ -16,8 +16,6 @@ from .utility_jobs import (
     _excel_import_mapping_warning,
 )
 from utilities.doc_to_postgres import choose_doc_file
-from utilities.pdf_to_postgres import find_header_row
-from utilities.pdf_to_postgres import find_header_row, extract_transactions
 
 
 def data_utilities(request):
@@ -794,24 +792,4 @@ def pg_row_delete_execute(request):
             ),
         }
     )
-
-@login_required
-@require_GET
-def excel_import_preview_json(request):
-    raw = request.session.get("data_excel_import_path", "")
-    if not raw:
-        return JsonResponse({"ok": False, "message": "No file selected."}, status=400)
-    path = Path(raw).expanduser()
-    if not path.is_file():
-        return JsonResponse({"ok": False, "message": "File not found."}, status=400)
-    if path.suffix.lower() != ".pdf":
-        return JsonResponse({"ok": False, "message": "Preview only supports PDF files for now."}, status=400)
-    try:
-        rows = extract_transactions(path)
-    except ValueError as exc:
-        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
-    except Exception as exc:
-        return JsonResponse({"ok": False, "message": f"{type(exc).__name__}: {exc}" if str(exc) else f"{type(exc).__name__} (no message) — file may be password-protected"}, status=400)
-    return JsonResponse({"ok": True, "rows": rows})
-
 
