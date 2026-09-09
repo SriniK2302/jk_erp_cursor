@@ -76,16 +76,16 @@ def gmail_accounts(request):
                 with open(dest_path, "wb") as f:
                     for chunk in uploaded.chunks():
                         f.write(chunk)
-                        set_credentials_path(email, str(dest_path))
-                        messages.success(request, f"Credentials set for '{email}'.")
-                elif action == "connect":
-                email = (request.POST.get("email") or "").strip()
-                try:
-                    connect_account(email)
-                    messages.success(request, f"Connected '{email}'.")
-                except Exception as exc:
-                    messages.error(request, f"Could not connect '{email}': {exc}")
-            return redirect("gmail_accounts")
+                set_credentials_path(email, str(dest_path))
+                messages.success(request, f"Credentials set for '{email}'.")
+        elif action == "connect":
+            email = (request.POST.get("email") or "").strip()
+            try:
+                connect_account(email)
+                messages.success(request, f"Connected '{email}'.")
+            except Exception as exc:
+                messages.error(request, f"Could not connect '{email}': {exc}")
+        return redirect("gmail_accounts")
 
     return render(request, "gmail_accounts.html", {"accounts": load_accounts()})
 
@@ -464,9 +464,10 @@ def bank_transactions_import_commit_json(request):
     result = commit_dataset_to_postgres(preview["rows"])
     if not result.get("ok"):
         return JsonResponse({"ok": False, "stage": "commit", "message": result["message"]}, status=400)
-    return (JsonResponse({"ok": True, "stage": "commit", "message": result["message"], "inserted": result["inserted"]})
+    return JsonResponse({"ok": True, "stage": "commit", "message": result["message"], "inserted": result["inserted"]})
 
-@login_required)
+
+@login_required
 @require_POST
 def excel_import_match_report(request):
     """Return Excel Γåö PostgreSQL column mapping and types without importing."""
@@ -913,4 +914,3 @@ def pg_row_delete_execute(request):
             ),
         }
     )
-

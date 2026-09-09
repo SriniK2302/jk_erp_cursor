@@ -26,6 +26,19 @@
         <tr>
           <td>{{ account.email }}</td>
           <td>
+            {% if account.credentials_path %}
+              Set
+            {% else %}
+              <form method="post" enctype="multipart/form-data" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_credentials">
+                <input type="hidden" name="email" value="{{ account.email }}">
+                <input type="file" name="credentials_file" accept=".json" required>
+                <button type="submit" class="link-button">Upload</button>
+              </form>
+            {% endif %}
+          </td>
+          <td>
             {% if account.token_path %}
               Yes
             {% else %}
@@ -47,7 +60,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3" class="muted">No accounts added yet.</td></tr>
+        <tr><td colspan="4" class="muted">No accounts added yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
