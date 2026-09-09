@@ -46,7 +46,6 @@ def gmail_accounts(request):
     if not _has_module_access(request.user, MODULE_TOOLS):
         raise PermissionDenied("Admin only.")
 
-    from utilities.gmail_accounts_store import load_accounts, add_account, remove_account
     from utilities.gmail_accounts_store import load_accounts, add_account, remove_account, set_credentials_path
 
     if request.method == "POST":
@@ -58,24 +57,28 @@ def gmail_accounts(request):
             else:
                 add_account(email)
                 messages.success(request, f"Added account '{email}'.")
-                elif action == "set_credentials":
-                email = (request.POST.get("email") or "").strip()
-                uploaded = request.FILES.get("credentials_file")
-                if not uploaded:
-                    messages.error(request, "Choose a credentials.json file first.")
-                else:
-                    from pathlib import Path
+        elif action == "remove":
+            email = (request.POST.get("email") or "").strip()
+            remove_account(email)
+            messages.success(request, f"Removed account '{email}'.")
+        elif action == "set_credentials":
+            email = (request.POST.get("email") or "").strip()
+            uploaded = request.FILES.get("credentials_file")
+            if not uploaded:
+                messages.error(request, "Choose a credentials.json file first.")
+            else:
+                from pathlib import Path
 
-                    dest_dir = Path(settings.MEDIA_ROOT) / "gmail_accounts" / "credentials"
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                    safe_name = email.replace("@", "_at_").replace(".", "_") + ".json"
-                    dest_path = dest_dir / safe_name
-                    with open(dest_path, "wb") as f:
-                        for chunk in uploaded.chunks():
-                            f.write(chunk)
-                    set_credentials_path(email, str(dest_path))
-                    messages.success(request, f"Credentials set for '{email}'.")
-                return redirect("gmail_accounts")
+                dest_dir = Path(settings.MEDIA_ROOT) / "gmail_accounts" / "credentials"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                safe_name = email.replace("@", "_at_").replace(".", "_") + ".json"
+                dest_path = dest_dir / safe_name
+                with open(dest_path, "wb") as f:
+                    for chunk in uploaded.chunks():
+                        f.write(chunk)
+                set_credentials_path(email, str(dest_path))
+                messages.success(request, f"Credentials set for '{email}'.")
+        return redirect("gmail_accounts")
 
     return render(request, "gmail_accounts.html", {"accounts": load_accounts()})
 
