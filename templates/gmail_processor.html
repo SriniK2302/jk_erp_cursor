@@ -10,7 +10,16 @@
       <p class="muted">Download attachments from matching emails.</p>
     </header>
 
-    <p class="muted">Setup pending — Gmail API credentials not yet configured.</p>
+    <nav class="tile-grid" aria-label="Gmail Processor">
+      <a class="tile-link" href="{% url 'gmail_accounts' %}">
+        <span class="tile-title">Gmail Accounts</span>
+        <span class="tile-subtitle">Add and manage Gmail accounts</span>
+      </a>
+      <a class="tile-link" href="{% url 'gmail_process' %}">
+        <span class="tile-title">Process Gmails</span>
+        <span class="tile-subtitle">Search and download attachments</span>
+      </a>
+    </nav>
 
     <p class="muted"><a href="{% url 'tools_utilities' %}">← Back to Tools & utilities</a></p>
   </section>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Gmail Accounts · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Gmail Accounts</h1>
+      <p class="muted">Manage Gmail accounts used for attachment processing.</p>
+    </header>
+
+    <form method="post" class="utility-form-inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+      <input type="text" name="label" class="utility-input" placeholder="Label (e.g. Main Office)" required>
+      <input type="email" name="email" class="utility-input" placeholder="Email address" required>
+      <button type="submit" class="button button-compact">Add Account</button>
+    </form>
+
+    <table class="data-grid">
+      <thead>
+        <tr><th>Label</th><th>Email</th><th>Credentials</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for account in accounts %}
+        <tr>
+          <td>{{ account.label }}</td>
+          <td>{{ account.email }}</td>
+          <td>{% if account.credentials_path %}Set{% else %}Not set{% endif %}</td>
+          <td>
+            <form method="post" class="inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="label" value="{{ account.label }}">
+              <button type="submit" class="link-button">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="muted">No accounts added yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p class="muted"><a href="{% url 'gmail_processor' %}">← Back to Gmail Processor</a></p>
+  </section>
+</div>
+{% endblock %}

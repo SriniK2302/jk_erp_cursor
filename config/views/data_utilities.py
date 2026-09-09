@@ -45,7 +45,25 @@ def gmail_processor(request):
 def gmail_accounts(request):
     if not _has_module_access(request.user, MODULE_TOOLS):
         raise PermissionDenied("Admin only.")
-    return render(request, "gmail_accounts.html")
+
+    from utilities.gmail_accounts_store import load_accounts, add_account, remove_account
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "add":
+            email = (request.POST.get("email") or "").strip()
+            if not email:
+                messages.error(request, "Email is required.")
+            else:
+                add_account(email)
+                messages.success(request, f"Added account '{email}'.")
+        elif action == "remove":
+            email = (request.POST.get("email") or "").strip()
+            remove_account(email)
+            messages.success(request, f"Removed account '{email}'.")
+            return redirect("gmail_accounts")
+
+    return render(request, "gmail_accounts.html", {"accounts": load_accounts()})
 
 
 @login_required
