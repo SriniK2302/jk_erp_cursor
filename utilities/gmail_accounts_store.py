@@ -39,3 +39,14 @@ def remove_account(email: str) -> None:
     accounts = load_accounts()
     accounts = [a for a in accounts if a["email"] != email]
     save_accounts(accounts)
+
+
+
+def set_credentials_path(email: str, path: str) -> None:
+    accounts = load_accounts()
+    for a in accounts:
+        if a["email"] == email:
+            a["credentials_path"] = path
+            break
+    save_accounts(accounts)
+
