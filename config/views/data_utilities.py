@@ -32,6 +32,28 @@ def tools_utilities(request):
     return render(request, "tools_utilities.html")
 
 
+
+
+@login_required
+def gmail_processor(request):
+    if not _has_module_access(request.user, MODULE_TOOLS):
+        raise PermissionDenied("Admin only.")
+    return render(request, "gmail_processor.html")
+
+
+@login_required
+def gmail_accounts(request):
+    if not _has_module_access(request.user, MODULE_TOOLS):
+        raise PermissionDenied("Admin only.")
+    return render(request, "gmail_accounts.html")
+
+
+@login_required
+def gmail_process(request):
+    if not _has_module_access(request.user, MODULE_TOOLS):
+        raise PermissionDenied("Admin only.")
+    return render(request, "gmail_process.html")
+
 @login_required
 def data_analysis(request):
     d = settings.DATABASES["default"]

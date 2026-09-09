@@ -44,6 +44,10 @@ urlpatterns = [
     ),
     path('data-utilities/', views.data_utilities, name='data_utilities'),
     path('tools-utilities/', views.tools_utilities, name='tools_utilities'),
+    path('gmail-processor/', views.gmail_processor, name='gmail_processor'),
+    path('gmail-processor/accounts/', views.gmail_accounts, name='gmail_accounts'),
+    path('gmail-processor/process/', views.gmail_process, name='gmail_process'),
+
     path(
         'data-utilities/data-analysis/',
         views.data_analysis,
