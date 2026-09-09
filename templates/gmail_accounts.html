@@ -19,22 +19,21 @@
 
     <table class="data-grid">
       <thead>
-        <tr><th>Email</th><th>Credentials</th><th></th></tr>
+        <tr><th>Email</th><th>Credentials</th><th>Connected</th><th></th></tr>
       </thead>
       <tbody>
         {% for account in accounts %}
         <tr>
           <td>{{ account.email }}</td>
           <td>
-            {% if account.credentials_path %}
-              Set
+            {% if account.token_path %}
+              Yes
             {% else %}
-              <form method="post" enctype="multipart/form-data" class="inline-form">
+              <form method="post" class="inline-form">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="set_credentials">
+                <input type="hidden" name="action" value="connect">
                 <input type="hidden" name="email" value="{{ account.email }}">
-                <input type="file" name="credentials_file" accept=".json" required>
-                <button type="submit" class="link-button">Upload</button>
+                <button type="submit" class="link-button" {% if not account.credentials_path %}disabled{% endif %}>Connect</button>
               </form>
             {% endif %}
           </td>
@@ -57,3 +56,4 @@
   </section>
 </div>
 {% endblock %}
+

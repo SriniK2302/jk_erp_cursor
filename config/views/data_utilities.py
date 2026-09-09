@@ -46,7 +46,7 @@ def gmail_accounts(request):
     if not _has_module_access(request.user, MODULE_TOOLS):
         raise PermissionDenied("Admin only.")
 
-    from utilities.gmail_accounts_store import load_accounts, add_account, remove_account, set_credentials_path
+    from utilities.gmail_accounts_store import load_accounts, add_account, remove_account, set_credentials_path, connect_account
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -76,9 +76,16 @@ def gmail_accounts(request):
                 with open(dest_path, "wb") as f:
                     for chunk in uploaded.chunks():
                         f.write(chunk)
-                set_credentials_path(email, str(dest_path))
-                messages.success(request, f"Credentials set for '{email}'.")
-        return redirect("gmail_accounts")
+                        set_credentials_path(email, str(dest_path))
+                        messages.success(request, f"Credentials set for '{email}'.")
+                elif action == "connect":
+                email = (request.POST.get("email") or "").strip()
+                try:
+                    connect_account(email)
+                    messages.success(request, f"Connected '{email}'.")
+                except Exception as exc:
+                    messages.error(request, f"Could not connect '{email}': {exc}")
+            return redirect("gmail_accounts")
 
     return render(request, "gmail_accounts.html", {"accounts": load_accounts()})
 
