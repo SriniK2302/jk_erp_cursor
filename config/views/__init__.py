@@ -34,7 +34,8 @@ from .data_utilities import (
     gmail_process,
     gmail_process_labels_json,
     gmail_process_search_json,
-
+    gmail_process_search_status_json,
+    gmail_process_unique_subjects_json,
 )
 from .home import admin_technical_data_flow, home, setup
 from .server_environment import setup_server_environment

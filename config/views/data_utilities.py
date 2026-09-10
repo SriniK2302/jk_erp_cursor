@@ -98,7 +98,14 @@ def gmail_process(request):
     from utilities.gmail_accounts_store import load_accounts
 
     accounts = [a for a in load_accounts() if a.get("token_path")]
-    return render(request, "gmail_process.html", {"accounts": accounts})
+    return render(request, "gmail_process.html", {
+        "accounts": accounts,
+        "initial_email": request.session.get("gmail_process_email", ""),
+        "initial_label_id": request.session.get("gmail_process_label_id", ""),
+        "initial_scope": request.session.get("gmail_process_scope", "subject"),
+        "initial_keywords": request.session.get("gmail_process_keywords", ""),
+        "initial_has_attachment": request.session.get("gmail_process_has_attachment", False),
+    })
 
 
 @login_required
@@ -127,18 +134,59 @@ def gmail_process_search_json(request):
     keywords = (request.GET.get("keywords") or "").strip()
     has_attachment = (request.GET.get("has_attachment") or "") == "1"
 
+    request.session["gmail_process_email"] = email
+    request.session["gmail_process_label_id"] = label_id
+    request.session["gmail_process_scope"] = scope
+    request.session["gmail_process_keywords"] = keywords
+    request.session["gmail_process_has_attachment"] = has_attachment
+
     if not email:
         return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
     if not keywords:
         return JsonResponse({"ok": False, "message": "Enter at least one keyword."}, status=400)
 
-    from utilities.gmail_service import search_messages
+    from utilities.gmail_search_jobs import start_search_job
 
-    try:
-        results = search_messages(email, label_id, scope, keywords, has_attachment)
-    except Exception as exc:
-        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
-    return JsonResponse({"ok": True, "results": results})
+    job_id = start_search_job(email, label_id, scope, keywords, has_attachment)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
+@login_required
+@require_GET
+def gmail_process_unique_subjects_json(request):
+    email = (request.GET.get("email") or "").strip()
+    label_id = (request.GET.get("label_id") or "").strip()
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+
+    from utilities.gmail_search_jobs import start_unique_subjects_job
+
+    job_id = start_unique_subjects_job(email, label_id)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
+
+@login_required
+@require_GET
+def gmail_process_search_status_json(request, job_id):
+    from utilities.gmail_search_jobs import get_job_status
+
+    job = get_job_status(job_id)
+    if not job:
+        return JsonResponse({"ok": False, "message": "Job not found."}, status=404)
+
+    payload = {
+        "ok": True,
+        "done": job["done"],
+        "current": job["current"],
+        "total": job["total"],
+        "message": job["message"],
+    }
+    if job.get("error"):
+        payload["error"] = job["error"]
+    if job.get("result") is not None:
+        payload["results"] = job["result"]
+    return JsonResponse(payload)
+
 
 @login_required
 def data_analysis(request):

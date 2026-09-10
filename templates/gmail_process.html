@@ -16,7 +16,7 @@
         <select id="gp-account-select" class="utility-input">
           <option value="">— Choose an account —</option>
           {% for account in accounts %}
-          <option value="{{ account.email }}">{{ account.email }}</option>
+          <option value="{{ account.email }}" {% if account.email == initial_email %}selected{% endif %}>{{ account.email }}</option>
           {% endfor %}
         </select>
       </div>
@@ -35,9 +35,9 @@
       <label for="gp-scope-select" class="muted utility-label">Search in</label>
       <div class="utility-field-row__grow">
         <select id="gp-scope-select" class="utility-input">
-          <option value="subject">Subject</option>
-          <option value="from">From</option>
-          <option value="body">Body</option>
+          <option value="subject" {% if initial_scope == "subject" %}selected{% endif %}>Subject</option>
+          <option value="from" {% if initial_scope == "from" %}selected{% endif %}>From</option>
+          <option value="body" {% if initial_scope == "body" %}selected{% endif %}>Body</option>
         </select>
       </div>
     </div>
@@ -45,10 +45,19 @@
     <div class="utility-field-row">
       <label for="gp-keyword-input" class="muted utility-label">Keywords</label>
       <div class="utility-field-row__grow">
-        <input id="gp-keyword-input" type="text" class="utility-input" placeholder="e.g. invoice+March (use + for AND)">
-        <label><input type="checkbox" id="gp-has-attachment"> Has attachment</label>
+        <input id="gp-keyword-input" type="text" class="utility-input" placeholder="e.g. invoice+March (use + for AND)" value="{{ initial_keywords }}">
+        <label><input type="checkbox" id="gp-has-attachment" {% if initial_has_attachment %}checked{% endif %}> Has attachment</label>
         <button type="button" id="gp-search-btn" class="button button-compact button-secondary">Search</button>
+        <button type="button" id="gp-unique-subjects-btn" class="button button-compact button-secondary">Show unique subjects (label)</button>
+
       </div>
+    </div>
+
+    <div id="gp-progress-wrap" class="utility-progress-wrap" hidden>
+      <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="gp-progress-track">
+        <div id="gp-progress-bar" class="utility-progress-bar"></div>
+      </div>
+      <p class="muted utility-progress-text" id="gp-progress-text">Preparing search…</p>
     </div>
 
     <div id="gp-results-wrap" class="excel-import-match-report-wrap" hidden></div>
@@ -110,6 +119,190 @@
         labelSelect.appendChild(opt);
       }
     });
+
+    const scopeSelect = document.getElementById("gp-scope-select");
+    const keywordInput = document.getElementById("gp-keyword-input");
+    const hasAttachment = document.getElementById("gp-has-attachment");
+    const searchBtn = document.getElementById("gp-search-btn");
+    const resultsWrap = document.getElementById("gp-results-wrap");
+
+    function escapeHtmlCell(text) {
+      if (text === null || text === undefined) return "";
+      const div = document.createElement("div");
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
+    const progressWrap = document.getElementById("gp-progress-wrap");
+    const progressBar = document.getElementById("gp-progress-bar");
+    const progressTrack = document.getElementById("gp-progress-track");
+    const progressText = document.getElementById("gp-progress-text");
+
+    searchBtn.addEventListener("click", async function () {
+      const email = accountSelect.value;
+      if (!email) {
+        alert("Choose an account first.");
+        return;
+      }
+      const keywords = keywordInput.value.trim();
+      if (!keywords) {
+        alert("Enter at least one keyword.");
+        return;
+      }
+
+      searchBtn.disabled = true;
+      resultsWrap.hidden = true;
+      resultsWrap.innerHTML = "";
+      progressWrap.hidden = false;
+      progressBar.style.width = "0%";
+      progressText.textContent = "Starting search…";
+
+      try {
+        const params = new URLSearchParams({
+          email: email,
+          label_id: labelSelect.value || "",
+          scope: scopeSelect.value,
+          keywords: keywords,
+          has_attachment: hasAttachment.checked ? "1" : "0"
+        });
+        const startRes = await fetch("{% url 'gmail_process_search_json' %}?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.ok) {
+          throw new Error(startData.message || "Could not start search.");
+        }
+        const jobId = startData.job_id;
+
+        let results = null;
+        while (true) {
+          const statusUrl = "{% url 'gmail_process_search_status_json' 'JOB_ID' %}".replace("JOB_ID", jobId);
+          const statusRes = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok || !statusData.ok) {
+            throw new Error(statusData.message || "Search status check failed.");
+          }
+
+          const total = statusData.total || 0;
+          const current = statusData.current || 0;
+          const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+          progressBar.style.width = percent + "%";
+          progressTrack.setAttribute("aria-valuenow", String(percent));
+          progressText.textContent = statusData.message || "Working…";
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(statusData.error);
+            }
+            results = statusData.results || [];
+            break;
+          }
+          await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        if (!results.length) {
+          resultsWrap.innerHTML = '<p class="muted">No matching emails found.</p>';
+          return;
+        }
+        let html = '<h2 class="excel-import-report-heading">Matching emails (' + results.length + ')</h2>';
+        html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">';
+        html += "<thead><tr><th>Subject</th><th>From</th><th>Date</th><th>Attachment</th></tr></thead><tbody>";
+        results.forEach(function (r) {
+          html += "<tr><td>" + escapeHtmlCell(r.subject) + "</td><td>" + escapeHtmlCell(r.from) +
+            "</td><td>" + escapeHtmlCell(r.date) + "</td><td>" + (r.has_attachment ? "Yes" : "No") + "</td></tr>";
+        });
+        html += "</tbody></table></div>";
+        resultsWrap.innerHTML = html;
+      } catch (e) {
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Search failed.") + "</p>";
+      } finally {
+        searchBtn.disabled = false;
+      }
+    });
+
+    const uniqueSubjectsBtn = document.getElementById("gp-unique-subjects-btn");
+
+    uniqueSubjectsBtn.addEventListener("click", async function () {
+      const email = accountSelect.value;
+      if (!email) {
+        alert("Choose an account first.");
+        return;
+      }
+
+      uniqueSubjectsBtn.disabled = true;
+      resultsWrap.hidden = true;
+      resultsWrap.innerHTML = "";
+      progressWrap.hidden = false;
+      progressBar.style.width = "0%";
+      progressText.textContent = "Starting…";
+
+      try {
+        const params = new URLSearchParams({
+          email: email,
+          label_id: labelSelect.value || ""
+        });
+        const startRes = await fetch("{% url 'gmail_process_unique_subjects_json' %}?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.ok) {
+          throw new Error(startData.message || "Could not start.");
+        }
+        const jobId = startData.job_id;
+
+        let subjects = null;
+        while (true) {
+          const statusUrl = "{% url 'gmail_process_search_status_json' 'JOB_ID' %}".replace("JOB_ID", jobId);
+          const statusRes = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok || !statusData.ok) {
+            throw new Error(statusData.message || "Status check failed.");
+          }
+
+          const total = statusData.total || 0;
+          const current = statusData.current || 0;
+          const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+          progressBar.style.width = percent + "%";
+          progressTrack.setAttribute("aria-valuenow", String(percent));
+          progressText.textContent = statusData.message || "Working…";
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(statusData.error);
+            }
+            subjects = statusData.results || [];
+            break;
+          }
+          await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        if (!subjects.length) {
+          resultsWrap.innerHTML = '<p class="muted">No emails found in this label.</p>';
+          return;
+        }
+        let html = '<h2 class="excel-import-report-heading">Unique subjects (' + subjects.length + ')</h2>';
+        html += "<ul>";
+        subjects.forEach(function (s) {
+          html += "<li>" + escapeHtmlCell(s) + "</li>";
+        });
+        html += "</ul>";
+        resultsWrap.innerHTML = html;
+      } catch (e) {
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Failed.") + "</p>";
+      } finally {
+        uniqueSubjectsBtn.disabled = false;
+      }
+    });
   })();
 </script>
+
 {% endblock %}
+

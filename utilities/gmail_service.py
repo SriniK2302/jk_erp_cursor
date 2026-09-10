@@ -36,17 +36,89 @@ def _build_query(scope: str, keywords: str, has_attachment: bool) -> str:
         parts.append("has:attachment")
     return " ".join(parts)
 
+def download_attachments_for_message(service, message_id: str, dest_dir) -> list[str]:
+    """Download all attachments of one message into dest_dir. Returns list of saved filenames."""
+    from pathlib import Path
+    import base64
 
-def search_messages(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool) -> list[dict]:
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    msg = service.users().messages().get(userId="me", id=message_id, format="full").execute()
+    parts = msg.get("payload", {}).get("parts", []) or []
+
+    saved = []
+    for part in parts:
+        filename = part.get("filename")
+        body = part.get("body", {})
+        att_id = body.get("attachmentId")
+        if not filename or not att_id:
+            continue
+        att = service.users().messages().attachments().get(
+            userId="me", messageId=message_id, id=att_id
+        ).execute()
+        data = base64.urlsafe_b64decode(att["data"])
+        out_path = dest_dir / filename
+        out_path.write_bytes(data)
+        saved.append(str(out_path))
+    return saved
+
+def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, progress_callback=None) -> dict:
+    """Download attachments for each message id. Calls progress_callback(current, total) after each message.
+    Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int}."""
+    service = get_service(email)
+    total = len(message_ids)
+    downloaded_files = 0
+    messages_with_no_attachment = 0
+
+    for i, message_id in enumerate(message_ids, start=1):
+        saved = download_attachments_for_message(service, message_id, dest_dir)
+        if saved:
+            downloaded_files += len(saved)
+        else:
+            messages_with_no_attachment += 1
+        if progress_callback:
+            progress_callback(i, total)
+
+    return {
+        "downloaded_files": downloaded_files,
+        "messages_processed": total,
+        "messages_with_no_attachment": messages_with_no_attachment,
+    }
+
+def list_unique_subjects(email: str, label_id: str, progress_callback=None) -> list[str]:
+    service = get_service(email)
+    label_ids = [label_id] if label_id else []
+    result = service.users().messages().list(userId="me", labelIds=label_ids, maxResults=50).execute()
+    message_refs = result.get("messages", [])
+    total = len(message_refs)
+
+    subjects = []
+    seen = set()
+    for i, ref in enumerate(message_refs, start=1):
+        msg = service.users().messages().get(
+            userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject"]
+        ).execute()
+        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+        subject = headers.get("Subject", "(no subject)")
+        if subject not in seen:
+            seen.add(subject)
+            subjects.append(subject)
+        if progress_callback:
+            progress_callback(i, total)
+    return subjects
+
+def search_messages(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool, progress_callback=None) -> list[dict]:
     service = get_service(email)
     query = _build_query(scope, keywords, has_attachment)
 
     label_ids = [label_id] if label_id else []
     result = service.users().messages().list(userId="me", q=query, labelIds=label_ids, maxResults=50).execute()
     message_refs = result.get("messages", [])
+    total = len(message_refs)
 
     results = []
-    for ref in message_refs:
+    for i, ref in enumerate(message_refs, start=1):
         msg = service.users().messages().get(
             userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject", "From", "Date"]
         ).execute()
@@ -61,4 +133,7 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
             "date": headers.get("Date", ""),
             "has_attachment": has_att,
         })
+        if progress_callback:
+            progress_callback(i, total)
     return results
+

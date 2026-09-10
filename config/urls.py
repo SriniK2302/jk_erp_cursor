@@ -49,6 +49,9 @@ urlpatterns = [
     path('gmail-processor/process/', views.gmail_process, name='gmail_process'),
     path('gmail-processor/process/labels/', views.gmail_process_labels_json, name='gmail_process_labels_json'),
     path('gmail-processor/process/search/', views.gmail_process_search_json, name='gmail_process_search_json'),
+    path('gmail-processor/process/search/status/<str:job_id>/', views.gmail_process_search_status_json, name='gmail_process_search_status_json'),
+    path('gmail-processor/process/unique-subjects/', views.gmail_process_unique_subjects_json,
+         name='gmail_process_unique_subjects_json'),
 
     path(
         'data-utilities/data-analysis/',
