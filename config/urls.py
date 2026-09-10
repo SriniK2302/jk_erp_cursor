@@ -47,7 +47,7 @@ urlpatterns = [
     path('gmail-processor/', views.gmail_processor, name='gmail_processor'),
     path('gmail-processor/accounts/', views.gmail_accounts, name='gmail_accounts'),
     path('gmail-processor/process/', views.gmail_process, name='gmail_process'),
-
+    path('gmail-processor/process/labels/', views.gmail_process_labels_json, name='gmail_process_labels_json'),
     path(
         'data-utilities/data-analysis/',
         views.data_analysis,

@@ -94,7 +94,27 @@ def gmail_accounts(request):
 def gmail_process(request):
     if not _has_module_access(request.user, MODULE_TOOLS):
         raise PermissionDenied("Admin only.")
-    return render(request, "gmail_process.html")
+
+    from utilities.gmail_accounts_store import load_accounts
+
+    accounts = [a for a in load_accounts() if a.get("token_path")]
+    return render(request, "gmail_process.html", {"accounts": accounts})
+
+
+@login_required
+@require_GET
+def gmail_process_labels_json(request):
+    email = (request.GET.get("email") or "").strip()
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+
+    from utilities.gmail_service import list_labels
+
+    try:
+        labels = list_labels(email)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    return JsonResponse({"ok": True, "labels": labels})
 
 @login_required
 def data_analysis(request):
