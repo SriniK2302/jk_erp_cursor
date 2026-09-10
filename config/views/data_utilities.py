@@ -116,6 +116,30 @@ def gmail_process_labels_json(request):
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
     return JsonResponse({"ok": True, "labels": labels})
 
+
+
+@login_required
+@require_GET
+def gmail_process_search_json(request):
+    email = (request.GET.get("email") or "").strip()
+    label_id = (request.GET.get("label_id") or "").strip()
+    scope = (request.GET.get("scope") or "subject").strip()
+    keywords = (request.GET.get("keywords") or "").strip()
+    has_attachment = (request.GET.get("has_attachment") or "") == "1"
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+    if not keywords:
+        return JsonResponse({"ok": False, "message": "Enter at least one keyword."}, status=400)
+
+    from utilities.gmail_service import search_messages
+
+    try:
+        results = search_messages(email, label_id, scope, keywords, has_attachment)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    return JsonResponse({"ok": True, "results": results})
+
 @login_required
 def data_analysis(request):
     d = settings.DATABASES["default"]

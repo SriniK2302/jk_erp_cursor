@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Process Gmails · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>Process Gmails</h1>
+      <p class="muted">Search emails and download matching attachments.</p>
+    </header>
+
+    <div class="utility-field-row">
+      <label for="gp-account-select" class="muted utility-label">Gmail account</label>
+      <div class="utility-field-row__grow">
+        <select id="gp-account-select" class="utility-input">
+          <option value="">— Choose an account —</option>
+          {% for account in accounts %}
+          <option value="{{ account.email }}">{{ account.email }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="utility-field-row">
+      <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
+      <div class="utility-field-row__grow">
+        <select id="gp-label-select" class="utility-input" disabled>
+          <option value="">— Select an account first —</option>
+        </select>
+      </div>
+    </div>
+
+        <div class="utility-field-row">
+      <label for="gp-keyword-input" class="muted utility-label">Subject keywords</label>
+      <div class="utility-field-row__grow">
+        <input id="gp-keyword-input" type="text" class="utility-input" placeholder="e.g. invoice+March (use + for AND)">
+        <button type="button" id="gp-search-btn" class="button button-compact button-secondary">Search</button>
+      </div>
+    </div>
+
+    <div class="utility-field-row">
+      <label for="gp-scope-select" class="muted utility-label">Search in</label>
+      <div class="utility-field-row__grow">
+        <select id="gp-scope-select" class="utility-input">
+          <option value="subject">Subject</option>
+          <option value="from">From</option>
+          <option value="body">Body</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="utility-field-row">
+      <label for="gp-keyword-input" class="muted utility-label">Keywords</label>
+      <div class="utility-field-row__grow">
+        <input id="gp-keyword-input" type="text" class="utility-input" placeholder="e.g. invoice+March (use + for AND)">
+        <label><input type="checkbox" id="gp-has-attachment"> Has attachment</label>
+        <button type="button" id="gp-search-btn" class="button button-compact button-secondary">Search</button>
+      </div>
+    </div>
+
+    <div id="gp-results-wrap" class="excel-import-match-report-wrap" hidden></div>
+
+    <p class="muted"><a href="{% url 'gmail_processor' %}">← Back to Gmail Processor</a></p>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const accountSelect = document.getElementById("gp-account-select");
+    const labelSelect = document.getElementById("gp-label-select");
+
+    accountSelect.addEventListener("change", async function () {
+      const email = accountSelect.value;
+      labelSelect.innerHTML = "";
+      labelSelect.disabled = true;
+
+      if (!email) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— Select an account first —";
+        labelSelect.appendChild(opt);
+        return;
+      }
+
+      const loadingOpt = document.createElement("option");
+      loadingOpt.value = "";
+      loadingOpt.textContent = "Loading labels…";
+      labelSelect.appendChild(loadingOpt);
+
+      try {
+        const res = await fetch("{% url 'gmail_process_labels_json' %}?email=" + encodeURIComponent(email), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not load labels.");
+        }
+        labelSelect.innerHTML = "";
+        const opt0 = document.createElement("option");
+        opt0.value = "";
+        opt0.textContent = "— Choose a label —";
+        labelSelect.appendChild(opt0);
+        (data.labels || []).forEach(function (label) {
+          const opt = document.createElement("option");
+          opt.value = label.id;
+          opt.textContent = label.name;
+          labelSelect.appendChild(opt);
+        });
+        labelSelect.disabled = false;
+      } catch (e) {
+        labelSelect.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = e.message || "Failed to load labels.";
+        labelSelect.appendChild(opt);
+      }
+    });
+  })();
+</script>
+{% endblock %}
