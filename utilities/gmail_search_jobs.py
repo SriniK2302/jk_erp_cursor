@@ -50,7 +50,8 @@ def start_search_job(email: str, label_id: str, scope: str, keywords: str, has_a
     return job_id
 
 
-def start_unique_subjects_job(email: str, label_id: str) -> str:
+def start_unique_subjects_job(email: str, label_id: str, scope: str = "subject", keywords: str = "", has_attachment: bool = False) -> str:
+
     job_id = str(uuid.uuid4())
     with _JOBS_LOCK:
         _JOBS[job_id] = {
@@ -75,7 +76,8 @@ def start_unique_subjects_job(email: str, label_id: str) -> str:
                     job["message"] = f"Scanned {current} of {total} email(s)…"
 
         try:
-            subjects = list_unique_subjects(email, label_id, progress_callback=progress)
+            subjects = list_unique_subjects(email, label_id, scope=scope, keywords=keywords, has_attachment=has_attachment, progress_callback=progress)
+
             with _JOBS_LOCK:
                 job = _JOBS.get(job_id)
                 if job:

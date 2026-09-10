@@ -155,15 +155,16 @@ def gmail_process_search_json(request):
 def gmail_process_unique_subjects_json(request):
     email = (request.GET.get("email") or "").strip()
     label_id = (request.GET.get("label_id") or "").strip()
+    scope = (request.GET.get("scope") or "subject").strip()
+    keywords = (request.GET.get("keywords") or "").strip()
+    has_attachment = (request.GET.get("has_attachment") or "") == "1"
 
     if not email:
         return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
 
     from utilities.gmail_search_jobs import start_unique_subjects_job
 
-    job_id = start_unique_subjects_job(email, label_id)
-    return JsonResponse({"ok": True, "job_id": job_id})
-
+    job_id = start_unique_subjects_job(email, label_id, scope, keywords, has_attachment)
 
 @login_required
 @require_GET

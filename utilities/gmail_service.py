@@ -86,11 +86,11 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, prog
         "messages_with_no_attachment": messages_with_no_attachment,
     }
 
-def list_unique_subjects(email: str, label_id: str, progress_callback=None) -> list[str]:
+def list_unique_subjects(email: str, label_id: str, scope: str = "subject", keywords: str = "", has_attachment: bool = False, progress_callback=None) -> list[str]:
     service = get_service(email)
     label_ids = [label_id] if label_id else []
-    result = service.users().messages().list(userId="me", labelIds=label_ids, maxResults=50).execute()
-    message_refs = result.get("messages", [])
+    query = _build_query(scope, keywords, has_attachment)
+    message_refs = _list_all_message_refs(service, label_ids, query)
     total = len(message_refs)
 
     subjects = []
@@ -108,14 +108,31 @@ def list_unique_subjects(email: str, label_id: str, progress_callback=None) -> l
             progress_callback(i, total)
     return subjects
 
+def _list_all_message_refs(service, label_ids: list[str], query: str = "") -> list[dict]:
+    refs = []
+    page_token = None
+    while True:
+        kwargs = {"userId": "me", "labelIds": label_ids, "maxResults": 500}
+        if query:
+            kwargs["q"] = query
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().messages().list(**kwargs).execute()
+        refs.extend(result.get("messages", []))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+    return refs
+
+
 def search_messages(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool, progress_callback=None) -> list[dict]:
     service = get_service(email)
     query = _build_query(scope, keywords, has_attachment)
 
     label_ids = [label_id] if label_id else []
-    result = service.users().messages().list(userId="me", q=query, labelIds=label_ids, maxResults=50).execute()
-    message_refs = result.get("messages", [])
+    message_refs = _list_all_message_refs(service, label_ids, query)
     total = len(message_refs)
+
 
     results = []
     for i, ref in enumerate(message_refs, start=1):
