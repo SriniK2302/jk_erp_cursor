@@ -242,10 +242,15 @@
         formData.append("email", email);
         messageIds.forEach(function (id) { formData.append("message_id", id); });
 
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrfMatch ? csrfMatch[1] : "";
         const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
           method: "POST",
           body: formData,
-          headers: { "X-Requested-With": "XMLHttpRequest" }
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": csrfToken
+          }
         });
         const startData = await startRes.json();
         if (!startRes.ok || !startData.ok) {
