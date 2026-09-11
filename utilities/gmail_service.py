@@ -22,6 +22,33 @@ def list_labels(email: str) -> list[dict]:
     labels = result.get("labels", [])
     return [{"id": l["id"], "name": l["name"]} for l in labels]
 
+def get_or_create_label(service, name: str) -> str:
+    result = service.users().labels().list(userId="me").execute()
+    for label in result.get("labels", []):
+        if label["name"] == name:
+            return label["id"]
+    created = service.users().labels().create(
+        userId="me", body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"}
+    ).execute()
+    return created["id"]
+
+def move_all_to_inbox(email: str, progress_callback=None) -> dict:
+    """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
+    service = get_service(email)
+    query = "-in:inbox -in:spam -in:trash"
+    message_refs = _list_all_message_refs(service, [], query)
+    total = len(message_refs)
+
+    moved = 0
+    for i, ref in enumerate(message_refs, start=1):
+        service.users().messages().modify(
+            userId="me", id=ref["id"], body={"addLabelIds": ["INBOX"]}
+        ).execute()
+        moved += 1
+        if progress_callback:
+            progress_callback(i, total)
+
+    return {"moved": moved, "total": total}
 
 
 def _build_query(scope: str, keywords: str, has_attachment: bool) -> str:
@@ -63,13 +90,17 @@ def download_attachments_for_message(service, message_id: str, dest_dir) -> list
         saved.append(str(out_path))
     return saved
 
-def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, progress_callback=None) -> dict:
-    """Download attachments for each message id. Calls progress_callback(current, total) after each message.
-    Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int}."""
+def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, source_label_id: str = "", progress_callback=None) -> dict:
+    """Download attachments for each message id, then move it to a 'Processed' label
+    (removing source_label_id if given). Calls progress_callback(current, total) after each message.
+    Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int, "moved": int}."""
     service = get_service(email)
     total = len(message_ids)
     downloaded_files = 0
     messages_with_no_attachment = 0
+    moved = 0
+
+    processed_label_id = get_or_create_label(service, "Processed")
 
     for i, message_id in enumerate(message_ids, start=1):
         saved = download_attachments_for_message(service, message_id, dest_dir)
@@ -77,6 +108,13 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, prog
             downloaded_files += len(saved)
         else:
             messages_with_no_attachment += 1
+
+        body = {"addLabelIds": [processed_label_id]}
+        if source_label_id:
+            body["removeLabelIds"] = [source_label_id]
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        moved += 1
+
         if progress_callback:
             progress_callback(i, total)
 
@@ -84,7 +122,9 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, prog
         "downloaded_files": downloaded_files,
         "messages_processed": total,
         "messages_with_no_attachment": messages_with_no_attachment,
+        "moved": moved,
     }
+
 
 def list_unique_subjects(email: str, label_id: str, scope: str = "subject", keywords: str = "", has_attachment: bool = False, progress_callback=None) -> list[str]:
     service = get_service(email)

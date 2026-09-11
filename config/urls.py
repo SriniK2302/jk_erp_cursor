@@ -51,6 +51,8 @@ urlpatterns = [
     path('gmail-processor/process/search/', views.gmail_process_search_json, name='gmail_process_search_json'),
     path('gmail-processor/process/search/status/<str:job_id>/', views.gmail_process_search_status_json, name='gmail_process_search_status_json'),
     path('gmail-processor/process/download/', views.gmail_process_download_json, name='gmail_process_download_json'),
+    path('gmail-processor/process/move-to-inbox/', views.gmail_process_move_to_inbox_json,
+         name='gmail_process_move_to_inbox_json'),
     path('gmail-processor/process/unique-subjects/', views.gmail_process_unique_subjects_json,
          name='gmail_process_unique_subjects_json'),
 

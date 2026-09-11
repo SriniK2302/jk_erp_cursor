@@ -21,6 +21,12 @@
         </select>
       </div>
     </div>
+    <div class="utility-field-row">
+      <button type="button" id="gp-move-to-inbox-btn" class="button button-compact button-secondary">Move all mails to Inbox</button>
+    </div>
+
+    <div class="utility-field-row">
+      <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
 
     <div class="utility-field-row">
       <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
@@ -240,9 +246,11 @@
       try {
         const formData = new FormData();
         formData.append("email", email);
+        formData.append("label_id", labelSelect.value || "");
         messageIds.forEach(function (id) { formData.append("message_id", id); });
 
-        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
+
         const csrfToken = csrfMatch ? csrfMatch[1] : "";
         const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
           method: "POST",
@@ -288,13 +296,91 @@
         resultsWrap.hidden = false;
         resultsWrap.innerHTML = '<p class="muted">Downloaded ' + (result.downloaded_files || 0) +
           ' file(s) from ' + (result.messages_processed || 0) + ' email(s) into your Downloads/gmail_processor folder. ' +
-          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment.</p>';
+          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment. ' +
+          'Moved ' + (result.moved || 0) + ' email(s) to the Processed label.</p>';
+
       } catch (e) {
         progressWrap.hidden = true;
         resultsWrap.hidden = false;
         resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
       }
     }
+
+    const moveToInboxBtn = document.getElementById("gp-move-to-inbox-btn");
+
+    moveToInboxBtn.addEventListener("click", async function () {
+      const email = accountSelect.value;
+      if (!email) {
+        alert("Choose an account first.");
+        return;
+      }
+      if (!confirm("Move ALL mails (outside Inbox, excluding Spam/Trash) into Inbox for " + email + "?")) {
+        return;
+      }
+
+      moveToInboxBtn.disabled = true;
+      resultsWrap.hidden = true;
+      progressWrap.hidden = false;
+      progressBar.style.width = "0%";
+      progressText.textContent = "Starting…";
+
+      try {
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrfMatch ? csrfMatch[1] : "";
+        const formData = new FormData();
+        formData.append("email", email);
+
+        const startRes = await fetch("{% url 'gmail_process_move_to_inbox_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": csrfToken
+          }
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.ok) {
+          throw new Error(startData.message || "Could not start.");
+        }
+        const jobId = startData.job_id;
+
+        let result = null;
+        while (true) {
+          const statusUrl = "{% url 'gmail_process_search_status_json' 'JOB_ID' %}".replace("JOB_ID", jobId);
+          const statusRes = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok || !statusData.ok) {
+            throw new Error(statusData.message || "Status check failed.");
+          }
+
+          const total = statusData.total || 0;
+          const current = statusData.current || 0;
+          const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+          progressBar.style.width = percent + "%";
+          progressTrack.setAttribute("aria-valuenow", String(percent));
+          progressText.textContent = statusData.message || "Working…";
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(statusData.error);
+            }
+            result = statusData.results;
+            break;
+          }
+          await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="muted">Moved ' + (result.moved || 0) + ' of ' + (result.total || 0) + ' email(s) to Inbox.</p>';
+      } catch (e) {
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Failed.") + "</p>";
+      } finally {
+        moveToInboxBtn.disabled = false;
+      }
+    });
 
     const uniqueSubjectsBtn = document.getElementById("gp-unique-subjects-btn");
 

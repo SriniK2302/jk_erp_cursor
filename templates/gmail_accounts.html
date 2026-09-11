@@ -39,16 +39,13 @@
             {% endif %}
           </td>
           <td>
-            {% if account.token_path %}
-              Yes
-            {% else %}
-              <form method="post" class="inline-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="connect">
-                <input type="hidden" name="email" value="{{ account.email }}">
-                <button type="submit" class="link-button" {% if not account.credentials_path %}disabled{% endif %}>Connect</button>
-              </form>
-            {% endif %}
+            {% if account.token_path %}Yes — {% endif %}
+            <form method="post" class="inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="connect">
+              <input type="hidden" name="email" value="{{ account.email }}">
+              <button type="submit" class="link-button" {% if not account.credentials_path %}disabled{% endif %}>{% if account.token_path %}Reconnect{% else %}Connect{% endif %}</button>
+            </form>
           </td>
           <td>
             <form method="post" class="inline-form">

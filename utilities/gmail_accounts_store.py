@@ -61,7 +61,7 @@ def set_token_path(email: str, path: str) -> None:
     save_accounts(accounts)
 
 
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
 
 def get_account(email: str) -> dict | None:

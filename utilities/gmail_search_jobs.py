@@ -94,7 +94,9 @@ def start_unique_subjects_job(email: str, label_id: str, scope: str = "subject",
     threading.Thread(target=run, daemon=True).start()
     return job_id
 
-def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
+
+
+def start_download_job(email: str, message_ids: list[str], dest_dir, source_label_id: str = "") -> str:
     job_id = str(uuid.uuid4())
     with _JOBS_LOCK:
         _JOBS[job_id] = {
@@ -119,7 +121,48 @@ def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
                     job["message"] = f"Downloaded {current} of {total} email(s)…"
 
         try:
-            result = download_attachments_bulk(email, message_ids, dest_dir, progress_callback=progress)
+            result = download_attachments_bulk(email, message_ids, dest_dir, source_label_id=source_label_id, progress_callback=progress)
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["message"] = "Done."
+                    job["result"] = result
+        except Exception as exc:
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["error"] = str(exc)
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
+def start_move_to_inbox_job(email: str) -> str:
+    job_id = str(uuid.uuid4())
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            "done": False,
+            "current": 0,
+            "total": 0,
+            "message": "Starting…",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+    def run():
+        from utilities.gmail_service import move_all_to_inbox
+
+        def progress(current, total):
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = f"Moved {current} of {total} email(s)…"
+
+        try:
+            result = move_all_to_inbox(email, progress_callback=progress)
             with _JOBS_LOCK:
                 job = _JOBS.get(job_id)
                 if job:
@@ -140,4 +183,5 @@ def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:
         return dict(_JOBS.get(job_id)) if job_id in _JOBS else None
+
 
