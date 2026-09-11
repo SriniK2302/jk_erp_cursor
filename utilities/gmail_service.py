@@ -54,34 +54,79 @@ def get_or_create_label(service, name: str) -> str:
 
 def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = None,
                   remove_label_ids: list[str] = None, progress_callback=None):
-    """Apply label changes in chunks of 1000 using batchModify (much faster than per-message calls)."""
+    """Apply label changes in chunks of 1000 using batchModify (much faster than per-message calls).
+    Automatically drops any label id Gmail rejects as invalid and retries."""
+    import re
+
     total = len(message_ids)
-    body_base = {}
-    if add_label_ids:
-        body_base["addLabelIds"] = add_label_ids
-    if remove_label_ids:
-        body_base["removeLabelIds"] = remove_label_ids
+    add_label_ids = list(add_label_ids) if add_label_ids else []
+    remove_label_ids = list(remove_label_ids) if remove_label_ids else []
 
     done = 0
-    for start in range(0, total, 1000):
-        chunk = message_ids[start:start + 1000]
-        body = dict(body_base)
-        body["ids"] = chunk
-        service.users().messages().batchModify(userId="me", body=body).execute()
+    for start in range(0, total, 100):
+        chunk = message_ids[start:start + 100]
+        attempts = 0
+        while True:
+            attempts += 1
+            if attempts > 20:
+                raise RuntimeError(f"Too many retries removing invalid labels at chunk starting {start}.")
+            body = {"ids": chunk}
+            if add_label_ids:
+                body["addLabelIds"] = add_label_ids
+            if remove_label_ids:
+                body["removeLabelIds"] = remove_label_ids
+            try:
+                service.users().messages().batchModify(userId="me", body=body).execute()
+                break
+                except Exception as exc:
+                match = re.search(r"Invalid label:\s*([A-Za-z0-9_\-]+)", str(exc))
+                if match:
+                    bad_label = match.group(1)
+                    before = len(add_label_ids) + len(remove_label_ids)
+                    add_label_ids = [l for l in add_label_ids if l != bad_label]
+                    remove_label_ids = [l for l in remove_label_ids if l != bad_label]
+                    after = len(add_label_ids) + len(remove_label_ids)
+                    if after == before:
+                        raise RuntimeError(f"Label '{bad_label}' reported invalid but not found in current list: {exc}")
+                    if progress_callback:
+                        progress_callback(done, total)
+                    continue
+                raise
         done += len(chunk)
         if progress_callback:
             progress_callback(done, total)
 
 
 def move_all_to_inbox(email: str, progress_callback=None) -> dict:
-    """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
+    """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
     service = get_service(email)
-    query = "-in:inbox -in:spam -in:trash"
-    message_refs = _list_all_message_refs(service, [], query)
+    query = "-in:spam -in:trash"
+
+    def list_progress(count):
+        if progress_callback:
+            progress_callback(0, max(count, 1))
+
+    message_refs = []
+    page_token = None
+    while True:
+        kwargs = {"userId": "me", "labelIds": [], "maxResults": 500, "q": query}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().messages().list(**kwargs).execute()
+        message_refs.extend(result.get("messages", []))
+        list_progress(len(message_refs))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+
     total = len(message_refs)
     message_ids = [ref["id"] for ref in message_refs]
 
-    _batch_modify(service, message_ids, add_label_ids=["INBOX"], progress_callback=progress_callback)
+
+    all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
+    remove_ids = [l["id"] for l in all_labels if l["id"] not in ("INBOX", "SPAM", "TRASH")]
+
+    _batch_modify(service, message_ids, add_label_ids=["INBOX"], remove_label_ids=remove_ids, progress_callback=progress_callback)
 
     return {"moved": total, "total": total}
 
