@@ -259,8 +259,7 @@
         formData.append("label_id", labelSelect.value || "");
         messageIds.forEach(function (id) { formData.append("message_id", id); });
 
-        const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
-
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
         const csrfToken = csrfMatch ? csrfMatch[1] : "";
         const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
           method: "POST",
@@ -270,6 +269,7 @@
             "X-CSRFToken": csrfToken
           }
         });
+
         const startData = await startRes.json();
         if (!startRes.ok || !startData.ok) {
           throw new Error(startData.message || "Could not start download.");

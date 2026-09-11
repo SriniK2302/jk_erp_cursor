@@ -27,10 +27,18 @@ def get_or_create_label(service, name: str) -> str:
     for label in result.get("labels", []):
         if label["name"] == name:
             return label["id"]
-    created = service.users().labels().create(
-        userId="me", body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"}
-    ).execute()
-    return created["id"]
+    try:
+        created = service.users().labels().create(
+            userId="me", body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"}
+        ).execute()
+        return created["id"]
+    except Exception as exc:
+        if "exists" in str(exc).lower() or "conflict" in str(exc).lower():
+            result = service.users().labels().list(userId="me").execute()
+            for label in result.get("labels", []):
+                if label["name"] == name:
+                    return label["id"]
+        raise
 
 def move_all_to_inbox(email: str, progress_callback=None) -> dict:
     """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
