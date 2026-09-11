@@ -44,7 +44,7 @@ def start_search_job(email: str, label_id: str, scope: str, keywords: str, has_a
                 job = _JOBS.get(job_id)
                 if job:
                     job["done"] = True
-                    job["error"] = str(exc)
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
@@ -89,7 +89,7 @@ def start_unique_subjects_job(email: str, label_id: str, scope: str = "subject",
                 job = _JOBS.get(job_id)
                 if job:
                     job["done"] = True
-                    job["error"] = str(exc)
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
@@ -133,7 +133,7 @@ def start_download_job(email: str, message_ids: list[str], dest_dir, source_labe
                 job = _JOBS.get(job_id)
                 if job:
                     job["done"] = True
-                    job["error"] = str(exc)
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
@@ -174,7 +174,7 @@ def start_move_to_inbox_job(email: str) -> str:
                 job = _JOBS.get(job_id)
                 if job:
                     job["done"] = True
-                    job["error"] = str(exc)
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
@@ -183,5 +183,3 @@ def start_move_to_inbox_job(email: str) -> str:
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:
         return dict(_JOBS.get(job_id)) if job_id in _JOBS else None
-
-
