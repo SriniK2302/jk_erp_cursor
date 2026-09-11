@@ -179,6 +179,48 @@ def start_move_to_inbox_job(email: str) -> str:
     threading.Thread(target=run, daemon=True).start()
     return job_id
 
+def start_cleanup_job(email: str) -> str:
+    job_id = str(uuid.uuid4())
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            "done": False,
+            "current": 0,
+            "total": 0,
+            "message": "Starting…",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+    def run():
+        from utilities.gmail_service import cleanup_already_filed_threads
+
+        def progress(current, total):
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = f"Checked {current} of {total} email(s)…"
+
+        try:
+            result = cleanup_already_filed_threads(email, progress_callback=progress)
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["message"] = "Done."
+                    job["result"] = result
+        except Exception as exc:
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
+
 
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:

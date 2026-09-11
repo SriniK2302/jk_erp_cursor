@@ -218,6 +218,17 @@ def gmail_process_label_count_json(request):
     except Exception as exc:
         return JsonResponse({"ok": False, "message": str(exc)}, status=400)
     return JsonResponse({"ok": True, "count": count})
+@login_required
+@require_POST
+def gmail_process_cleanup_json(request):
+    email = (request.POST.get("email") or "").strip()
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+
+    from utilities.gmail_search_jobs import start_cleanup_job
+
+    job_id = start_cleanup_job(email)
+    return JsonResponse({"ok": True, "job_id": job_id})
 
 
 @login_required

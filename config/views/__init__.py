@@ -39,6 +39,7 @@ from .data_utilities import (
     gmail_process_download_json,
     gmail_process_move_to_inbox_json,
     gmail_process_label_count_json,
+    gmail_process_cleanup_json,
 )
 from .home import admin_technical_data_flow, home, setup
 from .server_environment import setup_server_environment

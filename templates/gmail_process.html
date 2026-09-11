@@ -23,6 +23,7 @@
     </div>
     <div class="utility-field-row">
       <button type="button" id="gp-move-to-inbox-btn" class="button button-compact button-secondary">Move all mails to Inbox</button>
+      <button type="button" id="gp-cleanup-btn" class="button button-compact button-secondary">Clean up already-filed threads (archive from Inbox)</button>
     </div>
 
     <div class="utility-field-row">
@@ -60,12 +61,13 @@
       </div>
     </div>
 
-    <div id="gp-progress-wrap" class="utility-progress-wrap" hidden>
-      <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="gp-progress-track">
-        <div id="gp-progress-bar" class="utility-progress-bar"></div>
+    <div id="gp-cleanup-progress-wrap" class="utility-progress-wrap" hidden>
+      <div class="utility-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="gp-cleanup-progress-track">
+        <div id="gp-cleanup-progress-bar" class="utility-progress-bar"></div>
       </div>
-      <p class="muted utility-progress-text" id="gp-progress-text">Preparing search…</p>
+      <p class="muted utility-progress-text" id="gp-cleanup-progress-text">Preparing cleanup…</p>
     </div>
+    <p class="muted" id="gp-cleanup-result"></p>
 
     <div id="gp-results-wrap" class="excel-import-match-report-wrap" hidden></div>
 
@@ -432,7 +434,85 @@
       }
     });
 
+    const cleanupBtn = document.getElementById("gp-cleanup-btn");
+    const cleanupProgressWrap = document.getElementById("gp-cleanup-progress-wrap");
+    const cleanupProgressBar = document.getElementById("gp-cleanup-progress-bar");
+    const cleanupProgressTrack = document.getElementById("gp-cleanup-progress-track");
+    const cleanupProgressText = document.getElementById("gp-cleanup-progress-text");
+    const cleanupResult = document.getElementById("gp-cleanup-result");
 
+    cleanupBtn.addEventListener("click", async function () {
+      const email = accountSelect.value;
+      if (!email) {
+        alert("Choose an account first.");
+        return;
+      }
+      if (!confirm("Scan Inbox for already-filed threads and remove them from Inbox for " + email + "?")) {
+        return;
+      }
+
+      cleanupBtn.disabled = true;
+      cleanupResult.textContent = "";
+      cleanupProgressWrap.hidden = false;
+      cleanupProgressBar.style.width = "0%";
+      cleanupProgressText.textContent = "Starting…";
+
+      try {
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrfMatch ? csrfMatch[1] : "";
+        const formData = new FormData();
+        formData.append("email", email);
+
+        const startRes = await fetch("{% url 'gmail_process_cleanup_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": csrfToken
+          }
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.ok) {
+          throw new Error(startData.message || "Could not start cleanup.");
+        }
+        const jobId = startData.job_id;
+
+        let result = {};
+        while (true) {
+          const statusUrl = "{% url 'gmail_process_search_status_json' 'JOB_ID' %}".replace("JOB_ID", jobId);
+          const statusRes = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok || !statusData.ok) {
+            throw new Error(statusData.message || "Status check failed.");
+          }
+
+          const total = statusData.total || 0;
+          const current = statusData.current || 0;
+          const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+          cleanupProgressBar.style.width = percent + "%";
+          cleanupProgressTrack.setAttribute("aria-valuenow", String(percent));
+          cleanupProgressText.textContent = statusData.message || "Working…";
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(statusData.error);
+            }
+            result = statusData.results || {};
+            break;
+          }
+          await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+
+        cleanupProgressWrap.hidden = true;
+        cleanupResult.textContent = "Cleaned up " + (result.threads_cleaned || 0) + " thread(s), " +
+          (result.messages_affected || 0) + " message(s) removed from Inbox.";
+      } catch (e) {
+        cleanupProgressWrap.hidden = true;
+        cleanupResult.textContent = e.message || "Cleanup failed.";
+      } finally {
+        cleanupBtn.disabled = false;
+      }
+    });
     const uniqueSubjectsBtn = document.getElementById("gp-unique-subjects-btn");
 
     uniqueSubjectsBtn.addEventListener("click", async function () {

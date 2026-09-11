@@ -104,6 +104,50 @@ def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = No
         if progress_callback:
             progress_callback(done, total)
 
+def cleanup_already_filed_threads(email: str, progress_callback=None) -> dict:
+    """Find Inbox messages that already carry a custom (non-system) label — meaning they were
+    filed before this bug fix — and remove INBOX from their entire thread."""
+    service = get_service(email)
+
+    all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
+    system_ids = {l["id"] for l in all_labels if l.get("type") == "system"}
+
+    message_refs = _list_all_message_refs(service, ["INBOX"])
+    total = len(message_refs)
+
+    thread_ids = set()
+    done = 0
+
+    def handle_response(request_id, response, exception):
+        if exception is not None:
+            return
+        labels = set(response.get("labelIds", []))
+        if labels - system_ids:
+            thread_ids.add(response["threadId"])
+
+    for start in range(0, total, 50):
+        chunk = message_refs[start:start + 50]
+        batch = service.new_batch_http_request(callback=handle_response)
+        for ref in chunk:
+            batch.add(
+                service.users().messages().get(userId="me", id=ref["id"], format="minimal"),
+                request_id=ref["id"],
+            )
+        batch.execute()
+        done += len(chunk)
+        if progress_callback:
+            progress_callback(done, total)
+
+    all_message_ids = set()
+    for thread_id in thread_ids:
+        thread = service.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
+        for m in thread.get("messages", []):
+            all_message_ids.add(m["id"])
+
+    _batch_modify(service, list(all_message_ids), remove_label_ids=["INBOX"])
+
+    return {"threads_cleaned": len(thread_ids), "messages_affected": len(all_message_ids)}
+
 
 def move_all_to_inbox(email: str, progress_callback=None) -> dict:
     """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
@@ -180,29 +224,73 @@ def download_attachments_for_message(service, message_id: str, dest_dir) -> list
 
 def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, source_label_id: str = "", target_label_name: str = "Processed", progress_callback=None) -> dict:
     """Download attachments for each message id, then move all of them to target_label_name
-    (removing source_label_id and INBOX). Download progress calls progress_callback(current, total)
-    during the download phase; the label move is done in one batch call at the end.
+    (removing source_label_id and INBOX). Message payloads are fetched in batches of 50;
+    attachment bytes are then downloaded per-attachment. The label move is done in one batch
+    call at the end.
     Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int, "moved": int}."""
     service = get_service(email)
     total = len(message_ids)
     downloaded_files = 0
     messages_with_no_attachment = 0
+    done = 0
 
-    for i, message_id in enumerate(message_ids, start=1):
-        saved = download_attachments_for_message(service, message_id, dest_dir)
-        if saved:
-            downloaded_files += len(saved)
-        else:
+    import base64
+    from pathlib import Path
+
+    dest_dir_path = Path(dest_dir)
+    dest_dir_path.mkdir(parents=True, exist_ok=True)
+
+    def handle_response(request_id, response, exception):
+        nonlocal downloaded_files, messages_with_no_attachment
+        if exception is not None:
+            return
+        parts = response.get("payload", {}).get("parts", []) or []
+        saved_any = False
+        for part in parts:
+            filename = part.get("filename")
+            body = part.get("body", {})
+            att_id = body.get("attachmentId")
+            if not filename or not att_id:
+                continue
+            att = service.users().messages().attachments().get(
+                userId="me", messageId=response["id"], id=att_id
+            ).execute()
+            data = base64.urlsafe_b64decode(att["data"])
+            (dest_dir_path / filename).write_bytes(data)
+            downloaded_files += 1
+            saved_any = True
+        if not saved_any:
             messages_with_no_attachment += 1
+
+    for start in range(0, total, 50):
+        chunk = message_ids[start:start + 50]
+        batch = service.new_batch_http_request(callback=handle_response)
+        for message_id in chunk:
+            batch.add(
+                service.users().messages().get(userId="me", id=message_id, format="full"),
+                request_id=message_id,
+            )
+        batch.execute()
+        done += len(chunk)
         if progress_callback:
-            progress_callback(i, total)
+            progress_callback(done, total)
+
+    thread_ids = set()
+    for message_id in message_ids:
+        msg = service.users().messages().get(userId="me", id=message_id, format="minimal").execute()
+        thread_ids.add(msg["threadId"])
+
+    all_message_ids = set(message_ids)
+    for thread_id in thread_ids:
+        thread = service.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
+        for m in thread.get("messages", []):
+            all_message_ids.add(m["id"])
 
     target_label_id = get_or_create_label(service, target_label_name)
     remove_ids = ["INBOX"]
     if source_label_id and source_label_id != "INBOX":
         remove_ids.append(source_label_id)
-    _batch_modify(service, message_ids, add_label_ids=[target_label_id], remove_label_ids=remove_ids)
-
+    _batch_modify(service, list(all_message_ids), add_label_ids=[target_label_id], remove_label_ids=remove_ids)
     return {
         "downloaded_files": downloaded_files,
         "messages_processed": total,
@@ -261,13 +349,19 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
     results = []
     done = 0
 
+    def _has_attachment_recursive(part):
+        if part.get("filename"):
+            return True
+        for sub in part.get("parts", []) or []:
+            if _has_attachment_recursive(sub):
+                return True
+        return False
+
     def handle_response(request_id, response, exception):
         if exception is not None:
             return
         headers = {h["name"]: h["value"] for h in response.get("payload", {}).get("headers", [])}
-        has_att = any(
-            part.get("filename") for part in response.get("payload", {}).get("parts", []) or []
-        )
+        has_att = _has_attachment_recursive(response.get("payload", {}))
         results.append({
             "id": response["id"],
             "subject": headers.get("Subject", "(no subject)"),
@@ -276,14 +370,13 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
             "has_attachment": has_att,
         })
 
+
     for start in range(0, total, 50):
         chunk = message_refs[start:start + 50]
         batch = service.new_batch_http_request(callback=handle_response)
         for ref in chunk:
             batch.add(
-                service.users().messages().get(
-                    userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject", "From", "Date"]
-                ),
+                service.users().messages().get(userId="me", id=ref["id"], format="full"),
                 request_id=ref["id"],
             )
         batch.execute()
