@@ -20,7 +20,16 @@ def list_labels(email: str) -> list[dict]:
     service = get_service(email)
     result = service.users().labels().list(userId="me").execute()
     labels = result.get("labels", [])
-    return [{"id": l["id"], "name": l["name"]} for l in labels]
+    output = []
+    for l in labels:
+        detail = service.users().labels().get(userId="me", id=l["id"]).execute()
+        output.append({
+            "id": l["id"],
+            "name": l["name"],
+            "count": detail.get("messagesTotal", 0),
+        })
+    return output
+
 
 def get_or_create_label(service, name: str) -> str:
     import time
