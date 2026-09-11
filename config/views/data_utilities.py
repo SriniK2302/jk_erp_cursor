@@ -165,6 +165,27 @@ def gmail_process_unique_subjects_json(request):
     from utilities.gmail_search_jobs import start_unique_subjects_job
 
     job_id = start_unique_subjects_job(email, label_id, scope, keywords, has_attachment)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
+
+@login_required
+@require_POST
+def gmail_process_download_json(request):
+    email = (request.POST.get("email") or "").strip()
+    message_ids = request.POST.getlist("message_id")
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+    if not message_ids:
+        return JsonResponse({"ok": False, "message": "No messages to download."}, status=400)
+
+    from pathlib import Path
+    from utilities.gmail_search_jobs import start_download_job
+
+    dest_dir = Path.home() / "Downloads" / "gmail_processor"
+    job_id = start_download_job(email, message_ids, dest_dir)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
 
 @login_required
 @require_GET
