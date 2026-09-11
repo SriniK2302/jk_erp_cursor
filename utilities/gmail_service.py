@@ -258,24 +258,40 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
     message_refs = _list_all_message_refs(service, label_ids, query)
     total = len(message_refs)
 
-
     results = []
-    for i, ref in enumerate(message_refs, start=1):
-        msg = service.users().messages().get(
-            userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject", "From", "Date"]
-        ).execute()
-        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+    done = 0
+
+    def handle_response(request_id, response, exception):
+        if exception is not None:
+            return
+        headers = {h["name"]: h["value"] for h in response.get("payload", {}).get("headers", [])}
         has_att = any(
-            part.get("filename") for part in msg.get("payload", {}).get("parts", []) or []
+            part.get("filename") for part in response.get("payload", {}).get("parts", []) or []
         )
         results.append({
-            "id": ref["id"],
+            "id": response["id"],
             "subject": headers.get("Subject", "(no subject)"),
             "from": headers.get("From", ""),
             "date": headers.get("Date", ""),
             "has_attachment": has_att,
         })
+
+    for start in range(0, total, 50):
+        chunk = message_refs[start:start + 50]
+        batch = service.new_batch_http_request(callback=handle_response)
+        for ref in chunk:
+            batch.add(
+                service.users().messages().get(
+                    userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject", "From", "Date"]
+                ),
+                request_id=ref["id"],
+            )
+        batch.execute()
+        done += len(chunk)
         if progress_callback:
+            progress_callback(done, total)
+
+    return results
             progress_callback(i, total)
     return results
 
