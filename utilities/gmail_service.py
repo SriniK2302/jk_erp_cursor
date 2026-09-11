@@ -24,6 +24,12 @@ def list_labels(email: str) -> list[dict]:
 
 
 
+def get_label_count(email: str, label_id: str) -> int:
+    service = get_service(email)
+    detail = service.users().labels().get(userId="me", id=label_id).execute()
+    return detail.get("messagesTotal", 0)
+
+
 def get_or_create_label(service, name: str) -> str:
     import time
 

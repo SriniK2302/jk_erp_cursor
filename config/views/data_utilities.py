@@ -200,6 +200,24 @@ def gmail_process_move_to_inbox_json(request):
 
     job_id = start_move_to_inbox_job(email)
     return JsonResponse({"ok": True, "job_id": job_id})
+@login_required
+@require_GET
+def gmail_process_label_count_json(request):
+    email = (request.GET.get("email") or "").strip()
+    label_id = (request.GET.get("label_id") or "").strip()
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+    if not label_id:
+        return JsonResponse({"ok": False, "message": "Select a label first."}, status=400)
+
+    from utilities.gmail_service import get_label_count
+
+    try:
+        count = get_label_count(email, label_id)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    return JsonResponse({"ok": True, "count": count})
 
 
 @login_required

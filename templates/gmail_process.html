@@ -28,9 +28,11 @@
     <div class="utility-field-row">
       <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
       <div class="utility-field-row__grow">
-        <select id="gp-label-select" class="utility-input" disabled>
+        <select id="gp-label-select" class="utility-input" disabled style="max-width: 260px;">
           <option value="">— Select an account first —</option>
         </select>
+        <button type="button" id="gp-label-count-btn" class="button button-compact button-secondary">Count</button>
+        <span id="gp-label-count-result" class="muted"></span>
       </div>
     </div>
 
@@ -224,7 +226,8 @@
           return;
         }
         let html = '<h2 class="excel-import-report-heading">Matching emails (' + results.length + ')</h2>';
-        html += '<button type="button" id="gp-download-btn" class="button button-compact">Download attachments</button>';
+        html += '<button type="button" id="gp-download-btn" class="button button-compact">' +
+          (hasAttachment.checked ? 'Download attachments' : 'Move to folder') + '</button>';
         html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">';
         html += "<thead><tr><th>Subject</th><th>From</th><th>Date</th><th>Attachment</th></tr></thead><tbody>";
         results.forEach(function (r) {
@@ -394,6 +397,41 @@
         moveToInboxBtn.disabled = false;
       }
     });
+    const labelCountBtn = document.getElementById("gp-label-count-btn");
+    const labelCountResult = document.getElementById("gp-label-count-result");
+
+    labelCountBtn.addEventListener("click", async function () {
+      const email = accountSelect.value;
+      const labelId = labelSelect.value;
+      if (!email) {
+        alert("Choose an account first.");
+        return;
+      }
+      if (!labelId) {
+        alert("Select a label first.");
+        return;
+      }
+
+      labelCountBtn.disabled = true;
+      labelCountResult.textContent = "Counting…";
+
+      try {
+        const params = new URLSearchParams({ email: email, label_id: labelId });
+        const res = await fetch("{% url 'gmail_process_label_count_json' %}?" + params.toString(), {
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || "Could not get count.");
+        }
+        labelCountResult.textContent = data.count + " email(s)";
+      } catch (e) {
+        labelCountResult.textContent = e.message || "Failed.";
+      } finally {
+        labelCountBtn.disabled = false;
+      }
+    });
+
 
     const uniqueSubjectsBtn = document.getElementById("gp-unique-subjects-btn");
 
