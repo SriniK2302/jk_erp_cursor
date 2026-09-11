@@ -52,22 +52,38 @@ def get_or_create_label(service, name: str) -> str:
         )
 
 
-def move_all_to_inbox(email: str, progress_callback=None) -> dict:
-    def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = None,
-                      remove_label_ids: list[str] = None, progress_callback=None):
-        """Apply label changes in chunks of 1000 using batchModify (much faster than per-message calls)."""
-        total = len(message_ids)
-        body_base = {}
-        if add_label_ids:
-            body_base["addLabelIds"] = add_label_ids
-        if remove_label_ids:
-            body_base["removeLabelIds"] = remove_label_ids
+def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = None,
+                  remove_label_ids: list[str] = None, progress_callback=None):
+    """Apply label changes in chunks of 1000 using batchModify (much faster than per-message calls)."""
+    total = len(message_ids)
+    body_base = {}
+    if add_label_ids:
+        body_base["addLabelIds"] = add_label_ids
+    if remove_label_ids:
+        body_base["removeLabelIds"] = remove_label_ids
 
-        done = 0
-        for start in range(0, total, 1000):
-            chunk = message_ids[start:start + 1000]
-            body = dict(body_base)
-            body["ids"] = chunk
+    done = 0
+    for start in range(0, total, 1000):
+        chunk = message_ids[start:start + 1000]
+        body = dict(body_base)
+        body["ids"] = chunk
+        service.users().messages().batchModify(userId="me", body=body).execute()
+        done += len(chunk)
+        if progress_callback:
+            progress_callback(done, total)
+
+
+def move_all_to_inbox(email: str, progress_callback=None) -> dict:
+    """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
+    service = get_service(email)
+    query = "-in:inbox -in:spam -in:trash"
+    message_refs = _list_all_message_refs(service, [], query)
+    total = len(message_refs)
+    message_ids = [ref["id"] for ref in message_refs]
+
+    _batch_modify(service, message_ids, add_label_ids=["INBOX"], progress_callback=progress_callback)
+
+    return {"moved": total, "total": total}
             service.users().messages().batchModify(userId="me", body=body).execute()
             done += len(chunk)
             if progress_callback:
