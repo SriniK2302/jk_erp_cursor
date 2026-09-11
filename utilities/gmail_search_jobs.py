@@ -183,3 +183,4 @@ def start_move_to_inbox_job(email: str) -> str:
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:
         return dict(_JOBS.get(job_id)) if job_id in _JOBS else None
+

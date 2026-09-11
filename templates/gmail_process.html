@@ -299,7 +299,7 @@
             if (statusData.error) {
               throw new Error(statusData.error);
             }
-            result = statusData.results;
+            result = statusData.results || {};
             break;
           }
           await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
@@ -377,7 +377,7 @@
             if (statusData.error) {
               throw new Error(statusData.error);
             }
-            result = statusData.results;
+            result = statusData.results || {};
             break;
           }
           await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
