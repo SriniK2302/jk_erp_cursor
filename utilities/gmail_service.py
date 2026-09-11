@@ -78,7 +78,7 @@ def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = No
             try:
                 service.users().messages().batchModify(userId="me", body=body).execute()
                 break
-                except Exception as exc:
+            except Exception as exc:
                 match = re.search(r"Invalid label:\s*([A-Za-z0-9_\-]+)", str(exc))
                 if match:
                     bad_label = match.group(1)
