@@ -292,6 +292,4 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
             progress_callback(done, total)
 
     return results
-            progress_callback(i, total)
-    return results
 
