@@ -27,15 +27,13 @@
 
     <div class="utility-field-row">
       <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
-
-    <div class="utility-field-row">
-      <label for="gp-label-select" class="muted utility-label">Folder / Label</label>
       <div class="utility-field-row__grow">
         <select id="gp-label-select" class="utility-input" disabled>
           <option value="">— Select an account first —</option>
         </select>
       </div>
     </div>
+
 
     <div class="utility-field-row">
       <label for="gp-scope-select" class="muted utility-label">Search in</label>
@@ -78,9 +76,9 @@
   (function () {
     const accountSelect = document.getElementById("gp-account-select");
     const labelSelect = document.getElementById("gp-label-select");
+    const initialLabelId = "{{ initial_label_id|escapejs }}";
 
-    accountSelect.addEventListener("change", async function () {
-      const email = accountSelect.value;
+    async function loadLabelsFor(email, preselectId) {
       labelSelect.innerHTML = "";
       labelSelect.disabled = true;
 
@@ -98,7 +96,7 @@
       labelSelect.appendChild(loadingOpt);
 
       try {
-        const res = await fetch("{% url 'gmail_process_labels_json' %}?email=" + encodeURIComponent(email), {
+        const res = await fetch("{% url 'gmail_process_labels_json' %}?email=" + encodeURIComponent(email) + "&_ts=" + Date.now(), {
           headers: { "X-Requested-With": "XMLHttpRequest" }
         });
         const data = await res.json();
@@ -114,6 +112,9 @@
           const opt = document.createElement("option");
           opt.value = label.id;
           opt.textContent = label.name;
+          if (preselectId && label.id === preselectId) {
+            opt.selected = true;
+          }
           labelSelect.appendChild(opt);
         });
         labelSelect.disabled = false;
@@ -124,7 +125,16 @@
         opt.textContent = e.message || "Failed to load labels.";
         labelSelect.appendChild(opt);
       }
+    }
+
+    accountSelect.addEventListener("change", function () {
+      loadLabelsFor(accountSelect.value, "");
     });
+
+    if (accountSelect.value) {
+      loadLabelsFor(accountSelect.value, initialLabelId);
+    }
+
 
     const scopeSelect = document.getElementById("gp-scope-select");
     const keywordInput = document.getElementById("gp-keyword-input");
