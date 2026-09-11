@@ -96,7 +96,7 @@ def start_unique_subjects_job(email: str, label_id: str, scope: str = "subject",
 
 
 
-def start_download_job(email: str, message_ids: list[str], dest_dir, source_label_id: str = "") -> str:
+def start_download_job(email: str, message_ids: list[str], dest_dir, source_label_id: str = "", target_label_name: str = "Processed") -> str:
     job_id = str(uuid.uuid4())
     with _JOBS_LOCK:
         _JOBS[job_id] = {
@@ -121,7 +121,7 @@ def start_download_job(email: str, message_ids: list[str], dest_dir, source_labe
                     job["message"] = f"Downloaded {current} of {total} email(s)…"
 
         try:
-            result = download_attachments_bulk(email, message_ids, dest_dir, source_label_id=source_label_id, progress_callback=progress)
+            result = download_attachments_bulk(email, message_ids, dest_dir, source_label_id=source_label_id, target_label_name=target_label_name, progress_callback=progress)
             with _JOBS_LOCK:
                 job = _JOBS.get(job_id)
                 if job:

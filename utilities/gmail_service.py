@@ -23,40 +23,68 @@ def list_labels(email: str) -> list[dict]:
     return [{"id": l["id"], "name": l["name"]} for l in labels]
 
 def get_or_create_label(service, name: str) -> str:
-    result = service.users().labels().list(userId="me").execute()
-    for label in result.get("labels", []):
-        if label["name"] == name:
-            return label["id"]
+    import time
+
+    def find(target_name):
+        result = service.users().labels().list(userId="me").execute()
+        for label in result.get("labels", []):
+            if label["name"].strip().lower() == target_name.strip().lower():
+                return label["id"], label["name"]
+        return None, None
+
+    label_id, _ = find(name)
+    if label_id:
+        return label_id
+
     try:
         created = service.users().labels().create(
             userId="me", body={"name": name, "labelListVisibility": "labelShow", "messageListVisibility": "show"}
         ).execute()
         return created["id"]
     except Exception as exc:
-        if "exists" in str(exc).lower() or "conflict" in str(exc).lower():
-            result = service.users().labels().list(userId="me").execute()
-            for label in result.get("labels", []):
-                if label["name"] == name:
-                    return label["id"]
-        raise
+        for attempt in range(5):
+            time.sleep(1)
+            label_id, found_name = find(name)
+            if label_id:
+                return label_id
+        raise RuntimeError(
+            f"Could not create or find label '{name}' after conflict. Original error: {exc}"
+        )
+
 
 def move_all_to_inbox(email: str, progress_callback=None) -> dict:
-    """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
-    service = get_service(email)
-    query = "-in:inbox -in:spam -in:trash"
-    message_refs = _list_all_message_refs(service, [], query)
-    total = len(message_refs)
+    def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = None,
+                      remove_label_ids: list[str] = None, progress_callback=None):
+        """Apply label changes in chunks of 1000 using batchModify (much faster than per-message calls)."""
+        total = len(message_ids)
+        body_base = {}
+        if add_label_ids:
+            body_base["addLabelIds"] = add_label_ids
+        if remove_label_ids:
+            body_base["removeLabelIds"] = remove_label_ids
 
-    moved = 0
-    for i, ref in enumerate(message_refs, start=1):
-        service.users().messages().modify(
-            userId="me", id=ref["id"], body={"addLabelIds": ["INBOX"]}
-        ).execute()
-        moved += 1
-        if progress_callback:
-            progress_callback(i, total)
+        done = 0
+        for start in range(0, total, 1000):
+            chunk = message_ids[start:start + 1000]
+            body = dict(body_base)
+            body["ids"] = chunk
+            service.users().messages().batchModify(userId="me", body=body).execute()
+            done += len(chunk)
+            if progress_callback:
+                progress_callback(done, total)
 
-    return {"moved": moved, "total": total}
+    def move_all_to_inbox(email: str, progress_callback=None) -> dict:
+        """Add INBOX label to every message not already in Inbox, excluding Spam and Trash."""
+        service = get_service(email)
+        query = "-in:inbox -in:spam -in:trash"
+        message_refs = _list_all_message_refs(service, [], query)
+        total = len(message_refs)
+        message_ids = [ref["id"] for ref in message_refs]
+
+        _batch_modify(service, message_ids, add_label_ids=["INBOX"], progress_callback=progress_callback)
+
+        return {"moved": total, "total": total}
+
 
 
 def _build_query(scope: str, keywords: str, has_attachment: bool) -> str:
@@ -98,17 +126,15 @@ def download_attachments_for_message(service, message_id: str, dest_dir) -> list
         saved.append(str(out_path))
     return saved
 
-def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, source_label_id: str = "", progress_callback=None) -> dict:
-    """Download attachments for each message id, then move it to a 'Processed' label
-    (removing source_label_id if given). Calls progress_callback(current, total) after each message.
+def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, source_label_id: str = "", target_label_name: str = "Processed", progress_callback=None) -> dict:
+    """Download attachments for each message id, then move all of them to target_label_name
+    (removing source_label_id and INBOX). Download progress calls progress_callback(current, total)
+    during the download phase; the label move is done in one batch call at the end.
     Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int, "moved": int}."""
     service = get_service(email)
     total = len(message_ids)
     downloaded_files = 0
     messages_with_no_attachment = 0
-    moved = 0
-
-    processed_label_id = get_or_create_label(service, "Processed")
 
     for i, message_id in enumerate(message_ids, start=1):
         saved = download_attachments_for_message(service, message_id, dest_dir)
@@ -116,21 +142,20 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, sour
             downloaded_files += len(saved)
         else:
             messages_with_no_attachment += 1
-
-        body = {"addLabelIds": [processed_label_id]}
-        if source_label_id:
-            body["removeLabelIds"] = [source_label_id]
-        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
-        moved += 1
-
         if progress_callback:
             progress_callback(i, total)
+
+    target_label_id = get_or_create_label(service, target_label_name)
+    remove_ids = ["INBOX"]
+    if source_label_id and source_label_id != "INBOX":
+        remove_ids.append(source_label_id)
+    _batch_modify(service, message_ids, add_label_ids=[target_label_id], remove_label_ids=remove_ids)
 
     return {
         "downloaded_files": downloaded_files,
         "messages_processed": total,
         "messages_with_no_attachment": messages_with_no_attachment,
-        "moved": moved,
+        "moved": total,
     }
 
 
