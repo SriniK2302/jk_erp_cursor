@@ -12,6 +12,7 @@ from django.views.generic import RedirectView
 from django.urls import include, path
 from admin import views as admin_views
 from . import views
+from gmails import views as gmails_views
 
 urlpatterns = [
     path(
@@ -46,9 +47,9 @@ urlpatterns = [
     path('tools-utilities/', views.tools_utilities, name='tools_utilities'),
     path('gmail-processor/', views.gmail_processor, name='gmail_processor'),
     path('gmail-processor/accounts/', views.gmail_accounts, name='gmail_accounts'),
-    path('gmail-processor/process/', views.gmail_process, name='gmail_process'),
+    path('gmail-processor/process/', gmails_views.gmail_process, name='gmail_process'),
     path('gmail-processor/process/labels/', views.gmail_process_labels_json, name='gmail_process_labels_json'),
-    path('gmail-processor/process/search/', views.gmail_process_search_json, name='gmail_process_search_json'),
+    path('gmail-processor/process/search/', gmails_views.gmail_process_search_json, name='gmail_process_search_json'),
     path('gmail-processor/process/search/status/<str:job_id>/', views.gmail_process_search_status_json, name='gmail_process_search_status_json'),
     path('gmail-processor/process/download/', views.gmail_process_download_json, name='gmail_process_download_json'),
     path('gmail-processor/process/move-to-inbox/', views.gmail_process_move_to_inbox_json,

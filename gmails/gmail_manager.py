@@ -168,3 +168,32 @@ def start_move_to_inbox_job(email: str) -> str:
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:
         return dict(_JOBS.get(job_id)) if job_id in _JOBS else None
+
+
+
+SEARCH_PREF_KEYS = [
+    "email",
+    "label_id",
+    "scope",
+    "keywords",
+    "target_label_name",
+    "has_attachment",
+]
+
+
+def save_search_preferences(session, **kwargs) -> None:
+    for key in SEARCH_PREF_KEYS:
+        if key in kwargs:
+            session[f"gmail_process_{key}"] = kwargs[key]
+
+
+def load_search_preferences(session) -> dict:
+    return {
+        "initial_email": session.get("gmail_process_email", ""),
+        "initial_label_id": session.get("gmail_process_label_id", ""),
+        "initial_scope": session.get("gmail_process_scope", "subject"),
+        "initial_keywords": session.get("gmail_process_keywords", ""),
+        "initial_target_label_name": session.get("gmail_process_target_label_name", "Processed"),
+        "initial_has_attachment": session.get("gmail_process_has_attachment", False),
+    }
+
