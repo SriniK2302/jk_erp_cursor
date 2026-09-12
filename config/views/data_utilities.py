@@ -241,9 +241,10 @@ def gmail_process_cleanup_json(request):
 @login_required
 @require_GET
 def gmail_process_search_status_json(request, job_id):
-    from utilities.gmail_search_jobs import get_job_status
+    from utilities.gmail_search_jobs import get_job_status as _get_job_status_old
+    from gmails.gmail_manager import get_job_status as _get_job_status_new
 
-    job = get_job_status(job_id)
+    job = _get_job_status_new(job_id) or _get_job_status_old(job_id)
     if not job:
         return JsonResponse({"ok": False, "message": "Job not found."}, status=404)
 
