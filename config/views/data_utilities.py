@@ -202,10 +202,11 @@ def gmail_process_move_to_inbox_json(request):
     if not email:
         return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
 
-    from utilities.gmail_search_jobs import start_move_to_inbox_job
+    from gmails.gmail_manager import start_move_to_inbox_job
 
     job_id = start_move_to_inbox_job(email)
     return JsonResponse({"ok": True, "job_id": job_id})
+
 @login_required
 @require_GET
 def gmail_process_label_count_json(request):
