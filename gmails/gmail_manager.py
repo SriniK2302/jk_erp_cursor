@@ -86,42 +86,42 @@ def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = No
                         progress_callback(done, total)
                     continue
                 raise
-        done += len(chunk)
-        if progress_callback:
-            progress_callback(done, total)
+                done += len(chunk)
+                if progress_callback:
+                    progress_callback(done, total)
 
-    def move_all_to_inbox(email: str, progress_callback=None) -> dict:
-        """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
-        service = get_service(email)
-        query = "-in:spam -in:trash"
+        def move_all_to_inbox(email: str, progress_callback=None) -> dict:
+            """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
+            service = get_service(email)
+            query = "-in:spam -in:trash"
 
-        def list_progress(count):
-            if progress_callback:
-                progress_callback(0, max(count, 1))
+            def list_progress(count):
+                if progress_callback:
+                    progress_callback(0, max(count, 1))
 
-        message_refs = []
-        page_token = None
-        while True:
-            kwargs = {"userId": "me", "labelIds": [], "maxResults": 500, "q": query}
-            if page_token:
-                kwargs["pageToken"] = page_token
-            result = service.users().messages().list(**kwargs).execute()
-            message_refs.extend(result.get("messages", []))
-            list_progress(len(message_refs))
-            page_token = result.get("nextPageToken")
-            if not page_token:
-                break
+            message_refs = []
+            page_token = None
+            while True:
+                kwargs = {"userId": "me", "labelIds": [], "maxResults": 500, "q": query}
+                if page_token:
+                    kwargs["pageToken"] = page_token
+                result = service.users().messages().list(**kwargs).execute()
+                message_refs.extend(result.get("messages", []))
+                list_progress(len(message_refs))
+                page_token = result.get("nextPageToken")
+                if not page_token:
+                    break
 
-        total = len(message_refs)
-        message_ids = [ref["id"] for ref in message_refs]
+            total = len(message_refs)
+            message_ids = [ref["id"] for ref in message_refs]
 
-        all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
-        remove_ids = [l["id"] for l in all_labels if l["id"] not in ("INBOX", "SPAM", "TRASH")]
+            all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
+            remove_ids = [l["id"] for l in all_labels if l["id"] not in ("INBOX", "SPAM", "TRASH")]
 
-        _batch_modify(service, message_ids, add_label_ids=["INBOX"], remove_label_ids=remove_ids,
-                      progress_callback=progress_callback)
+            _batch_modify(service, message_ids, add_label_ids=["INBOX"], remove_label_ids=remove_ids,
+                          progress_callback=progress_callback)
 
-        return {"moved": total, "total": total}
+            return {"moved": total, "total": total}
 
 
 
