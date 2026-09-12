@@ -93,7 +93,7 @@ def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = No
 def move_all_to_inbox(email: str, progress_callback=None) -> dict:
     """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
     service = get_service(email)
-    query = "-in:spam -in:trash"
+    query = "-in:inbox -in:spam -in:trash"
 
     def list_progress(count):
         if progress_callback:

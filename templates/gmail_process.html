@@ -53,7 +53,7 @@
       <label for="gp-keyword-input" class="muted utility-label">Keywords</label>
       <div class="utility-field-row__grow">
         <input id="gp-keyword-input" type="text" class="utility-input" placeholder="e.g. invoice+March (use + for AND)" value="{{ initial_keywords }}">
-        <input id="gp-target-label-input" type="text" class="utility-input" placeholder="Target folder for downloaded mail" value="Processed" style="margin-left: 8px;">
+        <input id="gp-target-label-input" type="text" class="utility-input" placeholder="Target folder for downloaded mail" value="{{ initial_target_label_name|default:'Processed' }}" style="margin-left: 8px;">
         <label><input type="checkbox" id="gp-has-attachment" {% if initial_has_attachment %}checked{% endif %}> Has attachment</label>
         <button type="button" id="gp-search-btn" class="button button-compact button-secondary">Search</button>
         <button type="button" id="gp-unique-subjects-btn" class="button button-compact button-secondary">Show unique subjects (label)</button>
