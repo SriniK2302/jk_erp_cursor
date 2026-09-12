@@ -348,6 +348,7 @@ def search_messages(email: str, label_id: str, scope: str, keywords: str, has_at
     service = get_service(email)
     query = _build_query(scope, keywords, has_attachment)
 
+
     label_ids = [label_id] if label_id else []
     message_refs = _list_all_message_refs(service, label_ids, query)
     total = len(message_refs)
