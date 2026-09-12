@@ -256,7 +256,13 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, sour
                 userId="me", messageId=response["id"], id=att_id
             ).execute()
             data = base64.urlsafe_b64decode(att["data"])
-            (dest_dir_path / filename).write_bytes(data)
+            safe_filename = filename.replace("/", "-").replace("\\", "-")
+            out_path = dest_dir_path / safe_filename
+            if out_path.exists():
+                stem = out_path.stem
+                suffix = out_path.suffix
+                out_path = dest_dir_path / f"{stem}_{message_id}{suffix}"
+            out_path.write_bytes(data)
             downloaded_files += 1
             saved_any = True
         if not saved_any:
