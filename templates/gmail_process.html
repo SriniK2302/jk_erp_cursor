@@ -272,9 +272,7 @@
         formData.append("email", email);
         formData.append("label_id", labelSelect.value || "");
         formData.append("target_label_name", (targetLabelInput.value || "Processed").trim());
-        messageIds.forEach(function (id) { formData.append("message_id", id); });
-
-        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        formData.append("message_ids_json", JSON.stringify(messageIds));        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
         const csrfToken = csrfMatch ? csrfMatch[1] : "";
         const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
           method: "POST",

@@ -171,8 +171,14 @@ def gmail_process_unique_subjects_json(request):
 @login_required
 @require_POST
 def gmail_process_download_json(request):
+    import json as _json
+
     email = (request.POST.get("email") or "").strip()
-    message_ids = request.POST.getlist("message_id")
+    message_ids_raw = request.POST.get("message_ids_json") or "[]"
+    try:
+        message_ids = _json.loads(message_ids_raw)
+    except Exception:
+        message_ids = []
     source_label_id = (request.POST.get("label_id") or "").strip()
     target_label_name = (request.POST.get("target_label_name") or "").strip() or "Processed"
 
