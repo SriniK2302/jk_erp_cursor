@@ -2,19 +2,20 @@
 
 This module is being rebuilt step by step, starting from lowest dependencies.
 """
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-
-from utilities.gmail_accounts_store import get_account, GMAIL_SCOPES
 import threading
 import time
 import uuid
 
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
+from utilities.gmail_accounts_store import get_account, GMAIL_SCOPES
+
 _JOBS_LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
 
-
 BATCH_SIZE = 100
+
 
 def get_service(email: str):
     account = get_account(email)
@@ -25,7 +26,6 @@ def get_service(email: str):
 
     creds = Credentials.from_authorized_user_file(account["token_path"], GMAIL_SCOPES)
     return build("gmail", "v1", credentials=creds)
-
 
 
 def _list_all_message_refs(service, label_ids: list[str], query: str = "") -> list[dict]:
@@ -45,10 +45,9 @@ def _list_all_message_refs(service, label_ids: list[str], query: str = "") -> li
     return refs
 
 
-
 def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = None,
                   remove_label_ids: list[str] = None, progress_callback=None):
-    """Apply label changes in chunks of 100 using batchModify (much faster than per-message calls).
+    """Apply label changes in chunks of BATCH_SIZE using batchModify (much faster than per-message calls).
     Automatically drops any label id Gmail rejects as invalid and retries."""
     import re
 
@@ -86,43 +85,43 @@ def _batch_modify(service, message_ids: list[str], add_label_ids: list[str] = No
                         progress_callback(done, total)
                     continue
                 raise
-                done += len(chunk)
-                if progress_callback:
-                    progress_callback(done, total)
+        done += len(chunk)
+        if progress_callback:
+            progress_callback(done, total)
 
-        def move_all_to_inbox(email: str, progress_callback=None) -> dict:
-            """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
-            service = get_service(email)
-            query = "-in:spam -in:trash"
 
-            def list_progress(count):
-                if progress_callback:
-                    progress_callback(0, max(count, 1))
+def move_all_to_inbox(email: str, progress_callback=None) -> dict:
+    """Move every message (excluding Spam/Trash) into Inbox only, removing all other labels."""
+    service = get_service(email)
+    query = "-in:spam -in:trash"
 
-            message_refs = []
-            page_token = None
-            while True:
-                kwargs = {"userId": "me", "labelIds": [], "maxResults": 500, "q": query}
-                if page_token:
-                    kwargs["pageToken"] = page_token
-                result = service.users().messages().list(**kwargs).execute()
-                message_refs.extend(result.get("messages", []))
-                list_progress(len(message_refs))
-                page_token = result.get("nextPageToken")
-                if not page_token:
-                    break
+    def list_progress(count):
+        if progress_callback:
+            progress_callback(0, max(count, 1))
 
-            total = len(message_refs)
-            message_ids = [ref["id"] for ref in message_refs]
+    message_refs = []
+    page_token = None
+    while True:
+        kwargs = {"userId": "me", "labelIds": [], "maxResults": 500, "q": query}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().messages().list(**kwargs).execute()
+        message_refs.extend(result.get("messages", []))
+        list_progress(len(message_refs))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
 
-            all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
-            remove_ids = [l["id"] for l in all_labels if l["id"] not in ("INBOX", "SPAM", "TRASH")]
+    total = len(message_refs)
+    message_ids = [ref["id"] for ref in message_refs]
 
-            _batch_modify(service, message_ids, add_label_ids=["INBOX"], remove_label_ids=remove_ids,
-                          progress_callback=progress_callback)
+    all_labels = service.users().labels().list(userId="me").execute().get("labels", [])
+    remove_ids = [l["id"] for l in all_labels if l["id"] not in ("INBOX", "SPAM", "TRASH")]
 
-            return {"moved": total, "total": total}
+    _batch_modify(service, message_ids, add_label_ids=["INBOX"], remove_label_ids=remove_ids,
+                  progress_callback=progress_callback)
 
+    return {"moved": total, "total": total}
 
 
 def start_move_to_inbox_job(email: str) -> str:
@@ -169,4 +168,3 @@ def start_move_to_inbox_job(email: str) -> str:
 def get_job_status(job_id: str) -> dict | None:
     with _JOBS_LOCK:
         return dict(_JOBS.get(job_id)) if job_id in _JOBS else None
-
