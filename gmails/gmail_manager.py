@@ -437,14 +437,26 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, sour
     remove_ids = ["INBOX"]
     if source_label_id and source_label_id != "INBOX":
         remove_ids.append(source_label_id)
-    _batch_modify(service, list(all_message_ids), add_label_ids=[target_label_id], remove_label_ids=remove_ids)
+
+    moved = 0
+    failed_moves = []
+    for message_id in all_message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me", id=message_id,
+                body={"addLabelIds": [target_label_id], "removeLabelIds": remove_ids}
+            ).execute()
+            moved += 1
+        except Exception as exc:
+            failed_moves.append({"message_id": message_id, "error": str(exc)})
 
     return {
         "downloaded_files": downloaded_files,
         "messages_processed": total,
         "messages_with_no_attachment": messages_with_no_attachment,
-        "moved": len(all_message_ids),
+        "moved": moved,
         "failed_attachments": failed_attachments,
+        "failed_moves": failed_moves,
     }
 
 
@@ -493,3 +505,33 @@ def start_download_job(email: str, message_ids: list[str], dest_dir, source_labe
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
+
+
+
+
+
+def diagnose_message_labels(email: str, scope: str, keywords: str, has_attachment: bool = False) -> list[dict]:
+    """Search across the WHOLE account (no label restriction) and report each match's
+    current label ids, subject, and date — used to trace where 'missing' mail actually is."""
+    service = get_service(email)
+    query = _build_query(scope, keywords, has_attachment)
+    message_refs = _list_all_message_refs(service, [], query)
+
+    label_lookup = {l["id"]: l["name"] for l in service.users().labels().list(userId="me").execute().get("labels", [])}
+
+    results = []
+    for ref in message_refs:
+        msg = service.users().messages().get(
+            userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject", "Date"]
+        ).execute()
+        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+        label_ids = msg.get("labelIds", [])
+        label_names = [label_lookup.get(lid, lid) for lid in label_ids]
+        results.append({
+            "id": ref["id"],
+            "subject": headers.get("Subject", "(no subject)"),
+            "date": headers.get("Date", ""),
+            "labels": label_names,
+        })
+    return results
+
