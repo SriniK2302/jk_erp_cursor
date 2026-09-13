@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from config.views.constants import MODULE_TOOLS
 from config.views.access import _has_module_access
 
@@ -53,3 +53,33 @@ def gmail_process_search_json(request):
 
     job_id = start_search_job(email, label_id, scope, keywords, has_attachment)
     return JsonResponse({"ok": True, "job_id": job_id})
+
+
+
+
+@login_required
+@require_POST
+def gmail_process_download_json(request):
+    import json as _json
+
+    email = (request.POST.get("email") or "").strip()
+    message_ids_raw = request.POST.get("message_ids_json") or "[]"
+    try:
+        message_ids = _json.loads(message_ids_raw)
+    except Exception:
+        message_ids = []
+    source_label_id = (request.POST.get("label_id") or "").strip()
+    target_label_name = (request.POST.get("target_label_name") or "").strip() or "Processed"
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+    if not message_ids:
+        return JsonResponse({"ok": False, "message": "No messages to download."}, status=400)
+
+    from pathlib import Path
+    from gmails.gmail_manager import start_download_job
+
+    dest_dir = Path.home() / "Downloads" / "gmail_processor"
+    job_id = start_download_job(email, message_ids, dest_dir, source_label_id=source_label_id, target_label_name=target_label_name)
+    return JsonResponse({"ok": True, "job_id": job_id})
+

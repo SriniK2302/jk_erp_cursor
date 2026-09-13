@@ -213,6 +213,54 @@ def _build_query(scope: str, keywords: str, has_attachment: bool) -> str:
     return " ".join(parts)
 
 
+def search_messages(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool, progress_callback=None) -> list[dict]:
+    service = get_service(email)
+    query = _build_query(scope, keywords, has_attachment)
+
+    label_ids = [label_id] if label_id else []
+    message_refs = _list_all_message_refs(service, label_ids, query)
+    total = len(message_refs)
+
+    results = []
+    done = 0
+
+    def _has_attachment_recursive(part):
+        if part.get("filename"):
+            return True
+        for sub in part.get("parts", []) or []:
+            if _has_attachment_recursive(sub):
+                return True
+        return False
+
+    def handle_response(request_id, response, exception):
+        if exception is not None:
+            return
+        headers = {h["name"]: h["value"] for h in response.get("payload", {}).get("headers", [])}
+        has_att = _has_attachment_recursive(response.get("payload", {}))
+        results.append({
+            "id": response["id"],
+            "subject": headers.get("Subject", "(no subject)"),
+            "from": headers.get("From", ""),
+            "date": headers.get("Date", ""),
+            "has_attachment": has_att,
+        })
+
+    for start in range(0, total, BATCH_SIZE):
+        chunk = message_refs[start:start + BATCH_SIZE]
+        batch = service.new_batch_http_request(callback=handle_response)
+        for ref in chunk:
+            batch.add(
+                service.users().messages().get(userId="me", id=ref["id"], format="full"),
+                request_id=ref["id"],
+            )
+        batch.execute()
+        done += len(chunk)
+        if progress_callback:
+            progress_callback(done, total)
+
+    return results
+
+
 
 def start_search_job(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool) -> str:
     job_id = str(uuid.uuid4())
@@ -253,4 +301,3 @@ def start_search_job(email: str, label_id: str, scope: str, keywords: str, has_a
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
-
