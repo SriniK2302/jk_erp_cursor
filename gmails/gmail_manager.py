@@ -468,7 +468,8 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
     return {"moved": moved, "total": total, "failed_moves": failed_moves}
 
 
-def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
+def start_download_job(email: str, message_ids: list[str], dest_dir, source_label_id: str = "",
+                        target_label_name: str = "Processed") -> str:
     job_id = str(uuid.uuid4())
     with _JOBS_LOCK:
         _JOBS[job_id] = {
@@ -491,13 +492,16 @@ def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
                     job["message"] = f"Downloaded {current} of {total} email(s)…"
 
         try:
-            result = download_attachments_only(email, message_ids, dest_dir, progress_callback=progress)
+            download_result = download_attachments_only(email, message_ids, dest_dir, progress_callback=progress)
+            move_result = move_messages_to_folder(email, message_ids, source_label_id=source_label_id,
+                                                   target_label_name=target_label_name)
+            combined = {**download_result, "moved": move_result["moved"], "failed_moves": move_result["failed_moves"]}
             with _JOBS_LOCK:
                 job = _JOBS.get(job_id)
                 if job:
                     job["done"] = True
                     job["message"] = "Done."
-                    job["result"] = result
+                    job["result"] = combined
         except Exception as exc:
             with _JOBS_LOCK:
                 job = _JOBS.get(job_id)
@@ -583,5 +587,6 @@ def diagnose_message_labels(email: str, scope: str, keywords: str, has_attachmen
             "labels": label_names,
         })
     return results
+
 
 

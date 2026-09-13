@@ -276,8 +276,11 @@
       progressText.textContent = "Starting download…";
 
       try {
+        const targetLabelInput = document.getElementById("gp-target-label-input");
         const formData = new FormData();
         formData.append("email", email);
+        formData.append("label_id", labelSelect.value || "");
+        formData.append("target_label_name", (targetLabelInput.value || "Processed").trim());
         formData.append("message_ids_json", JSON.stringify(messageIds));
         const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
         const csrfToken = csrfMatch ? csrfMatch[1] : "";
@@ -326,6 +329,15 @@
         resultsWrap.hidden = false;
         resultsWrap.innerHTML = '<p class="muted">Downloaded ' + (result.downloaded_files || 0) +
           ' file(s) from ' + (result.messages_processed || 0) + ' email(s) into your Downloads/gmail_processor folder. ' +
+          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment. ' +
+          'Moved ' + (result.moved || 0) + ' email(s) to the ' + (targetLabelInput.value || "Processed").trim() + ' label.</p>';
+
+      } catch (e) {
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
+      }
+    }
           (result.messages_with_no_attachment || 0) + ' email(s) had no attachment.</p>';
 
       } catch (e) {

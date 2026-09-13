@@ -68,6 +68,8 @@ def gmail_process_download_json(request):
         message_ids = _json.loads(message_ids_raw)
     except Exception:
         message_ids = []
+    source_label_id = (request.POST.get("label_id") or "").strip()
+    target_label_name = (request.POST.get("target_label_name") or "").strip() or "Processed"
 
     if not email:
         return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
@@ -78,7 +80,7 @@ def gmail_process_download_json(request):
     from gmails.gmail_manager import start_download_job
 
     dest_dir = Path.home() / "Downloads" / "gmail_processor"
-    job_id = start_download_job(email, message_ids, dest_dir)
+    job_id = start_download_job(email, message_ids, dest_dir, source_label_id=source_label_id, target_label_name=target_label_name)
     return JsonResponse({"ok": True, "job_id": job_id})
 
 
