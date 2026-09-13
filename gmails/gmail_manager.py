@@ -197,3 +197,60 @@ def load_search_preferences(session) -> dict:
         "initial_has_attachment": session.get("gmail_process_has_attachment", False),
     }
 
+
+
+
+def _build_query(scope: str, keywords: str, has_attachment: bool) -> str:
+    terms = [t.strip() for t in keywords.split("+") if t.strip()]
+    if scope == "subject":
+        parts = [f'subject:"{t}"' for t in terms]
+    elif scope == "from":
+        parts = [f'from:"{t}"' for t in terms]
+    else:
+        parts = [f'"{t}"' for t in terms]
+    if has_attachment:
+        parts.append("has:attachment")
+    return " ".join(parts)
+
+
+
+def start_search_job(email: str, label_id: str, scope: str, keywords: str, has_attachment: bool) -> str:
+    job_id = str(uuid.uuid4())
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            "done": False,
+            "current": 0,
+            "total": 0,
+            "message": "Starting search…",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+    def run():
+        def progress(current, total):
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = f"Fetched {current} of {total} email(s)…"
+
+        try:
+            results = search_messages(email, label_id, scope, keywords, has_attachment, progress_callback=progress)
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["message"] = "Done."
+                    job["result"] = results
+        except Exception as exc:
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
+

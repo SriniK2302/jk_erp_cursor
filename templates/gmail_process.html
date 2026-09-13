@@ -186,13 +186,16 @@
       progressText.textContent = "Starting search…";
 
       try {
+        const targetLabelInputEl = document.getElementById("gp-target-label-input");
         const params = new URLSearchParams({
           email: email,
           label_id: labelSelect.value || "",
           scope: scopeSelect.value,
           keywords: keywords,
+          target_label_name: (targetLabelInputEl.value || "Processed").trim(),
           has_attachment: hasAttachment.checked ? "1" : "0"
         });
+
         const startRes = await fetch("{% url 'gmail_process_search_json' %}?" + params.toString(), {
           headers: { "X-Requested-With": "XMLHttpRequest" }
         });

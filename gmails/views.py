@@ -49,7 +49,7 @@ def gmail_process_search_json(request):
     if not keywords:
         return JsonResponse({"ok": False, "message": "Enter at least one keyword."}, status=400)
 
-    from utilities.gmail_search_jobs import start_search_job
+    from gmails.gmail_manager import start_search_job
 
     job_id = start_search_job(email, label_id, scope, keywords, has_attachment)
     return JsonResponse({"ok": True, "job_id": job_id})
