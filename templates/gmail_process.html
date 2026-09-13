@@ -338,14 +338,6 @@
         resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
       }
     }
-          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment.</p>';
-
-      } catch (e) {
-        progressWrap.hidden = true;
-        resultsWrap.hidden = false;
-        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
-      }
-    }
 
     async function moveMessagesOnly(email, messageIds) {
       progressWrap.hidden = false;
