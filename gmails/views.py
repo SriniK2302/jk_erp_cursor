@@ -68,8 +68,6 @@ def gmail_process_download_json(request):
         message_ids = _json.loads(message_ids_raw)
     except Exception:
         message_ids = []
-    source_label_id = (request.POST.get("label_id") or "").strip()
-    target_label_name = (request.POST.get("target_label_name") or "").strip() or "Processed"
 
     if not email:
         return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
@@ -80,6 +78,31 @@ def gmail_process_download_json(request):
     from gmails.gmail_manager import start_download_job
 
     dest_dir = Path.home() / "Downloads" / "gmail_processor"
-    job_id = start_download_job(email, message_ids, dest_dir, source_label_id=source_label_id, target_label_name=target_label_name)
+    job_id = start_download_job(email, message_ids, dest_dir)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
+
+@login_required
+@require_POST
+def gmail_process_move_json(request):
+    import json as _json
+
+    email = (request.POST.get("email") or "").strip()
+    message_ids_raw = request.POST.get("message_ids_json") or "[]"
+    try:
+        message_ids = _json.loads(message_ids_raw)
+    except Exception:
+        message_ids = []
+    source_label_id = (request.POST.get("label_id") or "").strip()
+    target_label_name = (request.POST.get("target_label_name") or "").strip() or "Processed"
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+    if not message_ids:
+        return JsonResponse({"ok": False, "message": "No messages to move."}, status=400)
+
+    from gmails.gmail_manager import start_move_job
+
+    job_id = start_move_job(email, message_ids, source_label_id=source_label_id, target_label_name=target_label_name)
     return JsonResponse({"ok": True, "job_id": job_id})
 

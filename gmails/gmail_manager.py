@@ -389,13 +389,10 @@ def _expand_to_thread_ids(service, message_ids: list[str]) -> set:
     return all_message_ids
 
 
-def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, source_label_id: str = "",
-                               target_label_name: str = "Processed", progress_callback=None) -> dict:
-    """Download attachments for each message id, then move the whole conversation (thread) to
-    target_label_name, removing source_label_id and INBOX. One bad attachment or filename does
-    not stop the run - it's recorded in 'failed_attachments' instead.
+def download_attachments_only(email: str, message_ids: list[str], dest_dir, progress_callback=None) -> dict:
+    """Download attachments for each message id. Does NOT move or relabel anything.
     Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int,
-             "moved": int, "failed_attachments": list}."""
+             "failed_attachments": list}."""
     from pathlib import Path
 
     service = get_service(email)
@@ -431,7 +428,23 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, sour
         if not saved_any:
             messages_with_no_attachment += 1
 
+    return {
+        "downloaded_files": downloaded_files,
+        "messages_processed": total,
+        "messages_with_no_attachment": messages_with_no_attachment,
+        "failed_attachments": failed_attachments,
+    }
+
+
+def move_messages_to_folder(email: str, message_ids: list[str], source_label_id: str = "",
+                             target_label_name: str = "Processed", progress_callback=None) -> dict:
+    """Move the whole conversation (thread) of each message id to target_label_name,
+    removing source_label_id and INBOX. Does NOT download anything.
+    Returns {"moved": int, "total": int, "failed_moves": list}."""
+    service = get_service(email)
+
     all_message_ids = _expand_to_thread_ids(service, message_ids)
+    total = len(all_message_ids)
 
     target_label_id = get_or_create_label(service, target_label_name)
     remove_ids = ["INBOX"]
@@ -449,19 +462,13 @@ def download_attachments_bulk(email: str, message_ids: list[str], dest_dir, sour
             moved += 1
         except Exception as exc:
             failed_moves.append({"message_id": message_id, "error": str(exc)})
+        if progress_callback:
+            progress_callback(moved + len(failed_moves), total)
 
-    return {
-        "downloaded_files": downloaded_files,
-        "messages_processed": total,
-        "messages_with_no_attachment": messages_with_no_attachment,
-        "moved": moved,
-        "failed_attachments": failed_attachments,
-        "failed_moves": failed_moves,
-    }
+    return {"moved": moved, "total": total, "failed_moves": failed_moves}
 
 
-def start_download_job(email: str, message_ids: list[str], dest_dir, source_label_id: str = "",
-                        target_label_name: str = "Processed") -> str:
+def start_download_job(email: str, message_ids: list[str], dest_dir) -> str:
     job_id = str(uuid.uuid4())
     with _JOBS_LOCK:
         _JOBS[job_id] = {
@@ -484,8 +491,50 @@ def start_download_job(email: str, message_ids: list[str], dest_dir, source_labe
                     job["message"] = f"Downloaded {current} of {total} email(s)…"
 
         try:
-            result = download_attachments_bulk(
-                email, message_ids, dest_dir,
+            result = download_attachments_only(email, message_ids, dest_dir, progress_callback=progress)
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["message"] = "Done."
+                    job["result"] = result
+        except Exception as exc:
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
+
+
+def start_move_job(email: str, message_ids: list[str], source_label_id: str = "",
+                    target_label_name: str = "Processed") -> str:
+    job_id = str(uuid.uuid4())
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            "done": False,
+            "current": 0,
+            "total": 0,
+            "message": "Starting move…",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+    def run():
+        def progress(current, total):
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = f"Moved {current} of {total} email(s)…"
+
+        try:
+            result = move_messages_to_folder(
+                email, message_ids,
                 source_label_id=source_label_id,
                 target_label_name=target_label_name,
                 progress_callback=progress,
@@ -534,4 +583,5 @@ def diagnose_message_labels(email: str, scope: str, keywords: str, has_attachmen
             "labels": label_names,
         })
     return results
+
 

@@ -238,8 +238,8 @@
           return;
         }
         let html = '<h2 class="excel-import-report-heading">Matching emails (' + results.length + ')</h2>';
-        html += '<button type="button" id="gp-download-btn" class="button button-compact">' +
-          (hasAttachment.checked ? 'Download attachments' : 'Move to folder') + '</button>';
+        html += '<button type="button" id="gp-download-btn" class="button button-compact">Download attachments</button>';
+        html += '<button type="button" id="gp-move-btn" class="button button-compact button-secondary">Move to folder</button>';
         html += '<div class="table-wrap"><table class="data-grid excel-import-match-table">';
         html += "<thead><tr><th>Subject</th><th>From</th><th>Date</th><th>Attachment</th></tr></thead><tbody>";
         results.forEach(function (r) {
@@ -252,7 +252,13 @@
         const downloadBtn = document.getElementById("gp-download-btn");
         if (downloadBtn) {
           downloadBtn.addEventListener("click", function () {
-            downloadAttachments(email, results.map(function (r) { return r.id; }));
+            downloadAttachmentsOnly(email, results.map(function (r) { return r.id; }));
+          });
+        }
+        const moveBtn = document.getElementById("gp-move-btn");
+        if (moveBtn) {
+          moveBtn.addEventListener("click", function () {
+            moveMessagesOnly(email, results.map(function (r) { return r.id; }));
           });
         }
       } catch (e) {
@@ -263,19 +269,17 @@
         searchBtn.disabled = false;
       }
     });
-    async function downloadAttachments(email, messageIds) {
+    async function downloadAttachmentsOnly(email, messageIds) {
       progressWrap.hidden = false;
       resultsWrap.hidden = true;
       progressBar.style.width = "0%";
       progressText.textContent = "Starting download…";
 
       try {
-        const targetLabelInput = document.getElementById("gp-target-label-input");
         const formData = new FormData();
         formData.append("email", email);
-        formData.append("label_id", labelSelect.value || "");
-        formData.append("target_label_name", (targetLabelInput.value || "Processed").trim());
-        formData.append("message_ids_json", JSON.stringify(messageIds));        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        formData.append("message_ids_json", JSON.stringify(messageIds));
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
         const csrfToken = csrfMatch ? csrfMatch[1] : "";
         const startRes = await fetch("{% url 'gmail_process_download_json' %}", {
           method: "POST",
@@ -322,12 +326,81 @@
         resultsWrap.hidden = false;
         resultsWrap.innerHTML = '<p class="muted">Downloaded ' + (result.downloaded_files || 0) +
           ' file(s) from ' + (result.messages_processed || 0) + ' email(s) into your Downloads/gmail_processor folder. ' +
-          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment. ' +
-          'Moved ' + (result.moved || 0) + ' email(s) to the Processed label.</p>';
+          (result.messages_with_no_attachment || 0) + ' email(s) had no attachment.</p>';
 
       } catch (e) {
         progressWrap.hidden = true;
         resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
+      }
+    }
+
+    async function moveMessagesOnly(email, messageIds) {
+      progressWrap.hidden = false;
+      resultsWrap.hidden = true;
+      progressBar.style.width = "0%";
+      progressText.textContent = "Starting move…";
+
+      try {
+        const targetLabelInput = document.getElementById("gp-target-label-input");
+        const formData = new FormData();
+        formData.append("email", email);
+        formData.append("label_id", labelSelect.value || "");
+        formData.append("target_label_name", (targetLabelInput.value || "Processed").trim());
+        formData.append("message_ids_json", JSON.stringify(messageIds));
+        const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrfMatch ? csrfMatch[1] : "";
+        const startRes = await fetch("{% url 'gmail_process_move_json' %}", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRFToken": csrfToken
+          }
+        });
+
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.ok) {
+          throw new Error(startData.message || "Could not start move.");
+        }
+        const jobId = startData.job_id;
+
+        let result = null;
+        while (true) {
+          const statusUrl = "{% url 'gmail_process_search_status_json' 'JOB_ID' %}".replace("JOB_ID", jobId);
+          const statusRes = await fetch(statusUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+          const statusData = await statusRes.json();
+          if (!statusRes.ok || !statusData.ok) {
+            throw new Error(statusData.message || "Status check failed.");
+          }
+
+          const total = statusData.total || 0;
+          const current = statusData.current || 0;
+          const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+          progressBar.style.width = percent + "%";
+          progressTrack.setAttribute("aria-valuenow", String(percent));
+          progressText.textContent = statusData.message || "Working…";
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(statusData.error);
+            }
+            result = statusData.results || {};
+            break;
+          }
+          await new Promise(function (resolve) { window.setTimeout(resolve, 500); });
+        }
+
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="muted">Moved ' + (result.moved || 0) + ' of ' + (result.total || 0) + ' email(s).</p>';
+
+      } catch (e) {
+        progressWrap.hidden = true;
+        resultsWrap.hidden = false;
+        resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Move failed.") + "</p>";
+      }
+    }
         resultsWrap.innerHTML = '<p class="field-error">' + escapeHtmlCell(e.message || "Download failed.") + "</p>";
       }
     }
