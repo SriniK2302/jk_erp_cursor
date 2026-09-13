@@ -389,6 +389,7 @@ def _expand_to_thread_ids(service, message_ids: list[str]) -> set:
     return all_message_ids
 
 
+
 def download_attachments_only(email: str, message_ids: list[str], dest_dir, progress_callback=None) -> dict:
     """Download attachments for each message id. Does NOT move or relabel anything.
     Returns {"downloaded_files": int, "messages_processed": int, "messages_with_no_attachment": int,
