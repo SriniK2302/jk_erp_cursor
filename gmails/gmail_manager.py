@@ -444,13 +444,26 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
     Returns {"moved": int, "total": int, "failed_moves": list}."""
     service = get_service(email)
 
-    all_message_ids = _expand_to_thread_ids(service, message_ids)
-    total = len(all_message_ids)
+    total = len(message_ids)
+
+    all_message_ids = set(message_ids)
+    thread_ids = set()
+    for i, message_id in enumerate(message_ids, start=1):
+        msg = service.users().messages().get(userId="me", id=message_id, format="minimal").execute()
+        thread_ids.add(msg["threadId"])
+        if progress_callback:
+            progress_callback(min(i, total), total)
+
+    for thread_id in thread_ids:
+        thread = service.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
+        for m in thread.get("messages", []):
+            all_message_ids.add(m["id"])
 
     target_label_id = get_or_create_label(service, target_label_name)
     remove_ids = ["INBOX"]
     if source_label_id and source_label_id != "INBOX":
         remove_ids.append(source_label_id)
+
 
     moved = 0
     failed_moves = []
@@ -589,5 +602,83 @@ def diagnose_message_labels(email: str, scope: str, keywords: str, has_attachmen
         })
     return results
 
+
+
+def index_subjects_by_count(email: str, label_id: str, progress_callback=None) -> list[dict]:
+    """For the given label, return each unique subject with a count of how many
+    messages share it, sorted by count descending."""
+    service = get_service(email)
+    label_ids = [label_id] if label_id else []
+    message_refs = _list_all_message_refs(service, label_ids)
+    total = len(message_refs)
+
+    counts = {}
+    done = 0
+
+    def handle_response(request_id, response, exception):
+        if exception is not None:
+            return
+        headers = {h["name"]: h["value"] for h in response.get("payload", {}).get("headers", [])}
+        subject = headers.get("Subject", "(no subject)")
+        counts[subject] = counts.get(subject, 0) + 1
+
+    for start in range(0, total, BATCH_SIZE):
+        chunk = message_refs[start:start + BATCH_SIZE]
+        batch = service.new_batch_http_request(callback=handle_response)
+        for ref in chunk:
+            batch.add(
+                service.users().messages().get(userId="me", id=ref["id"], format="metadata", metadataHeaders=["Subject"]),
+                request_id=ref["id"],
+            )
+        batch.execute()
+        done += len(chunk)
+        if progress_callback:
+            progress_callback(done, total)
+
+    result = [{"subject": s, "count": c} for s, c in counts.items()]
+    result.sort(key=lambda x: x["count"], reverse=True)
+    return result
+
+
+
+def start_index_subjects_job(email: str, label_id: str) -> str:
+    job_id = str(uuid.uuid4())
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
+            "done": False,
+            "current": 0,
+            "total": 0,
+            "message": "Starting…",
+            "result": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+    def run():
+        def progress(current, total):
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["current"] = current
+                    job["total"] = total
+                    job["message"] = f"Indexed {current} of {total} email(s)…"
+
+        try:
+            result = index_subjects_by_count(email, label_id, progress_callback=progress)
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["message"] = "Done."
+                    job["result"] = result
+        except Exception as exc:
+            with _JOBS_LOCK:
+                job = _JOBS.get(job_id)
+                if job:
+                    job["done"] = True
+                    job["error"] = str(exc) or f"{type(exc).__name__} (no message)"
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
 
 

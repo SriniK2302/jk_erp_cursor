@@ -108,3 +108,19 @@ def gmail_process_move_json(request):
     job_id = start_move_job(email, message_ids, source_label_id=source_label_id, target_label_name=target_label_name)
     return JsonResponse({"ok": True, "job_id": job_id})
 
+
+
+@login_required
+@require_GET
+def gmail_process_index_subjects_json(request):
+    email = (request.GET.get("email") or "").strip()
+    label_id = (request.GET.get("label_id") or "").strip()
+
+    if not email:
+        return JsonResponse({"ok": False, "message": "No account selected."}, status=400)
+
+    from gmails.gmail_manager import start_index_subjects_job
+
+    job_id = start_index_subjects_job(email, label_id)
+    return JsonResponse({"ok": True, "job_id": job_id})
+
