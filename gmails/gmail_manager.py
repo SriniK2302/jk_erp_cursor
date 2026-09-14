@@ -481,19 +481,89 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
         remove_ids.append(source_label_id)
 
 
+    all_ids_list = list(all_message_ids)
     moved = 0
     failed_moves = []
-    for message_id in all_message_ids:
-        try:
-            service.users().messages().modify(
-                userId="me", id=message_id,
-                body={"addLabelIds": [target_label_id], "removeLabelIds": remove_ids}
-            ).execute()
-            moved += 1
-        except Exception as exc:
-            failed_moves.append({"message_id": message_id, "error": str(exc)})
+
+    for start in range(0, len(all_ids_list), BATCH_SIZE):
+        chunk = all_ids_list[start:start + BATCH_SIZE]
+        chunk_errors = {}
+
+        def handle_response(request_id, response, exception):
+            if exception is not None:
+                chunk_errors[request_id] = str(exception)
+
+        batch = service.new_batch_http_request(callback=handle_response)
+        for message_id in chunk:
+            batch.add(
+                service.users().messages().modify(
+                    userId="me", id=message_id,
+                    body={"addLabelIds": [target_label_id], "removeLabelIds": remove_ids}
+                ),
+                request_id=message_id,
+            )
+        _execute_with_backoff(batch)
+
+        to_verify = [m for m in chunk if m not in chunk_errors]
+        for message_id in chunk:
+            if message_id in chunk_errors:
+                failed_moves.append({"message_id": message_id, "error": chunk_errors[message_id]})
+
+        verify_results = {}
+        verify_errors = {}
+
+        def handle_verify(request_id, response, exception):
+            if exception is not None:
+                verify_errors[request_id] = str(exception)
+            else:
+                verify_results[request_id] = response
+
+        if to_verify:
+            verify_batch = service.new_batch_http_request(callback=handle_verify)
+            for message_id in to_verify:
+                verify_batch.add(
+                    service.users().messages().get(userId="me", id=message_id, format="minimal"),
+                    request_id=message_id,
+                )
+            _execute_with_backoff(verify_batch)
+
+        needs_retry = []
+        for message_id in to_verify:
+            if message_id in verify_errors:
+                failed_moves.append({"message_id": message_id, "error": verify_errors[message_id]})
+                continue
+            msg = verify_results.get(message_id, {})
+            if target_label_id in msg.get("labelIds", []):
+                moved += 1
+            else:
+                needs_retry.append(message_id)
+
+        if needs_retry:
+            retry_errors = {}
+
+            def handle_retry(request_id, response, exception):
+                if exception is not None:
+                    retry_errors[request_id] = str(exception)
+
+            retry_batch = service.new_batch_http_request(callback=handle_retry)
+            for message_id in needs_retry:
+                retry_batch.add(
+                    service.users().messages().modify(
+                        userId="me", id=message_id,
+                        body={"addLabelIds": [target_label_id], "removeLabelIds": remove_ids}
+                    ),
+                    request_id=message_id,
+                )
+            _execute_with_backoff(retry_batch)
+
+            for message_id in needs_retry:
+                if message_id in retry_errors:
+                    failed_moves.append({"message_id": message_id, "error": retry_errors[message_id]})
+                else:
+                    moved += 1
+
         if progress_callback:
-            progress_callback(moved + len(failed_moves), total)
+            progress_callback(min(moved + len(failed_moves), total), total)
 
     return {"moved": moved, "total": total, "failed_moves": failed_moves}
 
