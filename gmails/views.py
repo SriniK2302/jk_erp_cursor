@@ -124,3 +124,4 @@ def gmail_process_index_subjects_json(request):
     job_id = start_index_subjects_job(email, label_id)
     return JsonResponse({"ok": True, "job_id": job_id})
 
+

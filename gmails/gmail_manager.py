@@ -11,6 +11,21 @@ from googleapiclient.discovery import build
 
 from utilities.gmail_accounts_store import get_account, GMAIL_SCOPES
 
+def _execute_with_backoff(request, max_attempts: int = 6):
+    """Execute a Gmail API request, retrying with exponential backoff if rate-limited."""
+    import time as _time
+
+    for attempt in range(max_attempts):
+        try:
+            return request.execute()
+        except Exception as exc:
+            if "rateLimitExceeded" in str(exc) or "Quota exceeded" in str(exc):
+                if attempt == max_attempts - 1:
+                    raise
+                _time.sleep(2 ** attempt)
+                continue
+            raise
+
 _JOBS_LOCK = threading.Lock()
 _JOBS: dict[str, dict] = {}
 
@@ -37,7 +52,7 @@ def _list_all_message_refs(service, label_ids: list[str], query: str = "") -> li
             kwargs["q"] = query
         if page_token:
             kwargs["pageToken"] = page_token
-        result = service.users().messages().list(**kwargs).execute()
+        result = _execute_with_backoff(service.users().messages().list(**kwargs))
         refs.extend(result.get("messages", []))
         page_token = result.get("nextPageToken")
         if not page_token:
@@ -449,15 +464,16 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
     all_message_ids = set(message_ids)
     thread_ids = set()
     for i, message_id in enumerate(message_ids, start=1):
-        msg = service.users().messages().get(userId="me", id=message_id, format="minimal").execute()
+        msg = _execute_with_backoff(service.users().messages().get(userId="me", id=message_id, format="minimal"))
         thread_ids.add(msg["threadId"])
         if progress_callback:
             progress_callback(min(i, total), total)
 
     for thread_id in thread_ids:
-        thread = service.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
+        thread = _execute_with_backoff(service.users().threads().get(userId="me", id=thread_id, format="minimal"))
         for m in thread.get("messages", []):
             all_message_ids.add(m["id"])
+
 
     target_label_id = get_or_create_label(service, target_label_name)
     remove_ids = ["INBOX"]
