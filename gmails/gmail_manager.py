@@ -696,5 +696,3 @@ def start_index_subjects_job(email: str, label_id: str) -> str:
 
     threading.Thread(target=run, daemon=True).start()
     return job_id
-
-
