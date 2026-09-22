@@ -468,6 +468,7 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
         if exception is None:
             thread_ids.add(response["threadId"])
 
+    looked_up = 0
     for start in range(0, len(message_ids), BATCH_SIZE):
         chunk = message_ids[start:start + BATCH_SIZE]
         lookup_batch = service.new_batch_http_request(callback=handle_lookup)
@@ -477,6 +478,9 @@ def move_messages_to_folder(email: str, message_ids: list[str], source_label_id:
                 request_id=message_id,
             )
         _execute_with_backoff(lookup_batch)
+        looked_up += len(chunk)
+        if progress_callback:
+            progress_callback(min(looked_up, total), total)
 
     for thread_id in thread_ids:
         thread = _execute_with_backoff(service.users().threads().get(userId="me", id=thread_id, format="minimal"))
