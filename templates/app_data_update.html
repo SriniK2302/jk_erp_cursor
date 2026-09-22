@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}App Data Update · JK ERP{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="home-frame">
+    <header class="page-header">
+      <h1>App Data Update</h1>
+      <p class="muted">Maintenance data updates. Only fields with a cascade defined can be updated.</p>
+    </header>
+
+    <div class="form-grid" style="max-width:640px;">
+      <label>
+        Table
+        <input type="text" id="adu-table-search" placeholder="Search table…" autocomplete="off">
+        <select id="adu-table-select" size="8" style="width:100%;"></select>
+      </label>
+
+      <label>
+        Field
+        <select id="adu-field-select" disabled>
+          <option value="">-- select a table first --</option>
+        </select>
+      </label>
+
+      <label>
+        Old value
+        <input type="text" id="adu-old-value" disabled>
+      </label>
+
+      <label>
+        New value
+        <input type="text" id="adu-new-value" disabled>
+      </label>
+
+      <button type="button" id="adu-submit" disabled>Update</button>
+      <p id="adu-message" class="muted"></p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const tableSearch = document.getElementById("adu-table-search");
+  const tableSelect = document.getElementById("adu-table-select");
+  const fieldSelect = document.getElementById("adu-field-select");
+  const oldValue = document.getElementById("adu-old-value");
+  const newValue = document.getElementById("adu-new-value");
+  const submitBtn = document.getElementById("adu-submit");
+  const message = document.getElementById("adu-message");
+
+  function getCookie(name) {
+    const match = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+    return match ? decodeURIComponent(match[2]) : "";
+  }
+
+  function loadTables(q) {
+    fetch("{% url 'app_data_update_tables_json' %}?q=" + encodeURIComponent(q || ""))
+      .then((r) => r.json())
+      .then((data) => {
+        tableSelect.innerHTML = "";
+        data.tables.forEach((t) => {
+          const opt = document.createElement("option");
+          opt.value = t.key;
+          opt.textContent = t.label;
+          tableSelect.appendChild(opt);
+        });
+      });
+  }
+
+  function resetDownstream() {
+    fieldSelect.innerHTML = '<option value="">-- select a field --</option>';
+    fieldSelect.disabled = true;
+    oldValue.value = "";
+    newValue.value = "";
+    oldValue.disabled = true;
+    newValue.disabled = true;
+    submitBtn.disabled = true;
+    message.textContent = "";
+  }
+
+  tableSearch.addEventListener("input", () => loadTables(tableSearch.value));
+
+  tableSelect.addEventListener("change", () => {
+    resetDownstream();
+    const table = tableSelect.value;
+    if (!table) return;
+    fetch("{% url 'app_data_update_fields_json' %}?table=" + encodeURIComponent(table))
+      .then((r) => r.json())
+      .then((data) => {
+        fieldSelect.innerHTML = "";
+        if (data.fields.length === 0) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "-- no updatable fields for this table --";
+          fieldSelect.appendChild(opt);
+          fieldSelect.disabled = true;
+          return;
+        }
+        const blank = document.createElement("option");
+        blank.value = "";
+        blank.textContent = "-- select a field --";
+        fieldSelect.appendChild(blank);
+        data.fields.forEach((f) => {
+          const opt = document.createElement("option");
+          opt.value = f.name;
+          opt.textContent = f.label;
+          fieldSelect.appendChild(opt);
+        });
+        fieldSelect.disabled = false;
+      });
+  });
+
+  fieldSelect.addEventListener("change", () => {
+    const enabled = !!fieldSelect.value;
+    oldValue.disabled = !enabled;
+    newValue.disabled = !enabled;
+    submitBtn.disabled = !enabled;
+    oldValue.value = "";
+    newValue.value = "";
+    message.textContent = "";
+  });
+
+  submitBtn.addEventListener("click", () => {
+    message.textContent = "Updating…";
+    const body = new URLSearchParams({
+      table: tableSelect.value,
+      field: fieldSelect.value,
+      old_value: oldValue.value,
+      new_value: newValue.value,
+    });
+    fetch("{% url 'app_data_update_run' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      body: body.toString(),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        message.textContent = data.ok ? data.message : data.error;
+      });
+  });
+
+  loadTables("");
+})();
+</script>
+{% endblock %}

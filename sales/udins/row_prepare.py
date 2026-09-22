@@ -9,7 +9,7 @@ are filled, so a manual override always sticks.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from .certification_period_fee import maybe_apply_certification_period_fee
 from .service_fy_build import derive_service_fy, parse_udin_document_date
@@ -83,15 +83,19 @@ def prepare_udin_row(udin, *, save: bool = True) -> list[str]:
         update_fields.append("inv_tv_amount")
         changes.append(f"Inv TV amt set to {udin.inv_tv_amount}.")
 
-    if udin.inv_date is None:
+    if not udin.is_invoiced:
         doc_date = parse_udin_document_date(udin.date_of_signing_of_document or "")
         if doc_date is not None:
-            udin.inv_date = doc_date + timedelta(days=INV_DATE_DAYS_AFTER_DOC_DATE)
-            update_fields.append("inv_date")
-            changes.append(
-                f"Invoice date set to {udin.inv_date:%d-%m-%Y} "
-                f"({INV_DATE_DAYS_AFTER_DOC_DATE} days from doc date)."
-            )
+            computed_date = doc_date + timedelta(days=INV_DATE_DAYS_AFTER_DOC_DATE)
+            today = date.today()
+            new_inv_date = min(computed_date, today)
+            if udin.inv_date != new_inv_date:
+                udin.inv_date = new_inv_date
+                update_fields.append("inv_date")
+                changes.append(
+                    f"Invoice date set to {udin.inv_date:%d-%m-%Y} "
+                    f"({INV_DATE_DAYS_AFTER_DOC_DATE} days from doc date, capped to system date)."
+                )
 
     if save and update_fields and udin.pk:
         udin.save(update_fields=list(dict.fromkeys(update_fields + ["updated_on"])))

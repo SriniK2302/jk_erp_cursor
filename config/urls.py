@@ -31,6 +31,26 @@ urlpatterns = [
     path('invoices/', include('sales.invoices.urls')),
     path('setup/', views.setup, name='setup'),
     path(
+        'app-data-update/',
+        views.app_data_update,
+        name='app_data_update',
+    ),
+    path(
+        'app-data-update/tables/',
+        views.app_data_update_tables_json,
+        name='app_data_update_tables_json',
+    ),
+    path(
+        'app-data-update/fields/',
+        views.app_data_update_fields_json,
+        name='app_data_update_fields_json',
+    ),
+    path(
+        'app-data-update/run/',
+        views.app_data_update_run,
+        name='app_data_update_run',
+    ),
+    path(
         'setup/server/',
         views.setup_server_environment,
         name='setup_server_environment',

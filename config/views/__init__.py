@@ -1,6 +1,12 @@
 """Config views package — re-exports for URLconf and external imports."""
 
 from .access import _engagement_queryset_for_user, _has_module_access
+from .app_data_update import (
+    app_data_update,
+    app_data_update_fields_json,
+    app_data_update_run,
+    app_data_update_tables_json,
+)
 from .constants import MODULE_ENGAGEMENTS, MODULE_SETUP, MODULE_TOOLS
 from .data_utilities import (
     create_table_run,

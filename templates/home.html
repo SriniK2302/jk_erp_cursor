@@ -27,6 +27,10 @@
             <span class="tile-title">Admin</span>
             <span class="tile-subtitle">Manage users and roles</span>
           </a>
+          <a class="tile-link" href="{% url 'app_data_update' %}">
+            <span class="tile-title">App Data Update</span>
+            <span class="tile-subtitle">Maintenance data updates</span>
+          </a>
         {% endif %}
         {% if can_use_setup %}
           <a class="tile-link" href="{% url 'setup' %}">

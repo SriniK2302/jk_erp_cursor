@@ -49,6 +49,7 @@ class Client(models.Model):
     client_name = models.CharField(max_length=150)
     client_short_name = models.CharField(max_length=60)
     client_code = models.CharField(max_length=4, unique=True)
+    old_code = models.CharField(max_length=4, blank=True, default="", db_index=True)
     classification = models.ForeignKey(
         ClientClassification,
         on_delete=models.PROTECT,
